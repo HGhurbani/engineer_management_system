@@ -672,7 +672,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         route: '/admin/projects',
       ),
       _ManagementItem(
-        title: 'الحضور والانصراف',
+        title: 'كشف حضور',
         subtitle: 'متابعة حضور الموظفين',
         icon: Icons.access_time_filled_rounded,
         color: const Color(0xFF8B5CF6),

@@ -1,21 +1,44 @@
+// lib/pages/admin/admin_engineers_page.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-// Constants for consistent styling and text (يمكنك وضعها في ملف منفصل)
+// Constants for consistent styling, aligned with the admin dashboard's style.
 class AppConstants {
-  static const Color primaryColor = Color(0xFF0056D8); // أزرق داكن احترافي
-  static const Color accentColor = Color(0xFF42A5F5); // أزرق فاتح مميز
-  static const Color cardColor = Colors.white; // لون البطاقات
-  static const Color backgroundColor = Color(0xFFF0F2F5); // لون خلفية فاتح جداً
-  static const Color textColor = Color(0xFF333333); // لون النص الأساسي
-  static const Color secondaryTextColor = Color(0xFF666666); // لون نص ثانوي
-  static const Color errorColor = Color(0xFFE53935); // أحمر للأخطاء
-  static const Color deleteColor = Colors.redAccent; // لون لزر الحذف
+  // Primary colors
+  static const Color primaryColor = Color(0xFF2563EB); // Modern blue
+  static const Color primaryLight = Color(0xFF3B82F6); // Lighter blue
 
-  static const double padding = 20.0;
-  static const double borderRadius = 12.0;
+  // Status and feedback colors
+  static const Color successColor = Color(0xFF10B981); // Emerald green
+  static const Color warningColor = Color(0xFFF59E0B); // Amber
+  static const Color errorColor = Color(0xFFEF4444); // Red
+  static const Color infoColor = Color(0xFF3B82F6); // Blue
+
+  // UI element colors
+  static const Color cardColor = Colors.white;
+  static const Color backgroundColor = Color(0xFFF8FAFC); // Soft background
+  static const Color deleteColor = errorColor;
+
+  // Text colors
+  static const Color textPrimary = Color(0xFF1F2937); // Dark gray
+  static const Color textSecondary = Color(0xFF6B7280); // Medium gray
+
+  // Spacing and dimensions
+  static const double paddingLarge = 24.0;
+  static const double paddingMedium = 16.0;
+  static const double borderRadius = 16.0;
   static const double itemSpacing = 16.0;
+
+  // Shadows for depth
+  static const List<BoxShadow> cardShadow = [
+    BoxShadow(
+      color: Color(0x0A000000),
+      blurRadius: 10,
+      offset: Offset(0, 4),
+    ),
+  ];
 }
 
 class AdminEngineersPage extends StatefulWidget {
@@ -26,24 +49,39 @@ class AdminEngineersPage extends StatefulWidget {
 }
 
 class _AdminEngineersPageState extends State<AdminEngineersPage> {
-  // دالة لحذف المهندس من Firestore و Firebase Auth
+  /// Deletes an engineer from Firestore.
+  ///
+  /// IMPORTANT: Deleting a user from Firebase Authentication is a sensitive operation
+  /// and typically requires admin privileges not directly available in client-side code
+  /// for deleting *other* users. This function only deletes the user's record from
+  /// Firestore. True deletion from Firebase Auth should be handled via a backend
+  /// mechanism (e.g., Cloud Functions with Admin SDK) for security and proper execution.
   Future<void> _deleteEngineer(String uid, String email) async {
     bool? confirm = await showDialog(
       context: context,
       builder: (context) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+          ),
           title: const Text('تأكيد الحذف'),
-          content: Text('هل أنت متأكد من رغبتك في حذف المهندس $email؟'),
+          content: Text('هل أنت متأكد من رغبتك في حذف المهندس $email؟ هذا الإجراء سيقوم فقط بإزالة بياناته من قاعدة بيانات التطبيق وليس من نظام المصادقة.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('إلغاء'),
+              child: const Text('إلغاء', style: TextStyle(color: AppConstants.textSecondary)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.deleteColor),
-              child: const Text('حذف', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.deleteColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+                ),
+              ),
+              child: const Text('حذف'),
             ),
           ],
         ),
@@ -52,41 +90,21 @@ class _AdminEngineersPageState extends State<AdminEngineersPage> {
 
     if (confirm == true) {
       try {
-        // حذف المستند من Firestore
         await FirebaseFirestore.instance.collection('users').doc(uid).delete();
-
-        // يجب عليك أيضاً حذف المستخدم من Firebase Authentication.
-        // هذا يتطلب صلاحيات Admin SDK إذا كنت تحذف من جانب الخادم،
-        // أو قد يكون صعباً إذا كنت تحذف من جانب العميل بسبب قيود الأمان (خاصة إذا لم يكن المستخدم الحالي هو المستخدم المحذوف).
-        // مثال على محاولة حذف المستخدم من العميل (قد تفشل إذا لم يكن لديك صلاحيات كافية):
-        // User? userToDelete = await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: "tempPassword"); // هذا ليس عملياً
-        // if (userToDelete != null) await userToDelete.delete();
-        // **الأفضل: قم بتنفيذ حذف المستخدم من Firebase Auth باستخدام Cloud Functions أو Admin SDK على الخادم.**
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تم حذف المهندس $email بنجاح.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        _showFeedbackSnackBar(context, 'تم حذف المهندس $email من قاعدة البيانات.', isError: false);
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('فشل حذف المهندس: $e'),
-            backgroundColor: AppConstants.errorColor,
-          ),
-        );
+        _showFeedbackSnackBar(context, 'فشل حذف المهندس: $e', isError: true);
       }
     }
   }
 
-  // دالة لعرض نافذة إضافة مهندس جديد
-  Future<void> _addEngineerDialog(BuildContext context) async {
+  /// Displays the dialog for adding a new engineer.
+  Future<void> _showAddEngineerDialog() async {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
-    final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-    bool isLoading = false; // حالة تحميل داخل الـ dialog
+    final formKey = GlobalKey<FormState>();
+    bool isLoading = false;
 
     await showDialog(
       context: context,
@@ -103,50 +121,42 @@ class _AdminEngineersPageState extends State<AdminEngineersPage> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: AppConstants.primaryColor,
+                  color: AppConstants.textPrimary,
+                  fontSize: 22,
                 ),
               ),
               content: SingleChildScrollView(
                 child: Form(
-                  key: _formKey,
+                  key: formKey,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      TextFormField(
+                      _buildStyledTextField(
                         controller: nameController,
-                        decoration: _inputDecoration('الاسم الكامل', Icons.person_outline),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'الرجاء إدخال الاسم.';
-                          }
-                          return null;
-                        },
+                        labelText: 'الاسم الكامل للمهندس',
+                        icon: Icons.engineering_outlined,
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
-                      TextFormField(
+                      _buildStyledTextField(
                         controller: emailController,
+                        labelText: 'البريد الإلكتروني',
+                        icon: Icons.email_outlined,
                         keyboardType: TextInputType.emailAddress,
-                        decoration: _inputDecoration('البريد الإلكتروني', Icons.email_outlined),
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'الرجاء إدخال البريد الإلكتروني.';
-                          }
-                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                          if (value != null && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
                             return 'صيغة بريد إلكتروني غير صحيحة.';
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
-                      TextFormField(
+                      _buildStyledTextField(
                         controller: passwordController,
+                        labelText: 'كلمة المرور',
+                        icon: Icons.lock_outline,
                         obscureText: true,
-                        decoration: _inputDecoration('كلمة المرور', Icons.lock_outline),
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'الرجاء إدخال كلمة المرور.';
-                          }
-                          if (value.length < 6) {
+                          if (value != null && value.length < 6) {
                             return 'يجب أن تكون كلمة المرور 6 أحرف على الأقل.';
                           }
                           return null;
@@ -156,67 +166,47 @@ class _AdminEngineersPageState extends State<AdminEngineersPage> {
                   ),
                 ),
               ),
+              actionsAlignment: MainAxisAlignment.center,
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('إلغاء', style: TextStyle(color: AppConstants.secondaryTextColor)),
+                  child: const Text('إلغاء', style: TextStyle(color: AppConstants.textSecondary)),
                 ),
-                ElevatedButton(
-                  onPressed: isLoading
-                      ? null
-                      : () async {
-                    if (!_formKey.currentState!.validate()) return;
+                const SizedBox(width: AppConstants.itemSpacing / 2),
+                ElevatedButton.icon(
+                  onPressed: isLoading ? null : () async {
+                    if (!formKey.currentState!.validate()) return;
 
-                    setDialogState(() {
-                      isLoading = true;
-                    });
+                    setDialogState(() => isLoading = true);
 
                     try {
-                      // إنشاء المستخدم في Firebase Authentication
-                      final userCred = await FirebaseAuth.instance
-                          .createUserWithEmailAndPassword(
+                      final userCred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
                         email: emailController.text.trim(),
                         password: passwordController.text.trim(),
                       );
 
-                      // إضافة بيانات المستخدم إلى Firestore
-                      await FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(userCred.user!.uid)
-                          .set({
+                      await FirebaseFirestore.instance.collection('users').doc(userCred.user!.uid).set({
                         'uid': userCred.user!.uid,
                         'email': emailController.text.trim(),
                         'name': nameController.text.trim(),
-                        'role': 'engineer',
+                        'role': 'engineer', // Set role to 'engineer'
                         'createdAt': FieldValue.serverTimestamp(),
                       });
 
-                      Navigator.pop(dialogContext); // إغلاق الـ dialog
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('تم إضافة المهندس بنجاح.'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
+                      Navigator.pop(dialogContext);
+                      _showFeedbackSnackBar(context, 'تم إضافة المهندس بنجاح.', isError: false);
                     } on FirebaseAuthException catch (e) {
-                      setDialogState(() {
-                        isLoading = false; // توقف التحميل عند الخطأ
-                      });
-                      _showErrorSnackBar(context, _getFirebaseErrorMessage(e.code));
+                      _showFeedbackSnackBar(context, _getFirebaseErrorMessage(e.code), isError: true);
+                      Navigator.pop(dialogContext);
                     } catch (e) {
-                      setDialogState(() {
-                        isLoading = false; // توقف التحميل عند الخطأ
-                      });
-                      _showErrorSnackBar(context, 'فشل الإضافة: $e');
+                      _showFeedbackSnackBar(context, 'فشل الإضافة: $e', isError: true);
+                      Navigator.pop(dialogContext);
                     }
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConstants.primaryColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
-                    ),
-                  ),
-                  child: isLoading
+                  icon: isLoading
+                      ? const SizedBox.shrink()
+                      : const Icon(Icons.add_circle_outline, color: Colors.white),
+                  label: isLoading
                       ? const SizedBox(
                     width: 20,
                     height: 20,
@@ -225,7 +215,13 @@ class _AdminEngineersPageState extends State<AdminEngineersPage> {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
-                      : const Text('إضافة', style: TextStyle(color: Colors.white)),
+                      : const Text('إضافة مهندس', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.primaryColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -235,81 +231,17 @@ class _AdminEngineersPageState extends State<AdminEngineersPage> {
     );
   }
 
-  // دالة مساعدة لإنشاء InputDecoration موحد
-  InputDecoration _inputDecoration(String labelText, IconData icon) {
-    return InputDecoration(
-      labelText: labelText,
-      labelStyle: const TextStyle(color: AppConstants.secondaryTextColor),
-      prefixIcon: Icon(icon, color: AppConstants.primaryColor),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        borderSide: const BorderSide(color: AppConstants.accentColor, width: 1.5),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        borderSide: const BorderSide(color: AppConstants.errorColor, width: 1),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        borderSide: const BorderSide(color: AppConstants.errorColor, width: 2),
-      ),
-      filled: true,
-      fillColor: AppConstants.cardColor,
-      contentPadding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 16.0),
-    );
-  }
-
-  // دالة مساعدة لعرض SnackBar للأخطاء
-  void _showErrorSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppConstants.errorColor,
-      ),
-    );
-  }
-
-  // دالة مساعدة للحصول على رسائل خطأ Firebase
-  String _getFirebaseErrorMessage(String errorCode) {
-    switch (errorCode) {
-      case 'email-already-in-use':
-        return 'البريد الإلكتروني مستخدم بالفعل لحساب آخر.';
-      case 'invalid-email':
-        return 'صيغة البريد الإلكتروني غير صحيحة.';
-      case 'weak-password':
-        return 'كلمة المرور ضعيفة جداً.';
-      default:
-        return 'حدث خطأ: $errorCode';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppConstants.backgroundColor,
-        appBar: AppBar(
-          title: const Text(
-            'إدارة المهندسين',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 24,
-            ),
-          ),
-          backgroundColor: AppConstants.primaryColor,
-          elevation: 4,
-          centerTitle: true,
-        ),
+        appBar: _buildAppBar(),
         body: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('users')
-              .where('role', isEqualTo: 'engineer')
+              .where('role', isEqualTo: 'engineer') // Filter for engineers
               .orderBy('createdAt', descending: true)
               .snapshots(),
           builder: (context, snapshot) {
@@ -317,114 +249,238 @@ class _AdminEngineersPageState extends State<AdminEngineersPage> {
               return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
             }
             if (snapshot.hasError) {
-              return Center(
-                child: Text(
-                  'حدث خطأ: ${snapshot.error}',
-                  style: TextStyle(color: AppConstants.errorColor, fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-              );
+              return _buildErrorState('حدث خطأ: ${snapshot.error}');
             }
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.engineering, size: 80, color: AppConstants.secondaryTextColor.withOpacity(0.5)),
-                    const SizedBox(height: AppConstants.itemSpacing),
-                    Text(
-                      'لا يوجد مهندسون مسجلون حتى الآن.',
-                      style: TextStyle(fontSize: 18, color: AppConstants.secondaryTextColor),
-                    ),
-                  ],
-                ),
-              );
+              return _buildEmptyState();
             }
 
             final engineers = snapshot.data!.docs;
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(AppConstants.padding / 2),
-              itemCount: engineers.length,
-              itemBuilder: (context, index) {
-                final eng = engineers[index];
-                final data = eng.data() as Map<String, dynamic>; // Cast to Map<String, dynamic>
-                final name = data['name'] as String? ?? 'اسم غير متوفر';
-                final email = data['email'] as String? ?? 'بريد غير متوفر';
-                final uid = eng.id; // UID هو معرف المستند
-
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                        vertical: 8, horizontal: 16),
-                    leading: CircleAvatar(
-                      backgroundColor: AppConstants.accentColor.withOpacity(0.2),
-                      child: Icon(Icons.person, color: AppConstants.primaryColor),
-                    ),
-                    title: Text(
-                      name,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppConstants.textColor,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      email,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppConstants.secondaryTextColor,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // يمكنك إضافة زر للتعديل هنا
-                        // IconButton(
-                        //   icon: const Icon(Icons.edit, color: Colors.blue),
-                        //   onPressed: () {
-                        //     // TODO: Implement edit functionality
-                        //   },
-                        // ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: AppConstants.deleteColor),
-                          onPressed: () async {
-                            await _deleteEngineer(uid, email);
-                          },
-                        ),
-                      ],
-                    ),
-                    onTap: () {
-                      // يمكنك الانتقال إلى صفحة تفاصيل المهندس
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('تفاصيل المهندس: $name')),
-                      );
-                    },
-                  ),
-                );
-              },
-            );
+            return _buildEngineersList(engineers);
           },
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _addEngineerDialog(context),
-          backgroundColor: AppConstants.primaryColor,
-          icon: const Icon(Icons.person_add, color: Colors.white),
-          label: const Text(
-            'إضافة مهندس',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          tooltip: 'إضافة مهندس جديد',
-        ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat, // لتوسيط الزر
+        floatingActionButton: _buildFloatingActionButton(),
       ),
     );
+  }
+
+  /// Builds the main application bar.
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: const Text(
+        'إدارة المهندسين',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          fontSize: 22,
+        ),
+      ),
+      backgroundColor: AppConstants.primaryColor,
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppConstants.primaryColor, AppConstants.primaryLight],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+      ),
+      elevation: 4,
+      centerTitle: true,
+    );
+  }
+
+  /// Builds the list of engineer cards.
+  Widget _buildEngineersList(List<QueryDocumentSnapshot> engineers) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      itemCount: engineers.length,
+      itemBuilder: (context, index) {
+        final engineer = engineers[index];
+        final data = engineer.data() as Map<String, dynamic>;
+        final name = data['name'] ?? 'اسم غير متوفر';
+        final email = data['email'] ?? 'بريد غير متوفر';
+        final uid = engineer.id;
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
+          elevation: 2,
+          shadowColor: AppConstants.primaryColor.withOpacity(0.1),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppConstants.paddingMedium),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: AppConstants.primaryLight.withOpacity(0.15),
+                  // Changed icon for engineers
+                  child: const Icon(Icons.engineering_outlined, size: 30, color: AppConstants.primaryColor),
+                ),
+                const SizedBox(width: AppConstants.itemSpacing),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppConstants.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        email,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppConstants.textSecondary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: AppConstants.deleteColor),
+                  onPressed: () => _deleteEngineer(uid, email),
+                  tooltip: 'حذف المهندس',
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Builds the floating action button for adding new engineers.
+  Widget _buildFloatingActionButton() {
+    return FloatingActionButton.extended(
+      onPressed: _showAddEngineerDialog,
+      backgroundColor: AppConstants.primaryColor,
+      icon: const Icon(Icons.add, color: Colors.white),
+      label: const Text(
+        'إضافة مهندس', // Changed label
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+      ),
+      tooltip: 'إضافة مهندس جديد',
+    );
+  }
+
+  /// Builds a widget to display when there's an error fetching data.
+  Widget _buildErrorState(String errorMessage) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppConstants.paddingLarge),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off, size: 80, color: AppConstants.textSecondary),
+            const SizedBox(height: AppConstants.itemSpacing),
+            const Text(
+              'عذراً، حدث خطأ',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              errorMessage,
+              style: const TextStyle(fontSize: 16, color: AppConstants.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Builds a widget to display when there are no engineers.
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Changed icon for engineers
+          Icon(Icons.engineering_outlined, size: 100, color: AppConstants.textSecondary.withOpacity(0.5)),
+          const SizedBox(height: AppConstants.itemSpacing),
+          const Text(
+            'لا يوجد مهندسون بعد', // Changed text
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'انقر على زر "إضافة مهندس" لبدء الإضافة.', // Changed text
+            style: TextStyle(fontSize: 16, color: AppConstants.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Creates a consistently styled text field for dialogs.
+  Widget _buildStyledTextField({
+    required TextEditingController controller,
+    required String labelText,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    bool obscureText = false,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      decoration: InputDecoration(
+        labelText: labelText,
+        prefixIcon: Icon(icon, color: AppConstants.primaryColor),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: const BorderSide(color: AppConstants.textSecondary, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
+        ),
+      ),
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'هذا الحقل مطلوب.';
+        }
+        if (validator != null) {
+          return validator(value);
+        }
+        return null;
+      },
+    );
+  }
+
+  /// Shows a feedback SnackBar (for success or error).
+  void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AppConstants.errorColor : AppConstants.successColor,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  /// Translates Firebase Auth error codes into Arabic.
+  String _getFirebaseErrorMessage(String errorCode) {
+    switch (errorCode) {
+      case 'email-already-in-use':
+        return 'البريد الإلكتروني مستخدم بالفعل.';
+      case 'invalid-email':
+        return 'صيغة البريد الإلكتروني غير صحيحة.';
+      case 'weak-password':
+        return 'كلمة المرور ضعيفة جداً.';
+      default:
+        return 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.';
+    }
   }
 }

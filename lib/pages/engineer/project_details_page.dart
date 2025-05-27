@@ -1,30 +1,40 @@
+// lib/pages/engineer/project_details_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // لتحديد دور المستخدم
-import 'package:image_picker/image_picker.dart'; // لالتقاط الصور
-import 'dart:io'; // للتعامل مع File
-import 'package:http/http.dart' as http; // لرفع الصور
-import 'dart:convert'; // لتحويل JSON
-import 'package:url_launcher/url_launcher.dart'; // لفتح روابط الواتساب والبريد
-import 'package:share_plus/share_plus.dart'; // للمشاركة
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:ui' as ui; // For TextDirection
 
-// Constants for consistent styling and text (يمكنك وضعها في ملف منفصل)
+// Constants for consistent styling, aligned with the admin dashboard's style.
 class AppConstants {
-  static const Color primaryColor = Color(0xFF0056D8); // أزرق داكن احترافي
-  static const Color accentColor = Color(0xFF42A5F5); // أزرق فاتح مميز
-  static const Color cardColor = Colors.white; // لون البطاقات
-  static const Color backgroundColor = Color(0xFFF0F2F5); // لون خلفية فاتح جداً
-  static const Color textColor = Color(0xFF333333); // لون النص الأساسي
-  static const Color secondaryTextColor = Color(0xFF666666); // لون نص ثانوي
-  static const Color errorColor = Color(0xFFE53935); // أحمر للأخطاء
-  static const Color successColor = Colors.green; // لون للنجاح
-  static const Color deleteColor = Colors.redAccent; // لون لزر الحذف
-  static const Color warningColor = Colors.orange; // لون للتحذير
-  static const Color infoColor = Color(0xFF00BCD4); // لون للمعلومات (أزرق فاتح)
-
-  static const double padding = 20.0;
-  static const double borderRadius = 12.0;
+  static const Color primaryColor = Color(0xFF2563EB);
+  static const Color primaryLight = Color(0xFF3B82F6);
+  static const Color successColor = Color(0xFF10B981);
+  static const Color warningColor = Color(0xFFF59E0B);
+  static const Color errorColor = Color(0xFFEF4444);
+  static const Color infoColor = Color(0xFF3B82F6);
+  static const Color cardColor = Colors.white;
+  static const Color backgroundColor = Color(0xFFF8FAFC);
+  static const Color deleteColor = errorColor;
+  static const Color textPrimary = Color(0xFF1F2937);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const double paddingLarge = 24.0;
+  static const double paddingMedium = 16.0;
+  static const double paddingSmall = 8.0;
+  static const double borderRadius = 16.0;
   static const double itemSpacing = 16.0;
+  static const List<BoxShadow> cardShadow = [
+    BoxShadow(
+        color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 4)),
+  ];
+  // URL for the PHP script to upload images
+  static const String UPLOAD_URL = 'https://creditphoneqatar.com/eng-app/upload_image.php';
 }
 
 class ProjectDetailsPage extends StatefulWidget {
@@ -37,25 +47,29 @@ class ProjectDetailsPage extends StatefulWidget {
 
 class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
   String? _currentUserRole;
-  Key _projectFutureBuilderKey = UniqueKey(); // لتحديث واجهة المستخدم بعد التعديل
-  static const String UPLOAD_URL = 'https://creditphoneqatar.com/eng-app/upload_image.php'; // URL الخاص بسكريبت PHP
+  Key _projectFutureBuilderKey = UniqueKey();
+  bool _isPageLoading = true;
 
-  // NEW: Add GlobalKeys for forms in dialogs
-  final GlobalKey<FormState> _updatePhaseFormKey = GlobalKey<FormState>();
-  final GlobalKey<FormState> _updateSubPhaseFormKey = GlobalKey<FormState>();
-
+  final GlobalKey<FormState> _updatePhaseFormKey = GlobalKey<FormState>(); //
+  final GlobalKey<FormState> _updateSubPhaseFormKey = GlobalKey<FormState>(); //
 
   @override
   void initState() {
     super.initState();
-    _fetchCurrentUserRole();
+    _fetchCurrentUserRole().then((_) {
+      if (mounted) {
+        setState(() {
+          _isPageLoading = false;
+        });
+      }
+    });
   }
 
-  Future<void> _fetchCurrentUserRole() async {
+  Future<void> _fetchCurrentUserRole() async { //
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
+      if (userDoc.exists && mounted) {
         setState(() {
           _currentUserRole = userDoc.data()?['role'] as String?;
         });
@@ -63,23 +77,74 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
     }
   }
 
-  // NEW: Function to send notifications (copied from AdminProjectDetailsPage)
-  Future<void> _sendNotification({
+  void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        backgroundColor: isError ? AppConstants.errorColor : AppConstants.successColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
+        margin: const EdgeInsets.all(AppConstants.paddingMedium),
+      ),
+    );
+  }
+
+  Widget _buildStyledTextField({
+    required TextEditingController controller,
+    required String labelText,
+    required IconData icon,
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+    bool enabled = true,
+  }) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      enabled: enabled,
+      decoration: InputDecoration(
+        labelText: labelText,
+        labelStyle: const TextStyle(color: AppConstants.textSecondary),
+        prefixIcon: Icon(icon, color: AppConstants.primaryColor),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: BorderSide(color: AppConstants.textSecondary.withOpacity(0.5), width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
+        ),
+        filled: true,
+        fillColor: enabled ? AppConstants.cardColor : AppConstants.backgroundColor.withOpacity(0.7),
+        contentPadding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 16.0),
+      ),
+      validator: (value) {
+        if (enabled && (value == null || value.isEmpty)) { // Only validate if enabled and empty
+          if (labelText.contains("ملاحظات")) return null; // Notes can be empty
+          return 'هذا الحقل مطلوب.';
+        }
+        return validator?.call(value);
+      },
+    );
+  }
+
+  Future<void> _sendNotification({ //
     required String projectId,
     required String projectName,
     required String phaseName,
     required String phaseDocId,
-    required String notificationType, // 'engineer_assignment', 'phase_completed_admin', 'phase_completed_client', 'subphase_completed_admin', 'subphase_completed_client'
-    String? recipientUid, // Engineer or Client UID
+    required String notificationType,
+    String? recipientUid,
   }) async {
     try {
       final notificationCollection = FirebaseFirestore.instance.collection('notifications');
-
       final currentUser = FirebaseAuth.instance.currentUser;
-      String senderName = "النظام"; // Default
+      String senderName = "النظام";
       if (currentUser != null) {
         final senderDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
-        senderName = senderDoc.data()?['name'] ?? 'مهندس'; // Engineer is sender in this context
+        senderName = senderDoc.data()?['name'] ?? 'مهندس';
       }
 
       String title = '';
@@ -90,7 +155,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
         case 'phase_completed_admin':
           title = 'تحديث مشروع: مرحلة مكتملة';
           body = 'المرحلة "$phaseName" في مشروع "$projectName" أصبحت مكتملة بواسطة $senderName.';
-          // Get all admins to notify
           final adminsSnapshot = await FirebaseFirestore.instance.collection('users').where('role', isEqualTo: 'admin').get();
           for (var adminDoc in adminsSnapshot.docs) {
             targetUserIds.add(adminDoc.id);
@@ -104,7 +168,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
         case 'subphase_completed_admin':
           title = 'تحديث مشروع: مرحلة فرعية مكتملة';
           body = 'المرحلة الفرعية "$phaseName" في مشروع "$projectName" أصبحت مكتملة بواسطة $senderName.';
-          // Get all admins to notify
           final adminsSnapshot = await FirebaseFirestore.instance.collection('users').where('role', isEqualTo: 'admin').get();
           for (var adminDoc in adminsSnapshot.docs) {
             targetUserIds.add(adminDoc.id);
@@ -115,398 +178,179 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
           body = 'المرحلة الفرعية "$phaseName" في مشروع "$projectName" أصبحت مكتملة. يمكنك الآن مراجعتها.';
           if (recipientUid != null) targetUserIds.add(recipientUid);
           break;
-        default:
-          return; // Do nothing for unknown types
       }
 
       for (String userId in targetUserIds) {
         await notificationCollection.add({
-          'userId': userId,
-          'projectId': projectId,
-          'phaseDocId': phaseDocId,
-          'title': title,
-          'body': body,
-          'type': notificationType,
-          'isRead': false,
-          'timestamp': FieldValue.serverTimestamp(),
-          'senderName': senderName,
+          'userId': userId, 'projectId': projectId, 'phaseDocId': phaseDocId, 'title': title, 'body': body,
+          'type': notificationType, 'isRead': false, 'timestamp': FieldValue.serverTimestamp(), 'senderName': senderName,
         });
       }
-      print('Notification sent: $notificationType to $targetUserIds');
     } catch (e) {
-      print('Error sending notification: $e');
-      _showErrorSnackBar(context, 'فشل إرسال الإشعار: $e');
+      if (mounted) _showFeedbackSnackBar(context, 'فشل إرسال الإشعار: $e', isError: true);
     }
   }
 
-  // ----------------------------------------------------
-  // دالة تحديث المرحلة الرئيسية (خاصة بالمهندس)
-  // ----------------------------------------------------
-  Future<void> _updatePhase(
-      String phaseDocId, Map<String, dynamic> currentData) async {
+  Future<void> _updateProjectLastCompletedPhaseName() async { //
+    try {
+      final projectPhases = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).collection('phases').orderBy('number', descending: true).get();
+      String lastCompletedPhaseName = 'لا توجد مراحل مكتملة بعد';
+      for (var phase in projectPhases.docs) {
+        final data = phase.data();
+        if (data['completed'] == true) {
+          lastCompletedPhaseName = data['name'] ?? 'مرحلة مكتملة';
+          // No break, find the highest numbered completed phase by iterating through all
+        }
+      }
+      await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).update({'lastCompletedPhaseName': lastCompletedPhaseName});
+      if (mounted) setState(() => _projectFutureBuilderKey = UniqueKey());
+    } catch (e) {
+      if (mounted) _showFeedbackSnackBar(context, 'فشل تحديث اسم آخر مرحلة مكتملة: $e', isError: true);
+    }
+  }
+
+  Future<void> _updatePhase(String phaseDocId, Map<String, dynamic> currentData) async { //
     final nameController = TextEditingController(text: currentData['name'] ?? '');
     final noteController = TextEditingController(text: currentData['note'] ?? '');
     bool completed = currentData['completed'] ?? false;
-    bool hasSubPhases = currentData['hasSubPhases'] ?? false; // لا يمكن للمهندس تغييرها
+    bool hasSubPhases = currentData['hasSubPhases'] ?? false; // Engineer cannot change this
     final bool initialCompletedState = completed;
     final String initialPhaseName = currentData['name'] ?? '';
 
     String? imageUrl = currentData['imageUrl'] as String?;
     String? image360Url = currentData['image360Url'] as String?;
-    final int? phaseNumber = currentData['number'] as int?; // Can be null
+    final int? phaseNumber = currentData['number'] as int?;
+    bool isLoadingDialog = false;
 
-    // المهندس لا يمكنه التعديل إذا كانت المرحلة مكتملة
-    bool canEngineerEdit = (_currentUserRole == 'engineer' && !completed);
-    // الإداري يمكنه التعديل دائمًا (هذا الكود لصفحة المهندس فقط، لكن لضمان الشمولية في المنطق)
-    bool isAdmin = (_currentUserRole == 'admin');
+    bool canEngineerEdit = (_currentUserRole == 'engineer' && !completed); //
 
-    // Determine what engineer can edit in this dialog
-    bool isEditableForEngineer = canEngineerEdit; // Engineer can only edit if not completed
-    bool nameEditable = isAdmin; // Only admin can edit name
-
-
-    // دالة لالتقاط الصورة ورفعها إلى خادم PHP
     Future<void> pickAndUploadImage(bool is360Image, Function(VoidCallback) setDialogState) async {
       final ImagePicker picker = ImagePicker();
-      final XFile? pickedFile = await picker.pickImage(source: ImageSource.camera);
+      final XFile? pickedFile = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
 
       if (pickedFile != null) {
         File imageFile = File(pickedFile.path);
         try {
-          _showInfoSnackBar(context, 'جاري رفع الصورة...');
-
-          var request = http.MultipartRequest('POST', Uri.parse(UPLOAD_URL));
+          if (mounted) _showFeedbackSnackBar(context, 'جاري رفع الصورة...', isError: false);
+          var request = http.MultipartRequest('POST', Uri.parse(AppConstants.UPLOAD_URL));
           request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
-
           var streamedResponse = await request.send();
           var response = await http.Response.fromStream(streamedResponse);
 
           if (response.statusCode == 200) {
             final Map<String, dynamic> responseData = jsonDecode(response.body);
             if (responseData['status'] == 'success') {
-              String uploadedImageUrl = responseData['url'];
               setDialogState(() {
-                if (is360Image) {
-                  image360Url = uploadedImageUrl;
-                } else {
-                  imageUrl = uploadedImageUrl;
-                }
+                if (is360Image) image360Url = responseData['url']; else imageUrl = responseData['url'];
               });
-              _showSuccessSnackBar(context, 'تم رفع الصورة بنجاح.');
+              if (mounted) _showFeedbackSnackBar(context, 'تم رفع الصورة بنجاح.', isError: false);
             } else {
-              _showErrorSnackBar(context, 'فشل الرفع: ${responseData['message']}');
+              if (mounted) _showFeedbackSnackBar(context, 'فشل الرفع: ${responseData['message']}', isError: true);
             }
           } else {
-            _showErrorSnackBar(context, 'خطأ في الخادم: ${response.statusCode} - ${response.body}');
+            if (mounted) _showFeedbackSnackBar(context, 'خطأ في الخادم: ${response.statusCode}', isError: true);
           }
         } catch (e) {
-          _showErrorSnackBar(context, 'فشل رفع الصورة: $e');
+          if (mounted) _showFeedbackSnackBar(context, 'فشل رفع الصورة: $e', isError: true);
         }
-      } else {
-        _showInfoSnackBar(context, 'لم يتم التقاط أي صورة.');
       }
     }
 
     await showDialog(
       context: context,
+      barrierDismissible: !isLoadingDialog,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) {
           return Directionality(
-            textDirection: TextDirection.rtl,
+            textDirection: ui.TextDirection.rtl,
             child: AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-              ),
-              title: Text(
-                'تعديل المرحلة ${phaseNumber != null ? '$phaseNumber: ' : ''}${nameController.text}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppConstants.primaryColor,
-                ),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+              title: Text('تحديث المرحلة ${phaseNumber ?? ""}: ${nameController.text}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, color: AppConstants.primaryColor, fontSize: 20)),
               content: SingleChildScrollView(
-                child: Form( // NEW: Form widget for validation
-                  key: _updatePhaseFormKey, // NEW: Assign key
+                child: Form(
+                  key: _updatePhaseFormKey,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // اسم المرحلة (غير قابل للتعديل للمهندس)
-                      TextFormField( // Changed to TextFormField
-                        controller: nameController,
-                        decoration: _inputDecoration('اسم المرحلة', Icons.label),
-                        enabled: nameEditable, // Only Admin can edit this
-                        validator: (value) { // Validator for name
-                          if (value == null || value.isEmpty) {
-                            return 'الرجاء إدخال اسم المرحلة.';
-                          }
-                          return null;
-                        },
-                      ),
+                      _buildStyledTextField(controller: nameController, labelText: 'اسم المرحلة', icon: Icons.label_important_outline, enabled: false), // Engineer cannot edit name
                       const SizedBox(height: AppConstants.itemSpacing),
-                      // ملاحظات المرحلة
-                      TextFormField( // Changed to TextFormField
-                        controller: noteController,
-                        decoration: _inputDecoration('ملاحظات المرحلة', Icons.notes),
-                        maxLines: 3,
-                        enabled: isEditableForEngineer, // Engineer edits if not completed
-                      ),
+                      _buildStyledTextField(controller: noteController, labelText: 'ملاحظات المرحلة', icon: Icons.notes_rounded, maxLines: 3, enabled: canEngineerEdit),
                       const SizedBox(height: AppConstants.itemSpacing),
-                      // حالة الاكتمال
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: completed,
-                            onChanged: isEditableForEngineer // Engineer edits if not completed
-                                ? (bool? value) {
-                              setDialogState(() {
-                                completed = value ?? false;
-                              });
-                            }
-                                : null,
-                            activeColor: AppConstants.successColor,
-                          ),
-                          Text(
-                            'مكتملة',
-                            style: TextStyle(
-                                fontSize: 16,
-                                color: isEditableForEngineer
-                                    ? AppConstants.textColor
-                                    : AppConstants.secondaryTextColor),
-                          ),
-                        ],
-                      ),
+                      Row(children: [
+                        Checkbox(value: completed, onChanged: canEngineerEdit ? (val) => setDialogState(() => completed = val ?? false) : null, activeColor: AppConstants.successColor),
+                        Text('مكتملة', style: TextStyle(fontSize: 16, color: canEngineerEdit ? AppConstants.textPrimary : AppConstants.textSecondary)),
+                        const Spacer(),
+                        Checkbox(value: hasSubPhases, onChanged: null, activeColor: AppConstants.infoColor), // Engineer cannot edit this
+                        const Text('بها مراحل فرعية', style: TextStyle(fontSize: 16, color: AppConstants.textSecondary)),
+                      ]),
                       const SizedBox(height: AppConstants.itemSpacing),
-                      // هل تحتوي على مراحل فرعية؟ (غير قابل للتعديل للمهندس)
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: hasSubPhases,
-                            onChanged: null, // Engineer cannot change this from this page
-                            activeColor: AppConstants.accentColor,
-                          ),
-                          Text(
-                            'تحتوي على مراحل فرعية',
-                            style: TextStyle(
-                                fontSize: 16,
-                                color: AppConstants.secondaryTextColor), // Always disabled for engineer
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppConstants.itemSpacing),
-                      // زر التقاط ورفع الصورة
-                      if (isEditableForEngineer)
+                      if (canEngineerEdit)
                         ElevatedButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (innerContext) => Directionality(
-                                textDirection: TextDirection.rtl,
-                                child: AlertDialog(
-                                  title: const Text('نوع الصورة'),
-                                  content: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      ListTile(
-                                        leading: const Icon(Icons.image),
-                                        title: const Text('صورة عادية'),
-                                        onTap: () {
-                                          Navigator.pop(innerContext);
-                                          pickAndUploadImage(false, setDialogState);
-                                        },
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.threed_rotation),
-                                        title: const Text('صورة 360°'),
-                                        onTap: () {
-                                          Navigator.pop(innerContext);
-                                          pickAndUploadImage(true, setDialogState);
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.camera_alt, color: Colors.white),
-                          label: const Text(
-                            'التقاط ورفع صورة',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor: AppConstants.accentColor),
+                          onPressed: () => showDialog(context: context, builder: (innerCtx) => AlertDialog(title: const Text('اختر نوع الصورة'), content: Column(mainAxisSize: MainAxisSize.min, children: [ListTile(leading: const Icon(Icons.image_outlined), title: const Text('صورة عادية'), onTap: (){Navigator.pop(innerCtx); pickAndUploadImage(false, setDialogState);}), ListTile(leading: const Icon(Icons.threed_rotation_outlined), title: const Text('صورة 360°'), onTap: (){Navigator.pop(innerCtx); pickAndUploadImage(true, setDialogState);})],))),
+                          icon: const Icon(Icons.camera_alt_rounded, color: Colors.white),
+                          label: const Text('التقاط ورفع صورة', style: TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryLight, minimumSize: const Size(double.infinity, 45)),
                         ),
                       const SizedBox(height: AppConstants.itemSpacing),
-
-                      // عرض الصور الموجودة مع زر الحذف (يظهر للمهندس إذا كانت المرحلة غير مكتملة)
-                      Text(
-                        'الصور المرفوعة:',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppConstants.textColor),
-                        textAlign: TextAlign.right,
-                      ),
-                      const SizedBox(height: AppConstants.itemSpacing / 2),
-                      if (imageUrl != null && imageUrl!.isNotEmpty)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('صورة عادية:'),
-                            const SizedBox(height: 8),
-                            Image.network(
-                              imageUrl!,
-                              height: 150,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.broken_image, size: 100),
-                            ),
-                            if (isEditableForEngineer) // زر الحذف يظهر للمهندس إذا كانت المرحلة غير مكتملة
-                              TextButton.icon(
-                                icon: const Icon(Icons.delete_forever,
-                                    color: AppConstants.deleteColor),
-                                label: const Text('حذف الصورة'),
-                                onPressed: () {
-                                  setDialogState(() {
-                                    imageUrl = null;
-                                  });
-                                },
-                              ),
-                            const SizedBox(height: AppConstants.itemSpacing / 2),
-                          ],
-                        ),
-                      if (image360Url != null && image360Url!.isNotEmpty)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('صورة 360°:'),
-                            const SizedBox(height: 8),
-                            Image.network(
-                              image360Url!,
-                              height: 150,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.broken_image, size: 100),
-                            ),
-                            if (isEditableForEngineer) // زر الحذف يظهر للمهندس إذا كانت المرحلة غير مكتملة
-                              TextButton.icon(
-                                icon: const Icon(Icons.delete_forever,
-                                    color: AppConstants.deleteColor),
-                                label: const Text('حذف صورة 360°'),
-                                onPressed: () {
-                                  setDialogState(() {
-                                    image360Url = null;
-                                  });
-                                },
-                              ),
-                            const SizedBox(height: AppConstants.itemSpacing / 2),
-                          ],
-                        ),
-                      if (imageUrl == null && image360Url == null)
-                        Text(
-                          'لا توجد صور مرفوعة لهذه المرحلة.',
-                          style: TextStyle(
-                              fontSize: 15,
-                              color: AppConstants.secondaryTextColor
-                                  .withOpacity(0.7)),
-                        ),
+                      if (imageUrl != null || image360Url != null) const Text('الصور المرفوعة:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                      if (imageUrl != null) _buildExistingImagePreview(imageUrl!, () => setDialogState(() => imageUrl = null), canEngineerEdit, "صورة عادية"),
+                      if (image360Url != null) _buildExistingImagePreview(image360Url!, () => setDialogState(() => image360Url = null), canEngineerEdit, "صورة 360°"),
                     ],
                   ),
                 ),
               ),
+              actionsAlignment: MainAxisAlignment.spaceBetween,
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('إلغاء',
-                      style: TextStyle(color: AppConstants.secondaryTextColor)),
-                ),
-                if (isEditableForEngineer || isAdmin) // Save button if anything can be edited by current user
-                  ElevatedButton(
-                    onPressed: () async {
-                      // NEW: Validate the form before saving
-                      if (!_updatePhaseFormKey.currentState!.validate()) {
-                        return;
-                      }
-                      try {
-                        await FirebaseFirestore.instance
-                            .collection('projects')
-                            .doc(widget.projectId)
-                            .collection('phases')
-                            .doc(phaseDocId)
-                            .update({
-                          'name': nameController.text.trim(), // Admin can edit, engineer cannot
-                          'note': noteController.text.trim(),
-                          'completed': completed,
-                          // 'hasSubPhases': hasSubPhases, // Engineer cannot change this property
-                          'imageUrl': imageUrl,
-                          'image360Url': image360Url,
-                          'lastUpdated': FieldValue.serverTimestamp(), // Track last update
-                        });
-
-                        // إذا تغيرت حالة اكتمال المرحلة أو اسمها، قم بتحديث lastCompletedPhaseName
-                        // وارسالة الاشعارات
-                        if (initialCompletedState != completed ||
-                            initialPhaseName != nameController.text.trim()) {
-                          await _updateProjectLastCompletedPhaseName(); // This function will be updated
-                          if (completed) {
-                            // Fetch project details to get client ID
-                            final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
-                            final projectData = projectDoc.data();
-                            final clientUid = projectData?['clientId'];
-                            final projectName = projectData?['name'] ?? 'المشروع';
-
-                            // Notify Admin
-                            _sendNotification(
-                              projectId: widget.projectId,
-                              projectName: projectName,
-                              phaseName: nameController.text.trim(),
-                              phaseDocId: phaseDocId,
-                              notificationType: 'phase_completed_admin',
-                            );
-                            // Notify Client
-                            _sendNotification(
-                              projectId: widget.projectId,
-                              projectName: projectName,
-                              phaseName: nameController.text.trim(),
-                              phaseDocId: phaseDocId,
-                              notificationType: 'phase_completed_client',
-                              recipientUid: clientUid,
-                            );
-                          }
-                        }
-
-                        Navigator.pop(dialogContext);
-                        _showSuccessSnackBar(context, 'تم تحديث المرحلة ${phaseNumber != null ? '$phaseNumber: ' : ''}${nameController.text} بنجاح.');
-                      } catch (e) {
-                        _showErrorSnackBar(context, 'فشل تحديث المرحلة: $e');
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppConstants.primaryColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                        BorderRadius.circular(AppConstants.borderRadius / 2),
-                      ),
-                    ),
-                    child:
-                    const Text('حفظ', style: TextStyle(color: Colors.white)),
-                  ),
-                if (completed && _currentUserRole == 'engineer') // زر مشاركة التقرير للمهندس فقط عند اكتمال المرحلة
-                  ElevatedButton(
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء', style: TextStyle(color: AppConstants.textSecondary))),
+                if (completed && _currentUserRole == 'engineer') // Share button appears for engineer if phase is completed
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.share_rounded, color: Colors.white, size: 18),
+                    label: const Text('مشاركة التقرير', style: TextStyle(color: Colors.white)),
                     onPressed: () {
+                      Navigator.pop(dialogContext); // Close update dialog first
                       final Map<String, dynamic> phaseDataWithId = Map<String, dynamic>.from(currentData);
-                      phaseDataWithId['id'] = phaseDocId; // أضف الـ ID هنا
-                      _showShareReportOptions(phaseDataWithId);
+                      phaseDataWithId['id'] = phaseDocId;
+                      _showShareReportOptionsDialog(phaseDataWithId);
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
-                      ),
-                    ),
-                    child: const Text('مشاركة التقرير', style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingSmall)),
                   ),
+                ElevatedButton.icon(
+                  onPressed: isLoadingDialog || !canEngineerEdit ? null : () async { // Save button active only if engineer can edit
+                    if (!_updatePhaseFormKey.currentState!.validate()) return;
+                    setDialogState(() => isLoadingDialog = true);
+                    try {
+                      await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).collection('phases').doc(phaseDocId).update({
+                        'name': nameController.text.trim(), // Name is not changed by engineer, but kept for consistency
+                        'note': noteController.text.trim(),
+                        'completed': completed,
+                        // 'hasSubPhases': hasSubPhases, // Engineer cannot change
+                        'imageUrl': imageUrl,
+                        'image360Url': image360Url,
+                        'lastUpdated': FieldValue.serverTimestamp(),
+                      });
+                      if (initialCompletedState != completed || initialPhaseName != nameController.text.trim()) {
+                        await _updateProjectLastCompletedPhaseName(); //
+                        if (completed) {
+                          final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
+                          final projectData = projectDoc.data();
+                          final clientUid = projectData?['clientId'];
+                          final projectName = projectData?['name'] ?? 'المشروع';
+                          _sendNotification(projectId: widget.projectId, projectName: projectName, phaseName: nameController.text.trim(), phaseDocId: phaseDocId, notificationType: 'phase_completed_admin'); //
+                          _sendNotification(projectId: widget.projectId, projectName: projectName, phaseName: nameController.text.trim(), phaseDocId: phaseDocId, notificationType: 'phase_completed_client', recipientUid: clientUid); //
+                        }
+                      }
+                      Navigator.pop(dialogContext);
+                      if(mounted) _showFeedbackSnackBar(context, 'تم تحديث المرحلة بنجاح.', isError: false);
+                    } catch (e) {
+                      if(mounted) _showFeedbackSnackBar(context, 'فشل تحديث المرحلة: $e', isError: true);
+                    } finally {
+                      if(mounted) setDialogState(() => isLoadingDialog = false);
+                    }
+                  },
+                  icon: isLoadingDialog ? const SizedBox.shrink() : const Icon(Icons.save_alt_rounded, color: Colors.white),
+                  label: isLoadingDialog ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white))) : const Text('حفظ', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, disabledBackgroundColor: AppConstants.primaryColor.withOpacity(0.5)),
+                ),
               ],
             ),
           );
@@ -515,340 +359,153 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
     );
   }
 
-  // ----------------------------------------------------
-  // دالة تحديث المرحلة الفرعية (خاصة بالمهندس)
-  // ----------------------------------------------------
-  Future<void> _updateSubPhase(
-      String phaseDocId, String subPhaseDocId, Map<String, dynamic> currentSubData) async {
+  Widget _buildExistingImagePreview(String url, VoidCallback onDelete, bool canEdit, String imageTypeLabel) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppConstants.paddingSmall),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(imageTypeLabel, style: const TextStyle(fontWeight: FontWeight.w500, color: AppConstants.textSecondary)),
+          const SizedBox(height: AppConstants.paddingSmall / 2),
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+                  child: Image.network(url, height: 100, fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 100, width: double.infinity,
+                      color: AppConstants.backgroundColor,
+                      child: const Icon(Icons.broken_image_outlined, color: AppConstants.textSecondary, size: 40),
+                    ),
+                  ),
+                ),
+              ),
+              if (canEdit)
+                IconButton(icon: const Icon(Icons.delete_outline_rounded, color: AppConstants.deleteColor), onPressed: onDelete, tooltip: 'حذف الصورة'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateSubPhase(String phaseDocId, String subPhaseDocId, Map<String, dynamic> currentSubData) async { //
     final nameController = TextEditingController(text: currentSubData['name'] ?? '');
     final noteController = TextEditingController(text: currentSubData['note'] ?? '');
     bool completed = currentSubData['completed'] ?? false;
-    final bool initialCompletedState = completed; // Track initial state for notifications
-
+    final bool initialCompletedState = completed;
     String? imageUrl = currentSubData['imageUrl'] as String?;
     String? image360Url = currentSubData['image360Url'] as String?;
+    bool isLoadingDialog = false;
 
-    // المهندس لا يمكنه التعديل إذا كانت المرحلة الفرعية مكتملة
-    bool canEngineerEditSubPhase = (_currentUserRole == 'engineer' && !completed);
-    bool isAdmin = (_currentUserRole == 'admin');
+    bool canEngineerEditSubPhase = (_currentUserRole == 'engineer' && !completed); //
 
-    // Determine what engineer can edit in this dialog
-    bool isEditableForEngineer = canEngineerEditSubPhase;
-    bool nameEditable = isAdmin; // Only admin can edit name
-
-
-    // دالة لالتقاط الصورة ورفعها إلى خادم PHP
     Future<void> pickAndUploadImage(bool is360Image, Function(VoidCallback) setDialogState) async {
       final ImagePicker picker = ImagePicker();
-      final XFile? pickedFile = await picker.pickImage(source: ImageSource.camera);
-
+      final XFile? pickedFile = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
       if (pickedFile != null) {
         File imageFile = File(pickedFile.path);
         try {
-          _showInfoSnackBar(context, 'جاري رفع الصورة...');
-
-          var request = http.MultipartRequest('POST', Uri.parse(UPLOAD_URL));
+          if (mounted) _showFeedbackSnackBar(context, 'جاري رفع الصورة...', isError: false);
+          var request = http.MultipartRequest('POST', Uri.parse(AppConstants.UPLOAD_URL));
           request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
-
           var streamedResponse = await request.send();
           var response = await http.Response.fromStream(streamedResponse);
-
           if (response.statusCode == 200) {
             final Map<String, dynamic> responseData = jsonDecode(response.body);
             if (responseData['status'] == 'success') {
-              String uploadedImageUrl = responseData['url'];
               setDialogState(() {
-                if (is360Image) {
-                  image360Url = uploadedImageUrl;
-                } else {
-                  imageUrl = uploadedImageUrl;
-                }
+                if (is360Image) image360Url = responseData['url']; else imageUrl = responseData['url'];
               });
-              _showSuccessSnackBar(context, 'تم رفع الصورة بنجاح.');
+              if (mounted) _showFeedbackSnackBar(context, 'تم رفع الصورة بنجاح.', isError: false);
             } else {
-              _showErrorSnackBar(context, 'فشل الرفع: ${responseData['message']}');
+              if (mounted) _showFeedbackSnackBar(context, 'فشل الرفع: ${responseData['message']}', isError: true);
             }
           } else {
-            _showErrorSnackBar(context, 'خطأ في الخادم: ${response.statusCode} - ${response.body}');
+            if (mounted) _showFeedbackSnackBar(context, 'خطأ في الخادم: ${response.statusCode}', isError: true);
           }
         } catch (e) {
-          _showErrorSnackBar(context, 'فشل رفع الصورة: $e');
+          if (mounted) _showFeedbackSnackBar(context, 'فشل رفع الصورة: $e', isError: true);
         }
-      } else {
-        _showInfoSnackBar(context, 'لم يتم التقاط أي صورة.');
       }
     }
 
-
     await showDialog(
       context: context,
+      barrierDismissible: !isLoadingDialog,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) {
-          bool isEditable = canEngineerEditSubPhase || isAdmin;
           return Directionality(
-            textDirection: TextDirection.rtl,
+            textDirection: ui.TextDirection.rtl,
             child: AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-              ),
-              title: Text(
-                'تعديل المرحلة الفرعية: ${nameController.text}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppConstants.primaryColor,
-                ),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+              title: Text('تحديث المرحلة الفرعية: ${nameController.text}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, color: AppConstants.primaryColor, fontSize: 20)),
               content: SingleChildScrollView(
-                child: Form( // NEW: Form widget for validation
-                  key: _updateSubPhaseFormKey, // NEW: Assign key
+                child: Form(
+                  key: _updateSubPhaseFormKey,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      TextFormField( // Changed to TextFormField
-                        controller: nameController,
-                        decoration: _inputDecoration('اسم المرحلة الفرعية', Icons.label_important),
-                        enabled: nameEditable, // Only admin can edit name
-                        validator: (value) { // Validator for name
-                          if (value == null || value.isEmpty) {
-                            return 'الرجاء إدخال اسم المرحلة الفرعية.';
-                          }
-                          return null;
-                        },
+                      _buildStyledTextField(controller: nameController, labelText: 'اسم المرحلة الفرعية', icon: Icons.label_outline, enabled: false), // Engineer cannot edit name
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      _buildStyledTextField(controller: noteController, labelText: 'ملاحظات المرحلة الفرعية', icon: Icons.comment_outlined, maxLines: 3, enabled: canEngineerEditSubPhase),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      Row(children: [
+                        Checkbox(value: completed, onChanged: canEngineerEditSubPhase ? (val) => setDialogState(() => completed = val ?? false) : null, activeColor: AppConstants.successColor),
+                        Text('مكتملة', style: TextStyle(fontSize: 16, color: canEngineerEditSubPhase ? AppConstants.textPrimary : AppConstants.textSecondary)),
+                      ]),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      if (canEngineerEditSubPhase) ElevatedButton.icon(
+                        onPressed: () => showDialog(context: context, builder: (innerCtx) => AlertDialog(title: const Text('اختر نوع الصورة'), content: Column(mainAxisSize: MainAxisSize.min, children: [ListTile(leading: const Icon(Icons.image_outlined), title: const Text('صورة عادية'), onTap: (){Navigator.pop(innerCtx); pickAndUploadImage(false, setDialogState);}), ListTile(leading: const Icon(Icons.threed_rotation_outlined), title: const Text('صورة 360°'), onTap: (){Navigator.pop(innerCtx); pickAndUploadImage(true, setDialogState);})],))),
+                        icon: const Icon(Icons.camera_alt_rounded, color: Colors.white),
+                        label: const Text('التقاط ورفع صورة', style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryLight, minimumSize: const Size(double.infinity, 45)),
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
-                      TextFormField( // Changed to TextFormField
-                        controller: noteController,
-                        decoration: _inputDecoration('ملاحظات المرحلة الفرعية', Icons.notes),
-                        maxLines: 3,
-                        enabled: isEditableForEngineer,
-                      ),
-                      const SizedBox(height: AppConstants.itemSpacing),
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: completed,
-                            onChanged: isEditableForEngineer
-                                ? (bool? value) {
-                              setDialogState(() {
-                                completed = value ?? false;
-                              });
-                            }
-                                : null,
-                            activeColor: AppConstants.successColor,
-                          ),
-                          Text(
-                            'مكتملة',
-                            style: TextStyle(
-                                fontSize: 16,
-                                color: isEditableForEngineer
-                                    ? AppConstants.textColor
-                                    : AppConstants.secondaryTextColor),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppConstants.itemSpacing),
-                      if (isEditableForEngineer)
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (innerContext) => Directionality(
-                                textDirection: TextDirection.rtl,
-                                child: AlertDialog(
-                                  title: const Text('نوع الصورة'),
-                                  content: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      ListTile(
-                                        leading: const Icon(Icons.image),
-                                        title: const Text('صورة عادية'),
-                                        onTap: () {
-                                          Navigator.pop(innerContext);
-                                          pickAndUploadImage(false, setDialogState);
-                                        },
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.threed_rotation),
-                                        title: const Text('صورة 360°'),
-                                        onTap: () {
-                                          Navigator.pop(innerContext);
-                                          pickAndUploadImage(true, setDialogState);
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.camera_alt, color: Colors.white),
-                          label: const Text(
-                            'التقاط ورفع صورة',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor: AppConstants.accentColor),
-                        ),
-                      const SizedBox(height: AppConstants.itemSpacing),
-
-                      Text(
-                        'الصور المرفوعة:',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppConstants.textColor),
-                        textAlign: TextAlign.right,
-                      ),
-                      const SizedBox(height: AppConstants.itemSpacing / 2),
-                      if (imageUrl != null && imageUrl!.isNotEmpty)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('صورة عادية:'),
-                            const SizedBox(height: 8),
-                            Image.network(
-                              imageUrl!,
-                              height: 150,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.broken_image, size: 100),
-                            ),
-                            if (isEditableForEngineer)
-                              TextButton.icon(
-                                icon: const Icon(Icons.delete_forever,
-                                    color: AppConstants.deleteColor),
-                                label: const Text('حذف الصورة'),
-                                onPressed: () {
-                                  setDialogState(() {
-                                    imageUrl = null;
-                                  });
-                                },
-                              ),
-                            const SizedBox(height: AppConstants.itemSpacing / 2),
-                          ],
-                        ),
-                      if (image360Url != null && image360Url!.isNotEmpty)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('صورة 360°:'),
-                            const SizedBox(height: 8),
-                            Image.network(
-                              image360Url!,
-                              height: 150,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.broken_image, size: 100),
-                            ),
-                            if (isEditableForEngineer)
-                              TextButton.icon(
-                                icon: const Icon(Icons.delete_forever,
-                                    color: AppConstants.deleteColor),
-                                label: const Text('حذف صورة 360°'),
-                                onPressed: () {
-                                  setDialogState(() {
-                                    image360Url = null;
-                                  });
-                                },
-                              ),
-                            const SizedBox(height: AppConstants.itemSpacing / 2),
-                          ],
-                        ),
-                      if (imageUrl == null && image360Url == null)
-                        Text(
-                          'لا توجد صور مرفوعة لهذه المرحلة الفرعية.',
-                          style: TextStyle(
-                              fontSize: 15,
-                              color: AppConstants.secondaryTextColor
-                                  .withOpacity(0.7)),
-                        ),
+                      if (imageUrl != null || image360Url != null) const Text('الصور المرفوعة:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                      if (imageUrl != null) _buildExistingImagePreview(imageUrl!, () => setDialogState(() => imageUrl = null), canEngineerEditSubPhase, "صورة عادية"),
+                      if (image360Url != null) _buildExistingImagePreview(image360Url!, () => setDialogState(() => image360Url = null), canEngineerEditSubPhase, "صورة 360°"),
                     ],
                   ),
                 ),
               ),
+              actionsAlignment: MainAxisAlignment.center,
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('إلغاء',
-                      style: TextStyle(color: AppConstants.secondaryTextColor)),
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء', style: TextStyle(color: AppConstants.textSecondary))),
+                const SizedBox(width: AppConstants.paddingSmall),
+                ElevatedButton.icon(
+                  onPressed: isLoadingDialog || !canEngineerEditSubPhase ? null : () async {
+                    if (!_updateSubPhaseFormKey.currentState!.validate()) return;
+                    setDialogState(() => isLoadingDialog = true);
+                    try {
+                      await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).collection('phases').doc(phaseDocId).collection('subPhases').doc(subPhaseDocId).update({
+                        // 'name': nameController.text.trim(), // Engineer cannot change name
+                        'note': noteController.text.trim(), 'completed': completed, 'imageUrl': imageUrl, 'image360Url': image360Url, 'lastUpdated': FieldValue.serverTimestamp(),
+                      });
+                      if (initialCompletedState != completed && completed) {
+                        final mainPhaseDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).collection('phases').doc(phaseDocId).get();
+                        final mainPhaseData = mainPhaseDoc.data();
+                        final mainPhaseName = mainPhaseData?['name'] ?? 'المرحلة الرئيسية';
+                        final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
+                        final projectData = projectDoc.data();
+                        final projectName = projectData?['name'] ?? 'المشروع';
+                        final clientUid = projectData?['clientId'];
+                        _sendNotification(projectId: widget.projectId, projectName: projectName, phaseName: '$mainPhaseName > ${nameController.text.trim()}', phaseDocId: phaseDocId, notificationType: 'subphase_completed_admin'); //
+                        _sendNotification(projectId: widget.projectId, projectName: projectName, phaseName: '$mainPhaseName > ${nameController.text.trim()}', phaseDocId: phaseDocId, notificationType: 'subphase_completed_client', recipientUid: clientUid); //
+                      }
+                      Navigator.pop(dialogContext);
+                      if(mounted) _showFeedbackSnackBar(context, 'تم تحديث المرحلة الفرعية بنجاح.', isError: false);
+                    } catch (e) {
+                      if(mounted) _showFeedbackSnackBar(context, 'فشل تحديث المرحلة الفرعية: $e', isError: true);
+                    } finally {
+                      if(mounted) setDialogState(() => isLoadingDialog = false);
+                    }
+                  },
+                  icon: isLoadingDialog ? const SizedBox.shrink() : const Icon(Icons.save_alt_rounded, color: Colors.white),
+                  label: isLoadingDialog ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white))) : const Text('حفظ', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, disabledBackgroundColor: AppConstants.primaryColor.withOpacity(0.5)),
                 ),
-                if (isEditableForEngineer || isAdmin)
-                  ElevatedButton(
-                    onPressed: () async {
-                      // NEW: Validate the form before saving
-                      if (!_updateSubPhaseFormKey.currentState!.validate()) {
-                        return;
-                      }
-                      try {
-                        await FirebaseFirestore.instance
-                            .collection('projects')
-                            .doc(widget.projectId)
-                            .collection('phases')
-                            .doc(phaseDocId)
-                            .collection('subPhases')
-                            .doc(subPhaseDocId)
-                            .update({
-                          'name': nameController.text.trim(), // Admin can edit, engineer cannot
-                          'note': noteController.text.trim(),
-                          'completed': completed,
-                          'imageUrl': imageUrl,
-                          'image360Url': image360Url,
-                          'lastUpdated': FieldValue.serverTimestamp(),
-                        });
-
-                        // Send notifications if sub-phase just became completed
-                        if (initialCompletedState != completed && completed) {
-                          // Fetch main phase and project details
-                          final mainPhaseDoc = await FirebaseFirestore.instance
-                              .collection('projects')
-                              .doc(widget.projectId)
-                              .collection('phases')
-                              .doc(phaseDocId)
-                              .get();
-                          final mainPhaseData = mainPhaseDoc.data();
-                          final mainPhaseName = mainPhaseData?['name'] ?? 'المرحلة الرئيسية';
-
-                          final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
-                          final projectData = projectDoc.data();
-                          final projectName = projectData?['name'] ?? 'المشروع';
-                          final clientUid = projectData?['clientId'];
-
-                          // Notify Admin
-                          _sendNotification(
-                            projectId: widget.projectId,
-                            projectName: projectName,
-                            phaseName: '$mainPhaseName > ${nameController.text.trim()}',
-                            phaseDocId: phaseDocId,
-                            notificationType: 'subphase_completed_admin',
-                          );
-                          // Notify Client
-                          _sendNotification(
-                            projectId: widget.projectId,
-                            projectName: projectName,
-                            phaseName: '$mainPhaseName > ${nameController.text.trim()}',
-                            phaseDocId: phaseDocId,
-                            notificationType: 'subphase_completed_client',
-                            recipientUid: clientUid,
-                          );
-                        }
-
-                        Navigator.pop(dialogContext);
-                        _showSuccessSnackBar(context, 'تم تحديث المرحلة الفرعية بنجاح.');
-                      } catch (e) {
-                        _showErrorSnackBar(context, 'فشل تحديث المرحلة الفرعية: $e');
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppConstants.primaryColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                        BorderRadius.circular(AppConstants.borderRadius / 2),
-                      ),
-                    ),
-                    child:
-                    const Text('حفظ', style: TextStyle(color: Colors.white)),
-                  ),
               ],
             ),
           );
@@ -857,242 +514,145 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
     );
   }
 
-  // ----------------------------------------------------
-  // دالة لتحديث اسم آخر مرحلة مكتملة في المشروع (لضمان التزامن)
-  // ----------------------------------------------------
-  Future<void> _updateProjectLastCompletedPhaseName() async {
-    try {
-      final projectPhases = await FirebaseFirestore.instance
-          .collection('projects')
-          .doc(widget.projectId)
-          .collection('phases')
-          .orderBy('number', descending: true)
-          .get();
-
-      String lastCompletedPhaseName = 'لا توجد مراحل مكتملة بعد';
-      // Find the latest completed phase based on 'number'
-      for (var phase in projectPhases.docs) {
-        final data = phase.data();
-        if (data['completed'] == true) {
-          lastCompletedPhaseName = data['name'] ?? 'مرحلة مكتملة';
-          // No need to break, iterate to find the one with highest number
-        }
-      }
-      // Re-iterate to find the highest numbered completed phase if needed.
-      // Or if ordered by number descending, the first one is the latest.
-      // The current logic of finding the first completed in descending order is correct
-      // for "last completed phase name".
-
-      await FirebaseFirestore.instance
-          .collection('projects')
-          .doc(widget.projectId)
-          .update({'lastCompletedPhaseName': lastCompletedPhaseName});
-
-      setState(() {
-        _projectFutureBuilderKey = UniqueKey(); // لتحديث واجهة المستخدم
-      });
-    } catch (e) {
-      _showErrorSnackBar(context, 'فشل تحديث اسم آخر مرحلة مكتملة: $e');
-    }
-  }
-
-  // ----------------------------------------------------
-  // دالة لعرض خيارات مشاركة التقرير (خاصة بالمهندس)
-  // ----------------------------------------------------
-  Future<void> _showShareReportOptions(Map<String, dynamic> phaseData) async {
-    final String projectName = (await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get()).data()?['name'] ?? 'المشروع';
+  Future<void> _showShareReportOptionsDialog(Map<String, dynamic> phaseData) async { //
+    final String phaseDocId = phaseData['id'] ?? ''; // Assuming 'id' is passed in phaseData
     final String phaseName = phaseData['name'] ?? 'المرحلة';
     final String note = phaseData['note'] ?? '';
     final String? imageUrl = phaseData['imageUrl'];
     final String? image360Url = phaseData['image360Url'];
 
+    DocumentSnapshot projectSnapshot = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
+    final String projectName = (projectSnapshot.data() as Map<String, dynamic>)['name'] ?? 'المشروع';
+
     String reportText = 'تقرير مرحلة "$phaseName" في مشروع "$projectName":\n';
-    if (note.isNotEmpty) {
-      reportText += 'ملاحظات: $note\n';
-    }
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      reportText += 'صورة عادية: $imageUrl\n';
-    }
-    if (image360Url != null && image360Url.isNotEmpty) {
-      reportText += 'صورة 360°: $image360Url\n';
-    }
+    if (note.isNotEmpty) reportText += 'ملاحظات: $note\n';
+    if (imageUrl != null && imageUrl.isNotEmpty) reportText += 'صورة عادية: $imageUrl\n';
+    if (image360Url != null && image360Url.isNotEmpty) reportText += 'صورة 360°: $image360Url\n';
 
-    // يجب أن يكون phaseData يحتوي على id المرحلة لاستعلام المراحل الفرعية
-    final String phaseId = phaseData['id'];
-
-    final subPhasesSnapshot = await FirebaseFirestore.instance
-        .collection('projects')
-        .doc(widget.projectId)
-        .collection('phases')
-        .doc(phaseId)
-        .collection('subPhases')
-        .orderBy('timestamp')
-        .get();
-
+    final subPhasesSnapshot = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).collection('phases').doc(phaseDocId).collection('subPhases').orderBy('timestamp').get();
     if (subPhasesSnapshot.docs.isNotEmpty) {
       reportText += '\nالمراحل الفرعية:\n';
       for (var subPhase in subPhasesSnapshot.docs) {
         final subData = subPhase.data();
         reportText += '- ${subData['name']} (${subData['completed'] ? 'مكتملة' : 'غير مكتملة'})\n';
-        if (subData['note'] != null && subData['note'].isNotEmpty) {
-          reportText += '  ملاحظة: ${subData['note']}\n';
-        }
-        if (subData['imageUrl'] != null && subData['imageUrl'].isNotEmpty) {
-          reportText += '  صورة: ${subData['imageUrl']}\n';
-        }
-        if (subData['image360Url'] != null && subData['image360Url'].isNotEmpty) {
-          reportText += '  صورة 360°: ${subData['image360Url']}\n';
-        }
+        if (subData['note'] != null && subData['note'].isNotEmpty) reportText += '  ملاحظة: ${subData['note']}\n';
+        if (subData['imageUrl'] != null && subData['imageUrl'].isNotEmpty) reportText += '  صورة: ${subData['imageUrl']}\n';
+        if (subData['image360Url'] != null && subData['image360Url'].isNotEmpty) reportText += '  صورة 360°: ${subData['image360Url']}\n';
       }
     }
 
-    await showDialog(
+    await showModalBottomSheet(
       context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('مشاركة التقرير'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.share),
-                title: const Text('مشاركة عادية'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Share.share(reportText, subject: 'تقرير مشروع $projectName - مرحلة $phaseName');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.phone_android_rounded),
-                title: const Text('مشاركة عبر واتساب'),
-                onTap: () async {
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppConstants.borderRadius))),
+      builder: (context) {
+        return Directionality(
+          textDirection: ui.TextDirection.rtl,
+          child: Padding(
+            padding: const EdgeInsets.all(AppConstants.paddingMedium),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('مشاركة تقرير المرحلة "$phaseName"', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                const Divider(height: AppConstants.itemSpacing),
+                _buildShareTile(Icons.share_rounded, 'مشاركة عادية (نص)', () {
+                  Navigator.pop(context); Share.share(reportText, subject: 'تقرير مشروع $projectName - مرحلة $phaseName');
+                }),
+                _buildShareTile(Icons.message_rounded, 'مشاركة عبر واتساب', () async {
                   Navigator.pop(context);
                   final whatsappUrl = "whatsapp://send?text=${Uri.encodeComponent(reportText)}";
-                  if (await canLaunchUrl(Uri.parse(whatsappUrl))) {
-                    await launchUrl(Uri.parse(whatsappUrl));
-                  } else {
-                    _showErrorSnackBar(context, 'واتساب غير مثبت أو لا يمكن فتحه.');
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.email),
-                title: const Text('مشاركة عبر البريد الإلكتروني'),
-                onTap: () async {
+                  if (await canLaunchUrl(Uri.parse(whatsappUrl))) await launchUrl(Uri.parse(whatsappUrl));
+                  else if(mounted) _showFeedbackSnackBar(context, 'واتساب غير مثبت.', isError: true);
+                }),
+                _buildShareTile(Icons.email_rounded, 'مشاركة عبر البريد', () async {
                   Navigator.pop(context);
-                  final emailLaunchUri = Uri(
-                    scheme: 'mailto',
-                    path: '', // يمكن وضع عنوان بريد إلكتروني هنا إذا كان ثابتًا
-                    queryParameters: {
-                      'subject': 'تقرير مشروع $projectName - مرحلة $phaseName',
-                      'body': reportText,
-                    },
-                  );
-                  if (await canLaunchUrl(emailLaunchUri)) {
-                    await launchUrl(emailLaunchUri);
-                  } else {
-                    _showErrorSnackBar(context, 'لا يمكن فتح تطبيق البريد الإلكتروني.');
-                  }
-                },
-              ),
-            ],
+                  final emailLaunchUri = Uri(scheme: 'mailto', queryParameters: {'subject': 'تقرير مشروع $projectName - مرحلة $phaseName', 'body': reportText});
+                  if (await canLaunchUrl(emailLaunchUri)) await launchUrl(emailLaunchUri);
+                  else if(mounted) _showFeedbackSnackBar(context, 'لا يمكن فتح تطبيق البريد.', isError: true);
+                }),
+                const SizedBox(height: AppConstants.paddingSmall),
+              ],
+            ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildShareTile(IconData icon, String title, VoidCallback onTap) {
+    return ListTile(
+      leading: Icon(icon, color: AppConstants.primaryColor),
+      title: Text(title, style: const TextStyle(color: AppConstants.textPrimary, fontWeight: FontWeight.w500)),
+      onTap: onTap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
+      hoverColor: AppConstants.primaryColor.withOpacity(0.05),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: const Text('تفاصيل المشروع', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 22)),
+      backgroundColor: AppConstants.primaryColor,
+      flexibleSpace: Container(decoration: const BoxDecoration(gradient: LinearGradient(colors: [AppConstants.primaryColor, AppConstants.primaryLight], begin: Alignment.topLeft, end: Alignment.bottomRight))),
+      elevation: 3,
+      centerTitle: true,
+    );
+  }
+
+  Widget _buildProjectSummaryCard(Map<String, dynamic> projectData) {
+    final projectName = projectData['name'] ?? 'مشروع غير مسمى';
+    final engineerName = projectData['engineerName'] ?? 'غير محدد'; // This will be the current engineer
+    final clientName = projectData['clientName'] ?? 'غير محدد';
+    final projectStatus = projectData['status'] ?? 'غير محدد';
+    final lastCompletedPhaseName = projectData['lastCompletedPhaseName'] ?? 'لا توجد مراحل مكتملة بعد'; //
+    // Note: 'currentStage' from project document might be different from 'lastCompletedPhaseName' if project is ongoing.
+    // We'll use lastCompletedPhaseName as it's specific to engineer's view of progress.
+
+    IconData statusIcon;
+    Color statusColor;
+    switch (projectStatus) {
+      case 'نشط': statusIcon = Icons.construction_rounded; statusColor = AppConstants.infoColor; break;
+      case 'مكتمل': statusIcon = Icons.check_circle_outline_rounded; statusColor = AppConstants.successColor; break;
+      case 'معلق': statusIcon = Icons.pause_circle_outline_rounded; statusColor = AppConstants.warningColor; break;
+      default: statusIcon = Icons.help_outline_rounded; statusColor = AppConstants.textSecondary;
+    }
+
+    return Card(
+      elevation: AppConstants.cardShadow[0].blurRadius,
+      shadowColor: AppConstants.primaryColor.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+      margin: const EdgeInsets.only(bottom: AppConstants.paddingLarge),
+      child: Padding(
+        padding: const EdgeInsets.all(AppConstants.paddingMedium),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(projectName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppConstants.primaryColor)),
+            const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
+            _buildDetailRow(Icons.engineering_rounded, 'المهندس المسؤول:', engineerName),
+            _buildDetailRow(Icons.person_rounded, 'العميل:', clientName),
+            _buildDetailRow(Icons.playlist_add_check_circle_outlined, 'آخر مرحلة مكتملة:', lastCompletedPhaseName),
+            _buildDetailRow(statusIcon, 'حالة المشروع:', projectStatus, valueColor: statusColor),
+          ],
         ),
       ),
     );
   }
 
-  // ----------------------------------------------------
-  // دوال مساعدة
-  // ----------------------------------------------------
-  InputDecoration _inputDecoration(String labelText, IconData icon) {
-    return InputDecoration(
-      labelText: labelText,
-      labelStyle: const TextStyle(color: AppConstants.secondaryTextColor),
-      prefixIcon: Icon(icon, color: AppConstants.primaryColor),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        borderSide: const BorderSide(color: AppConstants.accentColor, width: 1.5),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        borderSide: const BorderSide(color: AppConstants.errorColor, width: 1),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        borderSide: const BorderSide(color: AppConstants.errorColor, width: 2),
-      ),
-      filled: true,
-      fillColor: AppConstants.cardColor,
-      contentPadding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 16.0),
-    );
-  }
-
-  void _showErrorSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppConstants.errorColor,
-      ),
-    );
-  }
-
-  void _showSuccessSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppConstants.successColor,
-      ),
-    );
-  }
-
-  void _showInfoSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppConstants.warningColor,
-      ),
-    );
-  }
-
-  // ----------------------------------------------------
-  // مكون مساعد لعرض معلومات المشروع الرئيسية
-  // ----------------------------------------------------
-  Widget _buildInfoRow(IconData icon, String label, String value, {Color? valueColor}) {
+  Widget _buildDetailRow(IconData icon, String label, String value, {Color? valueColor}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall / 1.2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppConstants.primaryColor, size: 20),
-          const SizedBox(width: 8),
+          Icon(icon, size: 20, color: AppConstants.primaryLight),
+          const SizedBox(width: AppConstants.paddingSmall),
+          Text('$label ', style: const TextStyle(fontSize: 15, color: AppConstants.textSecondary, fontWeight: FontWeight.w500)),
           Expanded(
-            child: RichText(
-              textDirection: TextDirection.rtl,
-              text: TextSpan(
-                children: [
-                  TextSpan(
-                    text: label,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppConstants.textColor,
-                    ),
-                  ),
-                  TextSpan(
-                    text: ' $value',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: valueColor ?? AppConstants.secondaryTextColor,
-                    ),
-                  ),
-                ],
-              ),
+            child: Text(
+              value,
+              style: TextStyle(fontSize: 15, color: valueColor ?? AppConstants.textPrimary, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -1100,53 +660,89 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
     );
   }
 
-  // ----------------------------------------------------
-  // مكون مساعد لعرض قسم الصور (يعرض من روابط URL)
-  // ----------------------------------------------------
-  Widget _buildImageSection(String title, String imageUrl) {
+  Widget _buildPhasesSectionHeader() {
+    return const Padding(
+      padding: EdgeInsets.only(bottom: AppConstants.paddingSmall),
+      child: Text('مراحل المشروع:', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+    );
+  }
+
+  Widget _buildPhaseExpansionTile(QueryDocumentSnapshot phase) {
+    final data = phase.data() as Map<String, dynamic>;
+    final int number = data['number'] ?? 0;
+    final String name = data['name'] ?? 'مرحلة غير مسمى';
+    final String note = data['note'] ?? '';
+    final bool completed = data['completed'] ?? false;
+    final bool hasSubPhases = data['hasSubPhases'] ?? false; //
+    final String? imageUrl = data['imageUrl'];
+    final String? image360Url = data['image360Url'];
+
+    bool canEngineerEditThisPhase = (_currentUserRole == 'engineer' && !completed); //
+    bool canShare = completed && _currentUserRole == 'engineer';
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall),
+      elevation: 1.5,
+      shadowColor: AppConstants.primaryColor.withOpacity(0.08),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
+      child: ExpansionTile(
+        collapsedBackgroundColor: completed ? AppConstants.successColor.withOpacity(0.05) : AppConstants.cardColor,
+        backgroundColor: AppConstants.cardColor,
+        leading: CircleAvatar(
+          backgroundColor: completed ? AppConstants.successColor : AppConstants.primaryColor,
+          child: Text(number.toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        ),
+        title: Text('المرحلة $number: $name', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+        subtitle: Text(completed ? 'مكتملة ✅' : 'قيد التنفيذ ⏳', style: TextStyle(color: completed ? AppConstants.successColor : AppConstants.warningColor, fontWeight: FontWeight.w500)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (canEngineerEditThisPhase) IconButton(icon: const Icon(Icons.edit_note_rounded, color: AppConstants.primaryLight), tooltip: 'تحديث المرحلة', onPressed: () => _updatePhase(phase.id, data)),
+            if (canShare) IconButton(icon: const Icon(Icons.share_rounded, color: Colors.teal), tooltip: 'مشاركة التقرير', onPressed: () {
+              final Map<String, dynamic> phaseDataWithId = Map<String, dynamic>.from(data);
+              phaseDataWithId['id'] = phase.id;
+              _showShareReportOptionsDialog(phaseDataWithId);
+            }),
+          ],
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(AppConstants.paddingMedium).copyWith(top: AppConstants.paddingSmall),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (note.isNotEmpty) ...[
+                  const Text('الملاحظات:', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                  const SizedBox(height: AppConstants.paddingSmall / 2),
+                  ExpandableText(note, valueColor: AppConstants.textSecondary),
+                  const SizedBox(height: AppConstants.itemSpacing),
+                ],
+                if (imageUrl != null) _buildImageSectionDisplay('صورة عادية:', imageUrl),
+                if (image360Url != null) _buildImageSectionDisplay('صورة 360°:', image360Url),
+                if (note.isEmpty && imageUrl == null && image360Url == null && !hasSubPhases)
+                  const Text('لا توجد تفاصيل إضافية لهذه المرحلة.', style: TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                if (hasSubPhases) _buildSubPhasesSection(phase.id, name, canEngineerEditThisPhase),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageSectionDisplay(String title, String? imageUrl) { // Simplified for display only
+    if (imageUrl == null || imageUrl.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: TextStyle(
-              fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textColor),
-        ),
-        const SizedBox(height: 8),
-        Center(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
-            child: Image.network(
-              imageUrl,
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Center(
-                  child: CircularProgressIndicator(
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
-                        : null,
-                    color: AppConstants.primaryColor,
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) => Container(
-                height: 150,
-                color: Colors.grey.shade200,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.broken_image, size: 60, color: AppConstants.secondaryTextColor.withOpacity(0.5)),
-                      const Text('فشل تحميل الصورة', style: TextStyle(color: AppConstants.secondaryTextColor)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+        Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+        const SizedBox(height: AppConstants.paddingSmall),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+          child: Image.network(
+            imageUrl, height: 180, width: double.infinity, fit: BoxFit.cover,
+            loadingBuilder: (ctx, child, progress) => progress == null ? child : Container(height: 180, alignment: Alignment.center, child: const CircularProgressIndicator(color: AppConstants.primaryColor)),
+            errorBuilder: (ctx, err, st) => Container(height: 180, width: double.infinity, color: AppConstants.backgroundColor, child: const Icon(Icons.broken_image_outlined, color: AppConstants.textSecondary, size: 50)),
           ),
         ),
         const SizedBox(height: AppConstants.itemSpacing),
@@ -1154,403 +750,177 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
     );
   }
 
-  // ----------------------------------------------------
-  // مكون لعرض قائمة المراحل الفرعية
-  // ----------------------------------------------------
-  Widget _buildSubPhasesList(String phaseId, bool canEngineerEditMainPhase) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('projects')
-          .doc(widget.projectId)
-          .collection('phases')
-          .doc(phaseId)
-          .collection('subPhases')
-          .orderBy('timestamp')
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
-        }
-        if (snapshot.hasError) {
-          return Text('خطأ في تحميل المراحل الفرعية: ${snapshot.error}');
-        }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Text(
-            'لا توجد مراحل فرعية بعد.',
-            style: TextStyle(color: AppConstants.secondaryTextColor.withOpacity(0.7)),
-          );
-        }
+  Widget _buildSubPhasesSection(String phaseId, String mainPhaseName, bool canParentPhaseBeEditedByEngineer) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: AppConstants.itemSpacing * 1.5, thickness: 0.5),
+        const Text('المراحل الفرعية:', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.primaryColor)),
+        const SizedBox(height: AppConstants.paddingSmall),
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection('projects').doc(widget.projectId).collection('phases').doc(phaseId).collection('subPhases').orderBy('timestamp').snapshots(),
+          builder: (context, subPhaseSnapshot) {
+            if (subPhaseSnapshot.connectionState == ConnectionState.waiting) return const Center(child: SizedBox(height:30, width:30, child: CircularProgressIndicator(strokeWidth: 2,color: AppConstants.primaryColor)));
+            if (subPhaseSnapshot.hasError) return Text('خطأ: ${subPhaseSnapshot.error}', style: const TextStyle(color: AppConstants.errorColor));
+            if (!subPhaseSnapshot.hasData || subPhaseSnapshot.data!.docs.isEmpty) return const Text('لا توجد مراحل فرعية مضافة.', style: TextStyle(color: AppConstants.textSecondary));
 
-        final subPhases = snapshot.data!.docs;
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: subPhases.length,
-          itemBuilder: (context, index) {
-            final subPhase = subPhases[index];
-            final subData = subPhase.data() as Map<String, dynamic>;
-            final subName = subData['name'] as String? ?? 'مرحلة فرعية غير مسماة';
-            final subCompleted = subData['completed'] as bool? ?? false;
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: subPhaseSnapshot.data!.docs.length,
+              itemBuilder: (context, subIndex) {
+                final subPhase = subPhaseSnapshot.data!.docs[subIndex];
+                final subData = subPhase.data() as Map<String, dynamic>;
+                final String subName = subData['name'] ?? 'مرحلة فرعية غير مسمى';
+                final bool subCompleted = subData['completed'] ?? false;
+                // Engineer can edit sub-phase if the sub-phase itself is not completed AND the parent phase is also editable by them (not completed)
+                bool canEngineerEditThisSubPhase = (_currentUserRole == 'engineer' && !subCompleted && canParentPhaseBeEditedByEngineer);
 
-            // المهندس يمكنه التعديل إذا كانت المرحلة الفرعية غير مكتملة
-            bool canEngineerEditSubPhase = (_currentUserRole == 'engineer' && !subCompleted);
 
-            return Card(
-              color: subCompleted
-                  ? AppConstants.successColor.withOpacity(0.05)
-                  : AppConstants.warningColor.withOpacity(0.05),
-              margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-              elevation: 1,
-              child: ListTile(
-                leading: Icon(
-                  subCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-                  color: subCompleted ? AppConstants.successColor : AppConstants.warningColor,
-                ),
-                title: Text(
-                  subName,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppConstants.textColor,
-                    decoration: subCompleted ? TextDecoration.lineThrough : TextDecoration.none,
-                  ),
-                ),
-                subtitle: Text(
-                  subCompleted ? 'مكتملة' : 'غير مكتملة',
-                  style: TextStyle(
-                    color: subCompleted ? AppConstants.successColor : AppConstants.warningColor,
-                  ),
-                ),
-                trailing: canEngineerEditSubPhase
-                    ? IconButton(
-                  icon: const Icon(Icons.edit, color: AppConstants.accentColor),
-                  onPressed: () => _updateSubPhase(phaseId, subPhase.id, subData),
-                )
-                    : null,
-              ),
+                return ListTile(
+                  contentPadding: EdgeInsets.symmetric(horizontal: AppConstants.paddingSmall / 2, vertical: AppConstants.paddingSmall/4),
+                  leading: Icon(subCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, color: subCompleted ? AppConstants.successColor : AppConstants.warningColor, size: 22),
+                  title: Text(subName, style: TextStyle(fontWeight: FontWeight.w500, color: AppConstants.textPrimary, fontSize: 15, decoration: subCompleted ? TextDecoration.lineThrough : null)),
+                  trailing: canEngineerEditThisSubPhase
+                      ? IconButton(icon: const Icon(Icons.edit_rounded, color: AppConstants.primaryLight, size: 20), tooltip: 'تحديث المرحلة الفرعية', onPressed: () => _updateSubPhase(phaseId, subPhase.id, subData))
+                      : null,
+                  onTap: canEngineerEditThisSubPhase ? () => _updateSubPhase(phaseId, subPhase.id, subData) : null,
+                );
+              },
             );
           },
-        );
-      },
+        ),
+      ],
     );
   }
 
+
   @override
   Widget build(BuildContext context) {
+    if (_isPageLoading || _currentUserRole == null) {
+      return Scaffold(appBar: _buildAppBar(), body: const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor)));
+    }
+
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppConstants.backgroundColor,
-        appBar: AppBar(
-          title: const Text(
-            'تفاصيل المشروع',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 24,
-            ),
-          ),
-          backgroundColor: AppConstants.primaryColor,
-          elevation: 4,
-          centerTitle: true,
-        ),
+        appBar: _buildAppBar(),
         body: FutureBuilder<DocumentSnapshot>(
           key: _projectFutureBuilderKey,
           future: FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get(),
           builder: (context, projectSnapshot) {
-            if (projectSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
-            }
-            if (projectSnapshot.hasError) {
-              return Center(
-                child: Text(
-                  'حدث خطأ في تحميل تفاصيل المشروع: ${projectSnapshot.error}',
-                  style: TextStyle(color: AppConstants.errorColor, fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-              );
-            }
-            if (!projectSnapshot.hasData || !projectSnapshot.data!.exists) {
-              return Center(
+            if (projectSnapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+            if (projectSnapshot.hasError) return Center(child: Text('خطأ: ${projectSnapshot.error}', style: const TextStyle(color: AppConstants.errorColor)));
+            if (!projectSnapshot.hasData || !projectSnapshot.data!.exists) return const Center(child: Text('المشروع غير موجود.', style: TextStyle(color: AppConstants.textSecondary, fontSize: 18)));
+
+            final projectData = projectSnapshot.data!.data() as Map<String, dynamic>;
+            return RefreshIndicator(
+              onRefresh: () async {
+                if (mounted) {
+                  setState(() { // Force re-fetch of project data and then sub-collections
+                    _projectFutureBuilderKey = UniqueKey();
+                  });
+                }
+              },
+              color: AppConstants.primaryColor,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppConstants.paddingMedium),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.folder_off, size: 80, color: AppConstants.secondaryTextColor.withOpacity(0.5)),
+                    _buildProjectSummaryCard(projectData),
                     const SizedBox(height: AppConstants.itemSpacing),
-                    Text(
-                      'المشروع غير موجود أو تم حذفه.',
-                      style: TextStyle(fontSize: 18, color: AppConstants.secondaryTextColor),
-                      textAlign: TextAlign.center,
+                    _buildPhasesSectionHeader(),
+                    const SizedBox(height: AppConstants.paddingSmall),
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance.collection('projects').doc(widget.projectId).collection('phases').orderBy('number').snapshots(),
+                      builder: (context, phaseSnapshot) {
+                        if (phaseSnapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+                        if (phaseSnapshot.hasError) return Text('خطأ تحميل المراحل: ${phaseSnapshot.error}', style: const TextStyle(color: AppConstants.errorColor));
+                        if (!phaseSnapshot.hasData || phaseSnapshot.data!.docs.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(AppConstants.paddingMedium), child: Text('لا توجد مراحل مضافة لهذا المشروع بعد.', style: TextStyle(fontSize: 16, color: AppConstants.textSecondary))));
+
+                        return ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: phaseSnapshot.data!.docs.length,
+                          itemBuilder: (context, index) => _buildPhaseExpansionTile(phaseSnapshot.data!.docs[index]),
+                        );
+                      },
                     ),
                   ],
                 ),
-              );
-            }
-
-            final projectData = projectSnapshot.data!.data() as Map<String, dynamic>;
-            final projectName = projectData['name'] as String? ?? 'مشروع غير مسمى';
-            final lastCompletedPhaseName = projectData['lastCompletedPhaseName'] as String? ?? 'لا توجد مراحل مكتملة بعد'; // استخدام الحقل الجديد
-            final engineerName = projectData['engineerName'] as String? ?? 'غير معروف';
-            final clientName = projectData['clientName'] as String? ?? 'غير معروف';
-            final status = projectData['status'] as String? ?? 'غير محدد';
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(AppConstants.padding),
-                  child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-                    ),
-                    color: AppConstants.cardColor,
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppConstants.padding),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            projectName,
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              color: AppConstants.primaryColor,
-                            ),
-                          ),
-                          const SizedBox(height: AppConstants.itemSpacing / 2),
-                          // عرض اسم آخر مرحلة مكتملة
-                          _buildInfoRow(
-                              Icons.check_circle_outline, 'آخر مرحلة مكتملة:', lastCompletedPhaseName),
-                          _buildInfoRow(Icons.engineering, 'المهندس المسؤول:', engineerName),
-                          _buildInfoRow(Icons.person, 'العميل:', clientName),
-                          _buildInfoRow(Icons.info_outline, 'الحالة:', status,
-                              valueColor: (status == 'نشط')
-                                  ? AppConstants.successColor
-                                  : (status == 'مكتمل')
-                                  ? Colors.blue
-                                  : AppConstants.warningColor),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppConstants.itemSpacing),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppConstants.padding),
-                  child: Text(
-                    'مراحل المشروع:',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppConstants.textColor,
-                    ),
-                    textAlign: TextAlign.right,
-                  ),
-                ),
-                const SizedBox(height: AppConstants.itemSpacing),
-
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('projects')
-                        .doc(widget.projectId)
-                        .collection('phases')
-                        .orderBy('number') // التأكد من الترتيب حسب الرقم
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                            child: CircularProgressIndicator(color: AppConstants.primaryColor));
-                      }
-                      if (snapshot.hasError) {
-                        return Center(
-                          child: Text(
-                            'حدث خطأ في تحميل المراحل: ${snapshot.error}',
-                            style: TextStyle(color: AppConstants.errorColor, fontSize: 16),
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      }
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.folder_open, size: 80, color: AppConstants.secondaryTextColor.withOpacity(0.5)),
-                              const SizedBox(height: AppConstants.itemSpacing),
-                              Text(
-                                'لا توجد مراحل لهذا المشروع بعد.',
-                                style: TextStyle(fontSize: 18, color: AppConstants.secondaryTextColor),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      final phases = snapshot.data!.docs;
-
-                      return ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: AppConstants.padding / 2),
-                        itemCount: phases.length,
-                        itemBuilder: (context, index) {
-                          final phase = phases[index];
-                          final data = phase.data() as Map<String, dynamic>;
-                          final number = data['number'] as int? ?? (index + 1);
-                          final name = data['name'] as String? ?? 'المرحلة $number';
-                          final note = data['note'] as String? ?? '';
-                          final imageUrl = data['imageUrl'] as String?;
-                          final image360Url = data['image360Url'] as String?;
-                          final completed = data['completed'] as bool? ?? false;
-                          final hasSubPhases = data['hasSubPhases'] as bool? ?? false;
-
-
-                          // المهندس يمكنه التعديل فقط إذا كانت المرحلة غير مكتملة
-                          bool canEngineerEditPhase = (_currentUserRole == 'engineer' && !completed);
-
-
-                          return Card(
-                            margin: const EdgeInsets.symmetric(vertical: 8),
-                            elevation: 3,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-                            ),
-                            child: ExpansionTile(
-                              collapsedBackgroundColor: completed
-                                  ? AppConstants.successColor.withOpacity(0.1)
-                                  : AppConstants.warningColor.withOpacity(0.1),
-                              backgroundColor: completed
-                                  ? AppConstants.successColor.withOpacity(0.05)
-                                  : AppConstants.warningColor.withOpacity(0.05),
-                              leading: CircleAvatar(
-                                backgroundColor: completed
-                                    ? AppConstants.successColor
-                                    : AppConstants.warningColor,
-                                child: Text(
-                                  number.toString(),
-                                  style: const TextStyle(
-                                      color: Colors.white, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              title: Text(
-                                'المرحلة $number: $name', // Display phase number and name
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppConstants.textColor,
-                                ),
-                              ),
-                              subtitle: Text(
-                                completed ? 'مكتملة ✅' : 'غير مكتملة ❌',
-                                style: TextStyle(
-                                  color: completed
-                                      ? AppConstants.successColor
-                                      : AppConstants.warningColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (canEngineerEditPhase) // زر التعديل يظهر للمهندس إذا لم تكتمل المرحلة
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, color: AppConstants.primaryColor),
-                                      onPressed: () {
-                                        _updatePhase(phase.id, data);
-                                      },
-                                    ),
-                                  if (completed && _currentUserRole == 'engineer') // زر المشاركة (للمهندس والمرحلة مكتملة)
-                                    IconButton(
-                                      icon: const Icon(Icons.share, color: Colors.teal),
-                                      onPressed: () {
-                                        final Map<String, dynamic> phaseDataWithId = Map<String, dynamic>.from(data);
-                                        phaseDataWithId['id'] = phase.id; // أضف الـ ID هنا
-                                        _showShareReportOptions(phaseDataWithId);
-                                      },
-                                    ),
-                                ],
-                              ),
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: AppConstants.padding,
-                                      vertical: AppConstants.itemSpacing / 2),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      if (note.isNotEmpty)
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'الملاحظات:',
-                                              style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppConstants.textColor),
-                                            ),
-                                            Text(
-                                              note,
-                                              style: TextStyle(
-                                                  fontSize: 15,
-                                                  color: AppConstants.secondaryTextColor),
-                                            ),
-                                            const SizedBox(height: AppConstants.itemSpacing),
-                                          ],
-                                        ),
-                                      if (imageUrl != null && imageUrl.isNotEmpty)
-                                        _buildImageSection('صورة عادية:', imageUrl),
-                                      if (image360Url != null && image360Url.isNotEmpty)
-                                        _buildImageSection('صورة 360°:', image360Url),
-                                      if (note.isEmpty &&
-                                          (imageUrl == null || imageUrl.isEmpty) &&
-                                          (image360Url == null || image360Url.isEmpty) &&
-                                          !hasSubPhases)
-                                        Text(
-                                          'لا توجد تفاصيل إضافية لهذه المرحلة.',
-                                          style: TextStyle(
-                                              fontSize: 15,
-                                              color: AppConstants.secondaryTextColor
-                                                  .withOpacity(0.7)),
-                                        ),
-                                      // قسم المراحل الفرعية
-                                      if (hasSubPhases)
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Divider(),
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Text(
-                                                  'المراحل الفرعية:',
-                                                  style: TextStyle(
-                                                      fontSize: 18,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: AppConstants.primaryColor),
-                                                ),
-                                                // لا يوجد زر إضافة مرحلة فرعية للمهندس
-                                              ],
-                                            ),
-                                            const SizedBox(height: AppConstants.itemSpacing / 2),
-                                            _buildSubPhasesList(phase.id, canEngineerEditPhase),
-                                          ],
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
+              ),
             );
           },
         ),
       ),
     );
+  }
+}
+
+// Helper widget for expandable text (same as in admin_project_details_page)
+class ExpandableText extends StatefulWidget {
+  final String text;
+  final int trimLines;
+  final Color? valueColor;
+
+  const ExpandableText(this.text, {super.key, this.trimLines = 2, this.valueColor});
+
+  @override
+  ExpandableTextState createState() => ExpandableTextState();
+}
+
+class ExpandableTextState extends State<ExpandableText> {
+  bool _readMore = true;
+  void _onTapLink() {
+    setState(() => _readMore = !_readMore);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    TextSpan link = TextSpan(
+        text: _readMore ? " عرض المزيد" : " عرض أقل",
+        style: const TextStyle(color: AppConstants.primaryColor, fontWeight: FontWeight.w600, fontSize: 14),
+        recognizer: TapGestureRecognizer()..onTap = _onTapLink
+    );
+    Widget result = LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        assert(constraints.hasBoundedWidth);
+        final double maxWidth = constraints.maxWidth;
+        final text = TextSpan(text: widget.text, style: TextStyle(fontSize: 14.5, color: widget.valueColor ?? AppConstants.textSecondary, height: 1.5));
+        TextPainter textPainter = TextPainter(
+          text: link,
+          textAlign: TextAlign.start,
+          textDirection: ui.TextDirection.rtl,
+          maxLines: widget.trimLines,
+          ellipsis: '...',
+        );
+        textPainter.layout(minWidth: constraints.minWidth, maxWidth: maxWidth);
+        final linkSize = textPainter.size;
+        textPainter.text = text;
+        textPainter.layout(minWidth: constraints.minWidth, maxWidth: maxWidth);
+        final textSize = textPainter.size;
+        int endIndex = textPainter.getPositionForOffset(Offset(textSize.width - linkSize.width, textSize.height)).offset;
+        TextSpan textSpan;
+        if (textPainter.didExceedMaxLines) {
+          textSpan = TextSpan(
+            text: _readMore && widget.text.length > endIndex ? widget.text.substring(0, endIndex) + "..." : widget.text,
+            style: TextStyle(fontSize: 14.5, color: widget.valueColor ?? AppConstants.textSecondary, height: 1.5),
+            children: <TextSpan>[link],
+          );
+        } else {
+          textSpan = TextSpan(text: widget.text, style: TextStyle(fontSize: 14.5, color: widget.valueColor ?? AppConstants.textSecondary, height: 1.5));
+        }
+        return RichText(
+          softWrap: true,
+          overflow: TextOverflow.clip,
+          textAlign: TextAlign.start,
+          textDirection: ui.TextDirection.rtl,
+          text: textSpan,
+        );
+      },
+    );
+    return result;
   }
 }

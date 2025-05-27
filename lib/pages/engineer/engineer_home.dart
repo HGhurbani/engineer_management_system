@@ -1,25 +1,33 @@
+// lib/pages/engineer/engineer_home.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:signature/signature.dart';
+import 'package:intl/intl.dart'; // For date formatting
+import 'dart:ui' as ui; // For TextDirection
 
-// Constants for consistent styling and text
+// Constants for consistent styling, aligned with the admin dashboard's style.
 class AppConstants {
-  static const Color primaryColor = Color(0xFF0056D8); // أزرق داكن احترافي
-  static const Color accentColor = Color(0xFF42A5F5); // أزرق فاتح مميز
-  static const Color cardColor = Colors.white; // لون البطاقات
-  static const Color backgroundColor = Color(0xFFF0F2F5); // لون خلفية فاتح جداً
-  static const Color textColor = Color(0xFF333333); // لون النص الأساسي
-  static const Color secondaryTextColor = Color(0xFF666666); // لون نص ثانوي
-  static const Color errorColor = Color(0xFFE53935); // أحمر للأخطاء
-  static const Color successColor = Colors.green; // لون للنجاح
-  static const Color warningColor = Color(0xFFFFA000); // لون للتحذير (برتقالي أغمق)
-  static const Color infoColor = Color(0xFF00BCD4); // لون للمعلومات (أزرق فاتح)
-
-  static const double padding = 20.0;
-  static const double borderRadius = 12.0;
+  static const Color primaryColor = Color(0xFF2563EB);
+  static const Color primaryLight = Color(0xFF3B82F6);
+  static const Color successColor = Color(0xFF10B981);
+  static const Color warningColor = Color(0xFFF59E0B);
+  static const Color errorColor = Color(0xFFEF4444);
+  static const Color infoColor = Color(0xFF3B82F6);
+  static const Color cardColor = Colors.white;
+  static const Color backgroundColor = Color(0xFFF8FAFC);
+  static const Color textPrimary = Color(0xFF1F2937);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const double paddingLarge = 24.0;
+  static const double paddingMedium = 16.0;
+  static const double paddingSmall = 8.0;
+  static const double borderRadius = 16.0;
   static const double itemSpacing = 16.0;
+  static const List<BoxShadow> cardShadow = [
+    BoxShadow(
+        color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 4)),
+  ];
 }
 
 class EngineerHome extends StatefulWidget {
@@ -29,49 +37,55 @@ class EngineerHome extends StatefulWidget {
   State<EngineerHome> createState() => _EngineerHomeState();
 }
 
-class _EngineerHomeState extends State<EngineerHome> {
-  // UID للمهندس الحالي
-  final String? _currentEngineerUid = FirebaseAuth.instance.currentUser?.uid;
-  // اسم المهندس لعرضه في شريط التطبيق
+class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMixin {
+  final String? _currentEngineerUid = FirebaseAuth.instance.currentUser?.uid; //
   String? _engineerName;
-  // حالة الحضور الحالية
-  bool _isCheckedIn = false;
-  // وقت آخر تسجيل حضور/انصراف
-  DateTime? _lastCheckTime;
+  bool _isCheckedIn = false; //
+  DateTime? _lastCheckTime; //
+  bool _isLoading = true;
+
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    // تأكد من وجود UID للمستخدم قبل جلب البيانات
+    _fadeController = AnimationController(duration: const Duration(milliseconds: 700), vsync: this);
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut));
+
     if (_currentEngineerUid == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        // إذا لم يكن هناك مستخدم مسجل دخول، قم بتسجيل الخروج وإعادة التوجيه لصفحة تسجيل الدخول
         _logout();
       });
     } else {
-      // جلب بيانات المهندس إذا كان الـ UID متاحًا
-      _fetchEngineerData();
-      _checkCurrentAttendanceStatus();
+      _loadInitialData();
     }
   }
 
-  // دالة لجلب اسم المهندس الحالي من Firestore
-  Future<void> _fetchEngineerData() async {
+  Future<void> _loadInitialData() async {
+    setState(() => _isLoading = true);
+    await _fetchEngineerData(); //
+    await _checkCurrentAttendanceStatus(); //
+    if (mounted) {
+      setState(() => _isLoading = false);
+      _fadeController.forward();
+    }
+  }
+
+  Future<void> _fetchEngineerData() async { //
     try {
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(_currentEngineerUid).get();
-      if (userDoc.exists) {
+      if (userDoc.exists && mounted) {
         setState(() {
           _engineerName = userDoc.data()?['name'] as String?;
         });
       }
     } catch (e) {
-      // طباعة الخطأ للمساعدة في التصحيح
       print('Error fetching engineer name: $e');
     }
   }
 
-  // فحص حالة الحضور الحالية
-  Future<void> _checkCurrentAttendanceStatus() async {
+  Future<void> _checkCurrentAttendanceStatus() async { //
     try {
       final today = DateTime.now();
       final startOfDay = DateTime(today.year, today.month, today.day);
@@ -88,9 +102,16 @@ class _EngineerHomeState extends State<EngineerHome> {
 
       if (attendanceQuery.docs.isNotEmpty) {
         final lastRecord = attendanceQuery.docs.first.data();
-        setState(() {
-          _isCheckedIn = lastRecord['type'] == 'check_in';
-          _lastCheckTime = (lastRecord['timestamp'] as Timestamp).toDate();
+        if (mounted) {
+          setState(() {
+            _isCheckedIn = lastRecord['type'] == 'check_in';
+            _lastCheckTime = (lastRecord['timestamp'] as Timestamp).toDate();
+          });
+        }
+      } else if (mounted) {
+        setState(() { // Ensure _isCheckedIn is false if no records today
+          _isCheckedIn = false;
+          _lastCheckTime = null;
         });
       }
     } catch (e) {
@@ -98,433 +119,158 @@ class _EngineerHomeState extends State<EngineerHome> {
     }
   }
 
-  // فحص صلاحيات الموقع وحالة GPS
-  Future<bool> _checkLocationPermissions() async {
+  Future<bool> _checkLocationPermissions() async { //
     bool serviceEnabled;
     LocationPermission permission;
-
-    // فحص إذا كانت خدمات الموقع مفعلة
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      _showErrorSnackBar(context, 'يجب تفعيل خدمات الموقع (GPS) لتسجيل الحضور والانصراف');
+      if (mounted) _showFeedbackSnackBar(context, 'يجب تفعيل خدمات الموقع (GPS) لتسجيل الحضور والانصراف.', isError: true);
       return false;
     }
-
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        _showErrorSnackBar(context, 'يجب السماح بالوصول للموقع لتسجيل الحضور والانصراف');
+        if (mounted) _showFeedbackSnackBar(context, 'يجب السماح بالوصول للموقع لتسجيل الحضور والانصراف.', isError: true);
         return false;
       }
     }
-
     if (permission == LocationPermission.deniedForever) {
-      _showErrorSnackBar(context, 'يجب السماح بالوصول للموقع من إعدادات التطبيق');
+      if (mounted) _showFeedbackSnackBar(context, 'تم رفض إذن الموقع بشكل دائم. يرجى تمكينه من إعدادات التطبيق.', isError: true);
       return false;
     }
-
     return true;
   }
 
-  // الحصول على الموقع الحالي
-  Future<Position?> _getCurrentLocation() async {
-    try {
-      return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
-    } catch (e) {
-      _showErrorSnackBar(context, 'فشل في الحصول على الموقع الحالي');
-      return null;
-    }
-  }
+  // lib/pages/engineer/engineer_home.dart
+// ... (داخل كلاس _EngineerHomeState)
 
-  // عرض نافذة التوقيع الرقمي
-  Future<void> _showSignatureDialog(String type) async {
-    final SignatureController controller = SignatureController(
-      penStrokeWidth: 2,
-      penColor: AppConstants.primaryColor,
-    );
-
-    return showDialog<void>(
+  Future<bool?> _showLogoutConfirmationDialog() async {
+    return showDialog<bool>(
       context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(
-            type == 'check_in' ? 'توقيع تسجيل الحضور' : 'توقيع تسجيل الانصراف',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          content: SizedBox(
-            height: 200,
-            width: 300,
-            child: Column(
-              children: [
-                Text(
-                  'الرجاء وضع التوقيع في المساحة أدناه',
-                  style: TextStyle(color: AppConstants.secondaryTextColor),
+      barrierDismissible: false, // المستخدم يجب أن يختار أحد الخيارين
+      builder: (BuildContext dialogContext) {
+        return Directionality(
+          textDirection: ui.TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+            ),
+            title: const Text(
+              'تأكيد تسجيل الخروج',
+              style: TextStyle(
+                  color: AppConstants.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20),
+            ),
+            content: const Text(
+              'هل أنت متأكد من رغبتك في تسجيل الخروج من حسابك؟',
+              style: TextStyle(color: AppConstants.textSecondary, fontSize: 16),
+            ),
+            actionsAlignment: MainAxisAlignment.spaceEvenly,
+            actions: <Widget>[
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingMedium, vertical: AppConstants.paddingSmall),
                 ),
-                const SizedBox(height: 10),
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppConstants.primaryColor),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Signature(
-                    controller: controller,
-                    height: 150,
-                    backgroundColor: Colors.grey[100]!,
-                  ),
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(color: AppConstants.textSecondary, fontSize: 16, fontWeight: FontWeight.w500),
                 ),
-              ],
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('مسح'),
-              onPressed: () {
-                controller.clear();
-              },
-            ),
-            TextButton(
-              child: const Text('إلغاء'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (controller.isNotEmpty) {
-                  Navigator.of(context).pop();
-                  await _processAttendance(type, controller);
-                } else {
-                  _showErrorSnackBar(context, 'الرجاء وضع التوقيع قبل المتابعة');
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppConstants.primaryColor,
+                onPressed: () {
+                  Navigator.of(dialogContext).pop(false); // إرجاع false عند الإلغاء
+                },
               ),
-              child: const Text('تأكيد', style: TextStyle(color: Colors.white)),
-            ),
-          ],
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppConstants.errorColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingMedium, vertical: AppConstants.paddingSmall),
+                ),
+                child: const Text(
+                  'تسجيل الخروج',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                onPressed: () {
+                  Navigator.of(dialogContext).pop(true); // إرجاع true عند التأكيد
+                },
+              ),
+            ],
+          ),
         );
       },
     );
   }
 
-  // معالجة عملية تسجيل الحضور/الانصراف
-  Future<void> _processAttendance(String type, SignatureController signatureController) async {
+  Future<Position?> _getCurrentLocation() async { //
     try {
-      // فحص صلاحيات الموقع
-      final hasLocationPermission = await _checkLocationPermissions();
-      if (!hasLocationPermission) return;
-
-      // الحصول على الموقع الحالي
-      final position = await _getCurrentLocation();
-      if (position == null) return;
-
-      // تحويل التوقيع إلى بيانات
-      final signatureData = await signatureController.toPngBytes();
-
-      // إنشاء سجل الحضور
-      final attendanceData = {
-        'userId': _currentEngineerUid,
-        'userName': _engineerName ?? 'غير معروف',
-        'type': type, // 'check_in' أو 'check_out'
-        'timestamp': FieldValue.serverTimestamp(),
-        'location': {
-          'latitude': position.latitude,
-          'longitude': position.longitude,
-          'accuracy': position.accuracy,
-        },
-        'signatureData': signatureData,
-        'deviceInfo': {
-          'platform': 'mobile',
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        }
-      };
-
-      // حفظ السجل في قاعدة البيانات
-      await FirebaseFirestore.instance
-          .collection('attendance')
-          .add(attendanceData);
-
-      // تحديث الحالة المحلية
-      setState(() {
-        _isCheckedIn = type == 'check_in';
-        _lastCheckTime = DateTime.now();
-      });
-
-      // عرض رسالة نجاح
-      final message = type == 'check_in'
-          ? 'تم تسجيل الحضور بنجاح'
-          : 'تم تسجيل الانصراف بنجاح';
-      _showSuccessSnackBar(context, message);
-
+      return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 15));
     } catch (e) {
-      _showErrorSnackBar(context, 'فشل في تسجيل ${type == 'check_in' ? 'الحضور' : 'الانصراف'}: $e');
+      if (mounted) _showFeedbackSnackBar(context, 'فشل في الحصول على الموقع الحالي. حاول مرة أخرى.', isError: true);
+      return null;
     }
   }
 
-  // دالة لتسجيل الخروج من Firebase
-  Future<void> _logout() async {
-    try {
-      await FirebaseAuth.instance.signOut();
-      if (context.mounted) {
-        Navigator.of(context).pushReplacementNamed('/login');
-        _showSuccessSnackBar(context, 'تم تسجيل الخروج بنجاح.');
-      }
-    } catch (e) {
-      if (context.mounted) {
-        _showErrorSnackBar(context, 'فشل تسجيل الخروج: $e');
-      }
-    }
-  }
+  Future<void> _showSignatureDialog(String type) async { //
+    final SignatureController controller = SignatureController(penStrokeWidth: 3, penColor: AppConstants.primaryColor, exportBackgroundColor: AppConstants.cardColor.withOpacity(0.8));
+    bool isProcessing = false;
 
-  // دالة مساعدة لعرض رسائل النجاح للمستخدم
-  void _showSuccessSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppConstants.successColor,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  // دالة مساعدة لعرض رسائل الخطأ للمستخدم
-  void _showErrorSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppConstants.errorColor,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // عرض واجهة خطأ إذا لم يكن هناك UID للمهندس (لم يتم تسجيل الدخول بشكل صحيح)
-    if (_currentEngineerUid == null) {
-      return Scaffold(
-        backgroundColor: AppConstants.backgroundColor,
-        appBar: AppBar(
-          title: const Text('خطأ', style: TextStyle(color: Colors.white)),
-          backgroundColor: AppConstants.primaryColor,
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 80, color: AppConstants.errorColor),
-              const SizedBox(height: AppConstants.itemSpacing),
-              Text(
-                'فشل تحميل معلومات المستخدم. الرجاء تسجيل الدخول مرة أخرى.',
-                style: TextStyle(fontSize: 18, color: AppConstants.textColor),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppConstants.itemSpacing),
-              ElevatedButton.icon(
-                onPressed: _logout,
-                icon: const Icon(Icons.logout, color: Colors.white),
-                label: const Text('تسجيل الخروج', style: TextStyle(color: Colors.white)),
-                style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // الواجهة الرئيسية للمهندس مع تبويبات المشاريع وتسجيل الحضور
-    return Directionality(
-      textDirection: TextDirection.rtl, // تحديد اتجاه النص من اليمين لليسار
-      child: DefaultTabController(
-        length: 2, // عدد التبويبات: المشاريع وتسجيل الحضور
-        child: Scaffold(
-          backgroundColor: AppConstants.backgroundColor,
-          appBar: AppBar(
-            title: Text(
-              _engineerName != null ? 'مرحباً، $_engineerName!' : 'لوحة تحكم المهندس',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 24,
-              ),
-            ),
-            backgroundColor: AppConstants.primaryColor,
-            elevation: 4,
-            centerTitle: true,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.logout, color: Colors.white),
-                tooltip: 'تسجيل الخروج',
-                onPressed: _logout,
-              ),
-              // NEW: Notification icon for engineer
-              IconButton(
-                icon: const Icon(Icons.notifications, color: Colors.white),
-                tooltip: 'الإشعارات',
-                onPressed: () {
-                  Navigator.pushNamed(context, '/notifications'); // We will create this page soon
-                },
-              ),
-            ],
-            // تبويبات التنقل بين المشاريع وتسجيل الحضور
-            bottom: const TabBar(
-              indicatorColor: Colors.white, // لون المؤشر تحت التبويب النشط
-              labelColor: Colors.white, // لون نص التبويب النشط
-              unselectedLabelColor: Colors.white70, // لون نص التبويب غير النشط
-              labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              tabs: [
-                Tab(text: 'مشاريعي', icon: Icon(Icons.folder_open)),
-                Tab(text: 'تسجيل الحضور والانصراف', icon: Icon(Icons.access_time)),
-              ],
-            ),
-          ),
-          body: TabBarView(
-            children: [
-              _buildMyProjectsTab(), // محتوى تبويب "مشاريعي"
-              _buildAttendanceTab(), // محتوى تبويب "تسجيل الحضور والانصراف"
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // بناء تبويب عرض المشاريع المخصصة للمهندس
-  Widget _buildMyProjectsTab() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('projects')
-          .where('engineerId', isEqualTo: _currentEngineerUid) // فلترة المشاريع بالمهندس الحالي
-          .orderBy('createdAt', descending: true) // ترتيب حسب تاريخ الإنشاء الأحدث
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
-        }
-        if (snapshot.hasError) {
-          // عرض رسالة خطأ واضحة إذا فشل تحميل المشاريع
-          return Center(
-            child: Text(
-              'حدث خطأ في تحميل المشاريع: ${snapshot.error}',
-              style: TextStyle(color: AppConstants.errorColor, fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
-          );
-        }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          // عرض رسالة إذا لم يكن هناك مشاريع مخصصة للمهندس
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.folder_open, size: 80, color: AppConstants.secondaryTextColor.withOpacity(0.5)),
-                const SizedBox(height: AppConstants.itemSpacing),
-                Text(
-                  'لا توجد مشاريع مخصصة لك حتى الآن.',
-                  style: TextStyle(fontSize: 18, color: AppConstants.secondaryTextColor),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppConstants.itemSpacing),
-                Text(
-                  'الرجاء التواصل مع المسؤول لمزيد من المعلومات.',
-                  style: TextStyle(fontSize: 14, color: AppConstants.secondaryTextColor.withOpacity(0.7)),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          );
-        }
-
-        final projects = snapshot.data!.docs;
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(AppConstants.padding / 2),
-          itemCount: projects.length,
-          itemBuilder: (context, index) {
-            final project = projects[index];
-            final data = project.data() as Map<String, dynamic>;
-            final name = data['name'] as String? ?? 'اسم مشروع غير متوفر';
-            final currentStage = data['currentStage'] as int? ?? 0; // NEW: Default to 0
-            final currentPhaseName = data['currentPhaseName'] as String? ?? 'لا توجد مراحل بعد'; // NEW: Fetch current phase name
-            final clientName = data['clientName'] as String? ?? 'غير معروف';
-            final status = data['status'] as String? ?? 'غير محدد'; // حالة المشروع
-
-            // تحديد أيقونة ولون بناءً على حالة المشروع
-            Color statusColor = AppConstants.secondaryTextColor;
-            IconData statusIcon = Icons.info_outline;
-            if (status == 'نشط') {
-              statusColor = AppConstants.successColor;
-              statusIcon = Icons.play_circle_fill_outlined;
-            } else if (status == 'مكتمل') {
-              statusColor = Colors.blue.shade600;
-              statusIcon = Icons.check_circle_outline;
-            } else if (status == 'معلق') {
-              statusColor = AppConstants.warningColor;
-              statusIcon = Icons.pause_circle_outline;
-            }
-
-            return Card(
-              margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                leading: CircleAvatar(
-                  backgroundColor: statusColor.withOpacity(0.2),
-                  child: Icon(statusIcon, color: statusColor),
-                ),
-                title: Text(
-                  name,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppConstants.textColor,
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Directionality(
+              textDirection: ui.TextDirection.rtl,
+              child: AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+                title: Text(type == 'check_in' ? 'توقيع تسجيل الحضور' : 'توقيع تسجيل الانصراف', textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                content: SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.8,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('الرجاء وضع التوقيع في المساحة أدناه:', style: TextStyle(color: AppConstants.textSecondary, fontSize: 15)),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      Container(
+                        height: 180,
+                        decoration: BoxDecoration(border: Border.all(color: AppConstants.primaryLight, width: 1.5), borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2), color: AppConstants.backgroundColor),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2 -1),
+                          child: Signature(controller: controller, backgroundColor: AppConstants.backgroundColor),
+                        ),
+                      ),
+                    ],
                   ),
-                  overflow: TextOverflow.ellipsis, // لقطع النص الطويل
                 ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'المرحلة الحالية: ${currentStage == 0 ? currentPhaseName : '$currentStage - $currentPhaseName'}', // NEW: Display current phase name
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppConstants.secondaryTextColor,
-                      ),
-                    ),
-                    Text(
-                      'العميل: $clientName',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppConstants.secondaryTextColor.withOpacity(0.8),
-                        fontStyle: FontStyle.italic,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      'الحالة: $status',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: statusColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                isThreeLine: true, // للسماح بعرض 3 أسطر في العنوان الفرعي
-                trailing: const Icon(Icons.arrow_forward_ios, color: AppConstants.accentColor),
-                onTap: () {
-                  // عند النقر، انتقل إلى صفحة تفاصيل المشروع
-                  Navigator.pushNamed(context, '/projectDetails', arguments: project.id);
-                },
+                actionsAlignment: MainAxisAlignment.spaceEvenly,
+                actions: <Widget>[
+                  TextButton.icon(icon: const Icon(Icons.clear_all_rounded), label: const Text('مسح'), onPressed: () => controller.clear(), style: TextButton.styleFrom(foregroundColor: AppConstants.textSecondary)),
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    style: TextButton.styleFrom(foregroundColor: AppConstants.textSecondary),
+                    child: const Text('إلغاء'), // <-- هنا التعديل: استخدام child
+                  ),                  ElevatedButton.icon(
+                    icon: isProcessing ? const SizedBox.shrink() : Icon(type == 'check_in' ? Icons.login_rounded : Icons.logout_rounded, color: Colors.white),
+                    label: isProcessing
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
+                        : Text(type == 'check_in' ? 'تأكيد الحضور' : 'تأكيد الانصراف', style: const TextStyle(color: Colors.white)),
+                    onPressed: isProcessing ? null : () async {
+                      if (controller.isNotEmpty) {
+                        setDialogState(() => isProcessing = true);
+                        Navigator.of(dialogContext).pop(); // Close dialog before processing
+                        await _processAttendance(type, controller); //
+                      } else {
+                        _showFeedbackSnackBar(context, 'الرجاء وضع التوقيع قبل المتابعة.', isError: true);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: type == 'check_in' ? AppConstants.successColor : AppConstants.warningColor, padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingMedium, vertical: AppConstants.paddingSmall)),
+                  ),
+                ],
               ),
             );
           },
@@ -533,142 +279,269 @@ class _EngineerHomeState extends State<EngineerHome> {
     );
   }
 
-  // بناء تبويب تسجيل الحضور والانصراف
-  Widget _buildAttendanceTab() {
-    return Padding(
-      padding: const EdgeInsets.all(AppConstants.padding),
-      child: Column(
-        children: [
-          // بطاقة الحالة الحالية
-          Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(AppConstants.padding),
-              child: Column(
-                children: [
-                  Icon(
-                    _isCheckedIn ? Icons.work : Icons.home,
-                    size: 60,
-                    color: _isCheckedIn ? AppConstants.successColor : AppConstants.warningColor,
-                  ),
-                  const SizedBox(height: AppConstants.itemSpacing),
-                  Text(
-                    _isCheckedIn ? 'أنت حالياً في العمل' : 'أنت غير متواجد في العمل',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: _isCheckedIn ? AppConstants.successColor : AppConstants.warningColor,
-                    ),
-                  ),
-                  if (_lastCheckTime != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'آخر تسجيل: ${_formatTime(_lastCheckTime!)}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppConstants.secondaryTextColor,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+  Future<void> _processAttendance(String type, SignatureController signatureController) async { //
+    try {
+      final hasLocationPermission = await _checkLocationPermissions();
+      if (!hasLocationPermission || !mounted) return;
+
+      final position = await _getCurrentLocation();
+      if (position == null || !mounted) return;
+
+      final signatureData = await signatureController.toPngBytes();
+      if (signatureData == null || !mounted) {
+        _showFeedbackSnackBar(context, 'فشل في الحصول على بيانات التوقيع.', isError: true);
+        return;
+      }
+
+      final attendanceData = {
+        'userId': _currentEngineerUid,
+        'userName': _engineerName ?? 'غير معروف',
+        'type': type,
+        'timestamp': FieldValue.serverTimestamp(),
+        'location': {'latitude': position.latitude, 'longitude': position.longitude, 'accuracy': position.accuracy},
+        'signatureData': signatureData, //
+        'deviceInfo': {'platform': 'mobile', 'timestamp': DateTime.now().millisecondsSinceEpoch}
+      };
+
+      await FirebaseFirestore.instance.collection('attendance').add(attendanceData);
+
+      if (mounted) {
+        setState(() {
+          _isCheckedIn = type == 'check_in';
+          _lastCheckTime = DateTime.now(); // Approximation, actual time from server
+        });
+        final message = type == 'check_in' ? 'تم تسجيل الحضور بنجاح.' : 'تم تسجيل الانصراف بنجاح.';
+        _showFeedbackSnackBar(context, message, isError: false);
+      }
+    } catch (e) {
+      if (mounted) _showFeedbackSnackBar(context, 'فشل تسجيل ${type == 'check_in' ? 'الحضور' : 'الانصراف'}: $e', isError: true);
+    }
+  }
+
+
+
+  Future<void> _logout() async {
+    // عرض نافذة التأكيد أولاً
+    final bool? confirmed = await _showLogoutConfirmationDialog();
+
+    // التحقق مما إذا كان المستخدم قد أكد تسجيل الخروج (وضمان أن الواجهة لا تزال mounted)
+    if (confirmed == true && mounted) {
+      try {
+        await FirebaseAuth.instance.signOut();
+        if (mounted) { // تحقق مرة أخرى قبل استخدام context
+          Navigator.of(context).pushReplacementNamed('/login');
+          _showFeedbackSnackBar(context, 'تم تسجيل الخروج بنجاح.', isError: false);
+        }
+      } catch (e) {
+        if (mounted) { // تحقق مرة أخرى قبل استخدام context
+          _showFeedbackSnackBar(context, 'فشل تسجيل الخروج: $e', isError: true);
+        }
+      }
+    }
+  }
+
+  void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        backgroundColor: isError ? AppConstants.errorColor : AppConstants.successColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
+        margin: const EdgeInsets.all(AppConstants.paddingMedium),
+      ),
+    );
+  }
+
+  String _formatTimeForDisplay(DateTime? dateTime) { //
+    if (dateTime == null) return 'غير متوفر';
+    return DateFormat('hh:mm a  dd/MM/yyyy', 'ar').format(dateTime); // Arabic AM/PM and date
+  }
+
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_currentEngineerUid == null) {
+      return Scaffold(
+        backgroundColor: AppConstants.backgroundColor,
+        appBar: AppBar(title: const Text('خطأ', style: TextStyle(color: Colors.white)), backgroundColor: AppConstants.primaryColor, centerTitle: true),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppConstants.paddingLarge),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline_rounded, size: 80, color: AppConstants.errorColor),
+                const SizedBox(height: AppConstants.itemSpacing),
+                const Text('فشل تحميل معلومات المستخدم. الرجاء تسجيل الدخول مرة أخرى.', style: TextStyle(fontSize: 18, color: AppConstants.textPrimary), textAlign: TextAlign.center),
+                const SizedBox(height: AppConstants.itemSpacing),
+                ElevatedButton.icon(onPressed: _logout, icon: const Icon(Icons.logout_rounded, color: Colors.white), label: const Text('تسجيل الخروج', style: TextStyle(color: Colors.white)), style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor)),
+              ],
             ),
           ),
+        ),
+      );
+    }
 
-          const SizedBox(height: AppConstants.itemSpacing * 2),
-
-          // أزرار تسجيل الحضور والانصراف
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: !_isCheckedIn
-                      ? () => _showSignatureDialog('check_in')
-                      : null,
-                  icon: const Icon(Icons.login, color: Colors.white),
-                  label: const Text(
-                    'تسجيل الحضور',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isCheckedIn
-                        ? AppConstants.secondaryTextColor
-                        : AppConstants.successColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppConstants.itemSpacing),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _isCheckedIn
-                      ? () => _showSignatureDialog('check_out')
-                      : null,
-                  icon: const Icon(Icons.logout, color: Colors.white),
-                  label: const Text(
-                    'تسجيل الانصراف',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: !_isCheckedIn
-                        ? AppConstants.secondaryTextColor
-                        : AppConstants.warningColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+    return Directionality(
+      textDirection: ui.TextDirection.rtl,
+      child: DefaultTabController(
+        length: 2,
+        child: Scaffold(
+          backgroundColor: AppConstants.backgroundColor,
+          appBar: _buildAppBar(),
+          body: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor))
+              : FadeTransition(
+            opacity: _fadeAnimation,
+            child: TabBarView(
+              children: [
+                _buildMyProjectsTab(),
+                _buildAttendanceTab(),
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
 
-          const SizedBox(height: AppConstants.itemSpacing * 2),
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: Text(
+        _engineerName != null ? 'أهلاً، $_engineerName' : 'لوحة تحكم المهندس',
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 22),
+      ),
+      backgroundColor: AppConstants.primaryColor,
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(colors: [AppConstants.primaryColor, AppConstants.primaryLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        ),
+      ),
+      elevation: 3,
+      centerTitle: true,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+          tooltip: 'الإشعارات',
+          onPressed: () => Navigator.pushNamed(context, '/notifications'), //
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout_rounded, color: Colors.white),
+          tooltip: 'تسجيل الخروج',
+          onPressed: _logout,
+        ),
+      ],
+      bottom: TabBar(
+        indicatorColor: Colors.white,
+        indicatorWeight: 3.0,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white.withOpacity(0.7),
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.5, fontFamily: 'Cairo'), // Example using a common Arabic font
+        unselectedLabelStyle: const TextStyle(fontSize: 16, fontFamily: 'Cairo'),
+        tabs: const [
+          Tab(text: 'مشاريعي', icon: Icon(Icons.business_center_outlined)),
+          Tab(text: 'الحضور والانصراف', icon: Icon(Icons.timer_outlined)),
+        ],
+      ),
+    );
+  }
 
-          // سجل الحضور لليوم الحالي
-          Expanded(
-            child: Card(
+  Widget _buildMyProjectsTab() { //
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('projects')
+          .where('engineerId', isEqualTo: _currentEngineerUid)
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+        }
+        if (snapshot.hasError) {
+          return _buildErrorState('حدث خطأ في تحميل المشاريع: ${snapshot.error}');
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyState('لا توجد مشاريع مخصصة لك حالياً.', icon: Icons.work_off_outlined);
+        }
+
+        final projects = snapshot.data!.docs;
+        return ListView.builder(
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+          itemCount: projects.length,
+          itemBuilder: (context, index) {
+            final project = projects[index];
+            final data = project.data() as Map<String, dynamic>;
+            final name = data['name'] ?? 'اسم مشروع غير متوفر';
+            final currentStage = data['currentStage'] ?? 0; //
+            final currentPhaseName = data['currentPhaseName'] ?? 'لا توجد مراحل بعد'; //
+            final clientName = data['clientName'] ?? 'غير معروف';
+            final status = data['status'] ?? 'غير محدد';
+
+            IconData statusIcon;
+            Color statusColor;
+            switch (status) {
+              case 'نشط': statusIcon = Icons.construction_rounded; statusColor = AppConstants.infoColor; break;
+              case 'مكتمل': statusIcon = Icons.check_circle_outline_rounded; statusColor = AppConstants.successColor; break;
+              case 'معلق': statusIcon = Icons.pause_circle_outline_rounded; statusColor = AppConstants.warningColor; break;
+              default: statusIcon = Icons.help_outline_rounded; statusColor = AppConstants.textSecondary;
+            }
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
               elevation: 2,
-              shape: RoundedRectangleBorder(
+              shadowColor: AppConstants.primaryColor.withOpacity(0.1),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+              child: InkWell(
                 borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppConstants.primaryColor,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(AppConstants.borderRadius),
-                        topRight: Radius.circular(AppConstants.borderRadius),
+                onTap: () => Navigator.pushNamed(context, '/projectDetails', arguments: project.id), //
+                child: Padding(
+                  padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(statusIcon, color: statusColor, size: 26),
+                          const SizedBox(width: AppConstants.paddingSmall),
+                          Expanded(child: Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppConstants.textPrimary), overflow: TextOverflow.ellipsis)),
+                          const Icon(Icons.arrow_forward_ios_rounded, color: AppConstants.textSecondary, size: 18),
+                        ],
                       ),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.history, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text(
-                          'سجل اليوم',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
+                      const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
+                      _buildProjectInfoRow(Icons.stairs_outlined, 'المرحلة الحالية:', '$currentStage - $currentPhaseName'),
+                      _buildProjectInfoRow(Icons.person_outline_rounded, 'العميل:', clientName),
+                      _buildProjectInfoRow(statusIcon, 'الحالة:', status, valueColor: statusColor),
+                    ],
                   ),
-                  Expanded(
-                    child: _buildTodayAttendanceList(),
-                  ),
-                ],
+                ),
               ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildProjectInfoRow(IconData icon, String label, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppConstants.primaryColor),
+          const SizedBox(width: 8),
+          Text('$label ', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary, fontWeight: FontWeight.w500)),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(fontSize: 14, color: valueColor ?? AppConstants.textPrimary, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -676,8 +549,119 @@ class _EngineerHomeState extends State<EngineerHome> {
     );
   }
 
-  // بناء قائمة سجل الحضور لليوم الحالي
-  Widget _buildTodayAttendanceList() {
+
+  Widget _buildAttendanceTab() { //
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppConstants.paddingLarge),
+      child: Column(
+        children: [
+          _buildAttendanceStatusCard(),
+          const SizedBox(height: AppConstants.paddingLarge),
+          _buildAttendanceActionButtons(),
+          const SizedBox(height: AppConstants.paddingLarge),
+          _buildTodayAttendanceSection(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendanceStatusCard() {
+    return Card(
+      elevation: AppConstants.cardShadow[0].blurRadius,
+      shadowColor: AppConstants.primaryColor.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+      child: Padding(
+        padding: const EdgeInsets.all(AppConstants.paddingLarge),
+        child: Column(
+          children: [
+            Icon(
+              _isCheckedIn ? Icons.work_history_rounded : Icons.home_work_outlined,
+              size: 50,
+              color: _isCheckedIn ? AppConstants.successColor : AppConstants.warningColor,
+            ),
+            const SizedBox(height: AppConstants.itemSpacing),
+            Text(
+              _isCheckedIn ? 'أنت مسجل حضور حالياً' : 'أنت مسجل انصراف حالياً',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _isCheckedIn ? AppConstants.successColor : AppConstants.warningColor),
+            ),
+            if (_lastCheckTime != null) ...[
+              const SizedBox(height: AppConstants.paddingSmall),
+              Text('آخر تسجيل: ${_formatTimeForDisplay(_lastCheckTime)}', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttendanceActionButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: !_isCheckedIn ? () => _showSignatureDialog('check_in') : null,
+            icon: const Icon(Icons.login_rounded, color: Colors.white),
+            label: const Text('تسجيل الحضور', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppConstants.successColor,
+              disabledBackgroundColor: AppConstants.successColor.withOpacity(0.5),
+              padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingMedium),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
+              elevation: 2,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppConstants.itemSpacing),
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: _isCheckedIn ? () => _showSignatureDialog('check_out') : null,
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
+            label: const Text('تسجيل الانصراف', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppConstants.warningColor,
+              disabledBackgroundColor: AppConstants.warningColor.withOpacity(0.5),
+              padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingMedium),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
+              elevation: 2,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTodayAttendanceSection() {
+    return Card(
+      elevation: AppConstants.cardShadow[0].blurRadius,
+      shadowColor: AppConstants.primaryColor.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppConstants.paddingMedium),
+            decoration: BoxDecoration(
+              color: AppConstants.primaryLight.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(AppConstants.borderRadius), topRight: Radius.circular(AppConstants.borderRadius)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.history_edu_rounded, color: AppConstants.primaryColor),
+                SizedBox(width: AppConstants.paddingSmall),
+                Text('سجل اليوم', style: TextStyle(color: AppConstants.primaryColor, fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 250, // Constrain height for the list
+            child: _buildTodayAttendanceList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTodayAttendanceList() { //
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
     final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59);
@@ -694,28 +678,16 @@ class _EngineerHomeState extends State<EngineerHome> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
         }
-
         if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              'خطأ في تحميل السجل',
-              style: TextStyle(color: AppConstants.errorColor),
-            ),
-          );
+          return _buildErrorState('خطأ في تحميل سجل اليوم.');
         }
-
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(
-            child: Text(
-              'لا توجد سجلات لليوم الحالي',
-              style: TextStyle(fontSize: 16),
-            ),
-          );
+          return _buildEmptyState('لا توجد سجلات لليوم الحالي.', icon: Icons.event_busy_outlined);
         }
 
         final records = snapshot.data!.docs;
-
-        return ListView.builder(
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall),
           itemCount: records.length,
           itemBuilder: (context, index) {
             final record = records[index].data() as Map<String, dynamic>;
@@ -725,52 +697,49 @@ class _EngineerHomeState extends State<EngineerHome> {
 
             return ListTile(
               leading: CircleAvatar(
-                backgroundColor: isCheckIn
-                    ? AppConstants.successColor.withOpacity(0.2)
-                    : AppConstants.warningColor.withOpacity(0.2),
-                child: Icon(
-                  isCheckIn ? Icons.login : Icons.logout,
-                  color: isCheckIn ? AppConstants.successColor : AppConstants.warningColor,
-                ),
+                backgroundColor: (isCheckIn ? AppConstants.successColor : AppConstants.warningColor).withOpacity(0.15),
+                child: Icon(isCheckIn ? Icons.login_rounded : Icons.logout_rounded, color: isCheckIn ? AppConstants.successColor : AppConstants.warningColor, size: 22),
               ),
-              title: Text(
-                isCheckIn ? 'تسجيل حضور' : 'تسجيل انصراف',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              subtitle: Text(
-                _formatTime(timestamp),
-                style: TextStyle(
-                  color: AppConstants.secondaryTextColor,
-                  fontSize: 14,
-                ),
-              ),
-              trailing: Icon(
-                Icons.check_circle,
-                color: AppConstants.successColor,
-                size: 20,
-              ),
+              title: Text(isCheckIn ? 'تسجيل حضور' : 'تسجيل انصراف', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: AppConstants.textPrimary)),
+              subtitle: Text(_formatTimeForDisplay(timestamp), style: const TextStyle(color: AppConstants.textSecondary, fontSize: 13)),
+              dense: true,
             );
           },
+          separatorBuilder: (context, index) => const Divider(height: 0.5, indent: AppConstants.paddingLarge, endIndent: AppConstants.paddingLarge),
         );
       },
     );
   }
 
-  // دالة لتنسيق الوقت
-  String _formatTime(DateTime dateTime) {
-    // Check if the current time is after 12 PM to use 'مساءً' otherwise 'صباحًا'
-    final hour = dateTime.hour;
-    final ampm = hour < 12 ? 'صباحًا' : 'مساءً';
-    final formattedHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+  Widget _buildErrorState(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppConstants.paddingLarge),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off_rounded, size: 60, color: AppConstants.textSecondary),
+            const SizedBox(height: AppConstants.itemSpacing),
+            Text(message, style: const TextStyle(fontSize: 16, color: AppConstants.textSecondary, fontWeight:FontWeight.w500), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
 
-    final minute = dateTime.minute.toString().padLeft(2, '0');
-    final day = dateTime.day.toString().padLeft(2, '0');
-    final month = dateTime.month.toString().padLeft(2, '0');
-    final year = dateTime.year;
-
-    return '$day/$month/$year - $formattedHour:$minute $ampm';
+  Widget _buildEmptyState(String message, {IconData icon = Icons.inbox_rounded}) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppConstants.paddingLarge),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 70, color: AppConstants.textSecondary.withOpacity(0.4)),
+            const SizedBox(height: AppConstants.itemSpacing),
+            Text(message, style: const TextStyle(fontSize: 17, color: AppConstants.textSecondary, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
   }
 }
