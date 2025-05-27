@@ -200,25 +200,26 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
                         'engineerName': engineerName,
                         'clientId': selectedClientId,
                         'clientName': clientName,
-                        'currentStage': 1,
-                        'status': 'نشط', // يمكنك إضافة حالة أخرى للمشروع
+                        'currentStage': 0, // المرحلة تبدأ من 0 أو أي قيمة تدل على عدم وجود مراحل بعد
+                        'currentPhaseName': 'لا توجد مراحل بعد', // اسم المرحلة الحالية الافتراضي
+                        'status': 'نشط',
                         'createdAt': FieldValue.serverTimestamp(),
                       });
 
-                      // إنشاء 12 مرحلة افتراضيًا
-                      for (int i = 1; i <= 12; i++) {
-                        await docRef.collection('phases').doc(i.toString().padLeft(2, '0')).set({
-                          'number': i,
-                          'note': '',
-                          'imageUrl': null,
-                          'image360Url': null,
-                          'completed': false,
-                          'createdAt': FieldValue.serverTimestamp(),
-                        });
-                      }
+                      // تم إزالة جزء إنشاء الـ 12 مرحلة الافتراضية هنا
+                      // for (int i = 1; i <= 12; i++) {
+                      //   await docRef.collection('phases').doc(i.toString().padLeft(2, '0')).set({
+                      //     'number': i,
+                      //     'note': '',
+                      //     'imageUrl': null,
+                      //     'image360Url': null,
+                      //     'completed': false,
+                      //     'createdAt': FieldValue.serverTimestamp(),
+                      //   });
+                      // }
 
                       Navigator.pop(dialogContext); // إغلاق الـ dialog
-                      _showSuccessSnackBar(context, 'تم إضافة المشروع "${nameController.text.trim()}" بنجاح.');
+                      _showSuccessSnackBar(context, 'تم إضافة المشروع "${nameController.text.trim()}" بنجاح. يمكنك الآن إضافة المراحل إليه.');
                     } catch (e) {
                       setDialogState(() { isLoading = false; });
                       _showErrorSnackBar(context, 'فشل إضافة المشروع: $e');
@@ -403,7 +404,8 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
                 final project = projects[index];
                 final data = project.data() as Map<String, dynamic>;
                 final name = data['name'] as String? ?? 'اسم مشروع غير متوفر';
-                final currentStage = data['currentStage'] as int? ?? 1;
+                final currentStage = data['currentStage'] as int? ?? 1; // Assuming default if not set
+                final currentPhaseName = data['currentPhaseName'] as String? ?? 'غير محددة'; // Get phase name
                 final engineerName = data['engineerName'] as String? ?? 'غير معروف';
                 final clientName = data['clientName'] as String? ?? 'غير معروف';
                 final status = data['status'] as String? ?? 'غير محدد'; // حالة المشروع
@@ -448,7 +450,7 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'المرحلة الحالية: $currentStage / 12',
+                          'المرحلة الحالية: $currentStage - $currentPhaseName', // Display current phase name
                           style: TextStyle(
                             fontSize: 14,
                             color: AppConstants.secondaryTextColor,

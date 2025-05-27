@@ -255,6 +255,14 @@ class _ClientHomeState extends State<ClientHome> {
               tooltip: 'تسجيل الخروج',
               onPressed: _logout,
             ),
+            // NEW: Notification icon for client
+            IconButton(
+              icon: const Icon(Icons.notifications, color: Colors.white),
+              tooltip: 'الإشعارات',
+              onPressed: () {
+                Navigator.pushNamed(context, '/notifications'); // We will create this page soon
+              },
+            ),
           ],
         ),
         body: FutureBuilder<QuerySnapshot>(
@@ -304,8 +312,8 @@ class _ClientHomeState extends State<ClientHome> {
             final projectId = projectDoc.id;
             final projectData = projectDoc.data() as Map<String, dynamic>;
             final projectName = projectData['name'] as String? ?? 'مشروع غير مسمى';
-            final currentStageNumber = projectData['currentStage'] as int? ?? 1;
-            final currentPhaseName = projectData['currentPhaseName'] as String? ?? 'غير محددة'; // Fetch current phase name
+            final currentStageNumber = projectData['currentStage'] as int? ?? 0; // NEW: Default to 0
+            final currentPhaseName = projectData['currentPhaseName'] as String? ?? 'لا توجد مراحل بعد'; // NEW: Fetch current phase name
             final engineerName = projectData['engineerName'] as String? ?? 'غير معروف'; // جلب اسم المهندس مباشرة من المشروع
             final projectStatus = projectData['status'] as String? ?? 'غير محدد';
             final generalNotes = projectData['generalNotes'] as String? ?? ''; // ملاحظات عامة للمشروع
@@ -315,210 +323,311 @@ class _ClientHomeState extends State<ClientHome> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // قسم معلومات المشروع الرئيسية
-                  Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-                    ),
-                    color: AppConstants.cardColor,
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppConstants.padding),
+                // قسم معلومات المشروع الرئيسية
+                Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+                ),
+                color: AppConstants.cardColor,
+                child: Padding(
+                  padding: const EdgeInsets.all(AppConstants.padding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        projectName,
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: AppConstants.primaryColor,
+                        ),
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing / 2),
+                      // Display current phase number and name
+                      _buildInfoRow(Icons.calendar_today, 'المرحلة الحالية:',
+                          currentStageNumber == 0
+                              ? currentPhaseName // "لا توجد مراحل بعد"
+                              : '$currentStageNumber - $currentPhaseName'), // NEW: Display current phase name
+                      _buildInfoRow(Icons.engineering, 'المهندس المسؤول:', engineerName),
+                      _buildInfoRow(Icons.info_outline, 'حالة المشروع:', projectStatus,
+                          valueColor: (projectStatus == 'نشط')
+                              ? AppConstants.successColor
+                              : (projectStatus == 'مكتمل')
+                              ? Colors.blue
+                              : AppConstants.warningColor),
+                      if (generalNotes.isNotEmpty) ...[
+                        const Divider(height: AppConstants.itemSpacing * 2, thickness: 1),
+                        Text(
+                          'ملاحظات عامة من المهندس:',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppConstants.textColor,
+                          ),
+                        ),
+                        const SizedBox(height: AppConstants.itemSpacing / 2),
+                        Text(
+                          generalNotes,
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: AppConstants.secondaryTextColor,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppConstants.itemSpacing * 1.5),
+
+              // عنوان قسم المراحل المكتملة
+              Text(
+                'المراحل المكتملة:',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.textColor,
+                ),
+                textAlign: TextAlign.right,
+              ),
+              const SizedBox(height: AppConstants.itemSpacing),
+
+              // قائمة المراحل المكتملة
+              StreamBuilder<QuerySnapshot>(
+                // استخدام StreamBuilder لمراقبة المراحل المكتملة في الوقت الفعلي
+                stream: FirebaseFirestore.instance
+                    .collection('projects')
+                    .doc(projectId)
+                    .collection('phases')
+                    .where('completed', isEqualTo: true)
+                    .orderBy('number')
+                    .snapshots(),
+                builder: (context, phaseSnapshot) {
+                  if (phaseSnapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+                  }
+                  if (phaseSnapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'حدث خطأ في تحميل المراحل: ${phaseSnapshot.error}',
+                        style: TextStyle(color: AppConstants.errorColor, fontSize: 16),
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  }
+                  if (!phaseSnapshot.hasData || phaseSnapshot.data!.docs.isEmpty) {
+                    return Center(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
+                          Icon(Icons.checklist_rtl, size: 80, color: AppConstants.secondaryTextColor.withOpacity(0.5)),
+                          const SizedBox(height: AppConstants.itemSpacing),
                           Text(
-                            projectName,
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              color: AppConstants.primaryColor,
+                            'لا توجد مراحل مكتملة لهذا المشروع حتى الآن.',
+                            style: TextStyle(fontSize: 18, color: AppConstants.secondaryTextColor),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final completedPhases = phaseSnapshot.data!.docs;
+
+                  return ListView.builder(
+                    shrinkWrap: true, // مهم داخل SingleChildScrollView
+                    physics: const NeverScrollableScrollPhysics(), // لتمكين SingleChildScrollView من التمرير
+                    itemCount: completedPhases.length,
+                    itemBuilder: (context, index) {
+                      final phase = completedPhases[index];
+                      final data = phase.data() as Map<String, dynamic>;
+                      final number = data['number'] as int? ?? (index + 1);
+                      final name = data['name'] as String? ?? 'مرحلة غير مسمى'; // Get phase name
+                      final note = data['note'] as String? ?? '';
+                      final imageUrl = data['imageUrl'] as String?;
+                      final image360Url = data['image360Url'] as String?;
+                      final hasSubPhases = data['hasSubPhases'] as bool? ?? false; // NEW: check for sub-phases
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        elevation: 3,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+                        ),
+                        child: ExpansionTile(
+                          collapsedBackgroundColor: AppConstants.successColor.withOpacity(0.1),
+                          backgroundColor: AppConstants.successColor.withOpacity(0.05),
+                          leading: CircleAvatar(
+                            backgroundColor: AppConstants.successColor,
+                            child: Text(
+                              number.toString(),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                             ),
                           ),
-                          const SizedBox(height: AppConstants.itemSpacing / 2),
-                          // Display current phase number and name
-                          _buildInfoRow(Icons.calendar_today, 'المرحلة الحالية:', '$currentStageNumber - $currentPhaseName'),
-                          _buildInfoRow(Icons.engineering, 'المهندس المسؤول:', engineerName),
-                          _buildInfoRow(Icons.info_outline, 'حالة المشروع:', projectStatus,
-                              valueColor: (projectStatus == 'نشط')
-                                  ? AppConstants.successColor
-                                  : (projectStatus == 'مكتمل')
-                                  ? Colors.blue
-                                  : AppConstants.warningColor),
-                          if (generalNotes.isNotEmpty) ...[
-                            const Divider(height: AppConstants.itemSpacing * 2, thickness: 1),
-                            Text(
-                              'ملاحظات عامة من المهندس:',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppConstants.textColor,
-                              ),
+                          title: Text(
+                            'المرحلة $number: $name', // Display phase number and name
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppConstants.textColor,
                             ),
-                            const SizedBox(height: AppConstants.itemSpacing / 2),
-                            Text(
-                              generalNotes,
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: AppConstants.secondaryTextColor,
+                          ),
+                          subtitle: Text(
+                            'مكتملة ✅',
+                            style: TextStyle(
+                              color: AppConstants.successColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppConstants.padding, vertical: AppConstants.itemSpacing / 2),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (note.isNotEmpty)
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'الملاحظات:',
+                                          style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppConstants.textColor),
+                                        ),
+                                        Text(
+                                          note,
+                                          style: TextStyle(
+                                              fontSize: 15,
+                                              color: AppConstants.secondaryTextColor),
+                                        ),
+                                        const SizedBox(height: AppConstants.itemSpacing),
+                                      ],
+                                    ),
+                                  // استخدام الدالة المساعدة لعرض الصور
+                                  _buildImageSection('صورة عادية:', imageUrl),
+                                  _buildImageSection('صورة 360°:', image360Url),
+                                  if (note.isEmpty &&
+                                      (imageUrl == null || imageUrl.isEmpty) &&
+                                      (image360Url == null || image360Url.isEmpty) && !hasSubPhases) // NEW: check hasSubPhases
+                                    Text(
+                                      'لا توجد تفاصيل إضافية لهذه المرحلة.',
+                                      style: TextStyle(
+                                          fontSize: 15,
+                                          color: AppConstants.secondaryTextColor.withOpacity(0.7)),
+                                    ),
+                                  // NEW: Display sub-phases for client
+                                  if (hasSubPhases)
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Divider(height: AppConstants.itemSpacing * 2, thickness: 1),
+                                        Text(
+                                          'المراحل الفرعية:',
+                                          style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppConstants.primaryColor),
+                                        ),
+                                        const SizedBox(height: AppConstants.itemSpacing / 2),
+                                        StreamBuilder<QuerySnapshot>(
+                                          stream: FirebaseFirestore.instance
+                                              .collection('projects')
+                                              .doc(projectId)
+                                              .collection('phases')
+                                              .doc(phase.id)
+                                              .collection('subPhases')
+                                              .where('completed', isEqualTo: true) // Client sees only completed sub-phases
+                                              .orderBy('timestamp')
+                                              .snapshots(),
+                                          builder: (context, subPhaseSnapshot) {
+                                            if (subPhaseSnapshot.connectionState == ConnectionState.waiting) {
+                                              return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+                                            }
+                                            if (subPhaseSnapshot.hasError) {
+                                              return Text('خطأ في تحميل المراحل الفرعية: ${subPhaseSnapshot.error}', style: TextStyle(color: AppConstants.errorColor));
+                                            }
+                                            if (!subPhaseSnapshot.hasData || subPhaseSnapshot.data!.docs.isEmpty) {
+                                              return Text(
+                                                'لا توجد مراحل فرعية مكتملة.',
+                                                style: TextStyle(
+                                                    fontSize: 15,
+                                                    color: AppConstants.secondaryTextColor.withOpacity(0.7)),
+                                              );
+                                            }
+
+                                            final completedSubPhases = subPhaseSnapshot.data!.docs;
+                                            return ListView.builder(
+                                              shrinkWrap: true,
+                                              physics: const NeverScrollableScrollPhysics(),
+                                              itemCount: completedSubPhases.length,
+                                              itemBuilder: (context, subIndex) {
+                                                final subPhase = completedSubPhases[subIndex];
+                                                final subData = subPhase.data() as Map<String, dynamic>;
+                                                final String subName = subData['name'] as String? ?? 'مرحلة فرعية غير مسمى';
+                                                final String subNote = subData['note'] as String? ?? '';
+                                                final String? subImageUrl = subData['imageUrl'] as String?;
+                                                final String? subImage360Url = subData['image360Url'] as String?;
+
+                                                return Card(
+                                                  margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                                                  elevation: 1,
+                                                  color: AppConstants.successColor.withOpacity(0.05),
+                                                  child: ExpansionTile(
+                                                    leading: const Icon(Icons.check_circle_outline, color: AppConstants.successColor),
+                                                    title: Text(
+                                                      subName,
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        color: AppConstants.textColor,
+                                                      ),
+                                                    ),
+                                                    subtitle: const Text('مكتملة ✅', style: TextStyle(color: AppConstants.successColor)),
+                                                    children: [
+                                                      Padding(
+                                                        padding: const EdgeInsets.symmetric(horizontal: AppConstants.padding, vertical: AppConstants.itemSpacing / 4),
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            if (subNote.isNotEmpty)
+                                                              Text(
+                                                                'ملاحظات فرعية: $subNote',
+                                                                style: TextStyle(fontSize: 14, color: AppConstants.secondaryTextColor),
+                                                              ),
+                                                            _buildImageSection('صورة فرعية عادية:', subImageUrl),
+                                                            _buildImageSection('صورة فرعية 360°:', subImage360Url),
+                                                            if (subNote.isEmpty && (subImageUrl == null || subImageUrl.isEmpty) && (subImage360Url == null || subImage360Url.isEmpty))
+                                                              Text(
+                                                                'لا توجد تفاصيل إضافية لهذه المرحلة الفرعية.',
+                                                                style: TextStyle(fontSize: 14, color: AppConstants.secondaryTextColor.withOpacity(0.7)),
+                                                              ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
+                                            );
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                ],
                               ),
                             ),
                           ],
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppConstants.itemSpacing * 1.5),
-
-                  // عنوان قسم المراحل المكتملة
-                  Text(
-                    'المراحل المكتملة:',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppConstants.textColor,
-                    ),
-                    textAlign: TextAlign.right,
-                  ),
-                  const SizedBox(height: AppConstants.itemSpacing),
-
-                  // قائمة المراحل المكتملة
-                  StreamBuilder<QuerySnapshot>(
-                    // استخدام StreamBuilder لمراقبة المراحل المكتملة في الوقت الفعلي
-                    stream: FirebaseFirestore.instance
-                        .collection('projects')
-                        .doc(projectId)
-                        .collection('phases')
-                        .where('completed', isEqualTo: true)
-                        .orderBy('number')
-                        .snapshots(),
-                    builder: (context, phaseSnapshot) {
-                      if (phaseSnapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
-                      }
-                      if (phaseSnapshot.hasError) {
-                        return Center(
-                          child: Text(
-                            'حدث خطأ في تحميل المراحل: ${phaseSnapshot.error}',
-                            style: TextStyle(color: AppConstants.errorColor, fontSize: 16),
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      }
-                      if (!phaseSnapshot.hasData || phaseSnapshot.data!.docs.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.checklist_rtl, size: 80, color: AppConstants.secondaryTextColor.withOpacity(0.5)),
-                              const SizedBox(height: AppConstants.itemSpacing),
-                              Text(
-                                'لا توجد مراحل مكتملة لهذا المشروع حتى الآن.',
-                                style: TextStyle(fontSize: 18, color: AppConstants.secondaryTextColor),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      final completedPhases = phaseSnapshot.data!.docs;
-
-                      return ListView.builder(
-                        shrinkWrap: true, // مهم داخل SingleChildScrollView
-                        physics: const NeverScrollableScrollPhysics(), // لتمكين SingleChildScrollView من التمرير
-                        itemCount: completedPhases.length,
-                        itemBuilder: (context, index) {
-                          final phase = completedPhases[index];
-                          final data = phase.data() as Map<String, dynamic>;
-                          final number = data['number'] as int? ?? (index + 1);
-                          final name = data['name'] as String? ?? 'مرحلة غير مسمى'; // Get phase name
-                          final note = data['note'] as String? ?? '';
-                          final imageUrl = data['imageUrl'] as String?;
-                          final image360Url = data['image360Url'] as String?;
-
-                          return Card(
-                            margin: const EdgeInsets.symmetric(vertical: 8),
-                            elevation: 3,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-                            ),
-                            child: ExpansionTile(
-                              collapsedBackgroundColor: AppConstants.successColor.withOpacity(0.1),
-                              backgroundColor: AppConstants.successColor.withOpacity(0.05),
-                              leading: CircleAvatar(
-                                backgroundColor: AppConstants.successColor,
-                                child: Text(
-                                  number.toString(),
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              title: Text(
-                                'المرحلة $number: $name', // Display phase number and name
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppConstants.textColor,
-                                ),
-                              ),
-                              subtitle: Text(
-                                'مكتملة ✅',
-                                style: TextStyle(
-                                  color: AppConstants.successColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: AppConstants.padding, vertical: AppConstants.itemSpacing / 2),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      if (note.isNotEmpty)
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'الملاحظات:',
-                                              style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppConstants.textColor),
-                                            ),
-                                            Text(
-                                              note,
-                                              style: TextStyle(
-                                                  fontSize: 15,
-                                                  color: AppConstants.secondaryTextColor),
-                                            ),
-                                            const SizedBox(height: AppConstants.itemSpacing),
-                                          ],
-                                        ),
-                                      // استخدام الدالة المساعدة لعرض الصور
-                                      _buildImageSection('صورة عادية:', imageUrl),
-                                      _buildImageSection('صورة 360°:', image360Url),
-                                      if (note.isEmpty &&
-                                          (imageUrl == null || imageUrl.isEmpty) &&
-                                          (image360Url == null || image360Url.isEmpty))
-                                        Text(
-                                          'لا توجد تفاصيل إضافية لهذه المرحلة.',
-                                          style: TextStyle(
-                                              fontSize: 15,
-                                              color: AppConstants.secondaryTextColor.withOpacity(0.7)),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                        ),
                       );
                     },
-                  ),
-                ],
+                  );
+                },
               ),
+                ],
+            ),
             );
           },
         ),

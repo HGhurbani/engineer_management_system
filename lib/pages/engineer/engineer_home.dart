@@ -363,6 +363,14 @@ class _EngineerHomeState extends State<EngineerHome> {
                 tooltip: 'تسجيل الخروج',
                 onPressed: _logout,
               ),
+              // NEW: Notification icon for engineer
+              IconButton(
+                icon: const Icon(Icons.notifications, color: Colors.white),
+                tooltip: 'الإشعارات',
+                onPressed: () {
+                  Navigator.pushNamed(context, '/notifications'); // We will create this page soon
+                },
+              ),
             ],
             // تبويبات التنقل بين المشاريع وتسجيل الحضور
             bottom: const TabBar(
@@ -442,7 +450,8 @@ class _EngineerHomeState extends State<EngineerHome> {
             final project = projects[index];
             final data = project.data() as Map<String, dynamic>;
             final name = data['name'] as String? ?? 'اسم مشروع غير متوفر';
-            final currentStage = data['currentStage'] as int? ?? 1;
+            final currentStage = data['currentStage'] as int? ?? 0; // NEW: Default to 0
+            final currentPhaseName = data['currentPhaseName'] as String? ?? 'لا توجد مراحل بعد'; // NEW: Fetch current phase name
             final clientName = data['clientName'] as String? ?? 'غير معروف';
             final status = data['status'] as String? ?? 'غير محدد'; // حالة المشروع
 
@@ -485,7 +494,7 @@ class _EngineerHomeState extends State<EngineerHome> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'المرحلة الحالية: $currentStage / 12',
+                      'المرحلة الحالية: ${currentStage == 0 ? currentPhaseName : '$currentStage - $currentPhaseName'}', // NEW: Display current phase name
                       style: TextStyle(
                         fontSize: 14,
                         color: AppConstants.secondaryTextColor,
@@ -752,12 +761,16 @@ class _EngineerHomeState extends State<EngineerHome> {
 
   // دالة لتنسيق الوقت
   String _formatTime(DateTime dateTime) {
-    final hour = dateTime.hour.toString().padLeft(2, '0');
+    // Check if the current time is after 12 PM to use 'مساءً' otherwise 'صباحًا'
+    final hour = dateTime.hour;
+    final ampm = hour < 12 ? 'صباحًا' : 'مساءً';
+    final formattedHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+
     final minute = dateTime.minute.toString().padLeft(2, '0');
     final day = dateTime.day.toString().padLeft(2, '0');
     final month = dateTime.month.toString().padLeft(2, '0');
     final year = dateTime.year;
 
-    return '$day/$month/$year - $hour:$minute';
+    return '$day/$month/$year - $formattedHour:$minute $ampm';
   }
 }
