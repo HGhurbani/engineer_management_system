@@ -6,6 +6,9 @@ import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart' 
 import 'dart:typed_data'; // For Uint8List for signature image
 import 'dart:ui' as ui;
 
+import 'map_view_page.dart';
+
+
 // Constants for consistent styling, aligned with the admin dashboard's style.
 class AppConstants {
   // Primary colors
@@ -514,6 +517,24 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
                   _buildDetailRow(Icons.location_on_rounded, 'خط الطول:', location['longitude']?.toStringAsFixed(4) ?? 'غير متوفر'),
                   _buildDetailRow(Icons.my_location_rounded, 'دقة الموقع:', '${location['accuracy']?.toStringAsFixed(1) ?? 'غير متوفرة'} متر'),
                 ],
+                TextButton.icon(
+                  icon: const Icon(Icons.map_rounded, color: AppConstants.primaryColor),
+                  label: const Text('عرض على الخريطة', style: TextStyle(color: AppConstants.primaryColor, fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    if (location != null &&
+                        location['latitude'] != null &&
+                        location['longitude'] != null) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => MapViewPage(
+                            latitude: location['latitude'],
+                            longitude: location['longitude'],
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
                 if (signatureImage != null) ...[
                   const Divider(height: AppConstants.itemSpacing),
                   Text('التوقيع الرقمي:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),

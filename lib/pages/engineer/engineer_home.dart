@@ -443,8 +443,8 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         indicatorWeight: 3.0,
         labelColor: Colors.white,
         unselectedLabelColor: Colors.white.withOpacity(0.7),
-        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.5, fontFamily: 'Cairo'), // Example using a common Arabic font
-        unselectedLabelStyle: const TextStyle(fontSize: 16, fontFamily: 'Cairo'),
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.5, fontFamily: 'Tajawal'), // Example using a common Arabic font
+        unselectedLabelStyle: const TextStyle(fontSize: 16, fontFamily: 'Tajawal'),
         tabs: const [
           Tab(text: 'مشاريعي', icon: Icon(Icons.business_center_outlined)),
           Tab(text: 'الحضور والانصراف', icon: Icon(Icons.timer_outlined)),
