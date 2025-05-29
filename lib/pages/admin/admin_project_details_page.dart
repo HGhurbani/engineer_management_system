@@ -55,6 +55,33 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
   final GlobalKey<FormState> _mainPhaseFormKey = GlobalKey<FormState>();
   final GlobalKey<FormState> _subPhaseFormKey = GlobalKey<FormState>();
 
+  // Predefined lists for Autocomplete feature as requested
+  static const List<String> _predefinedMainPhases = [
+    'اعمال الميدة الداخلية',
+    'سباكة',
+    'كهرباء',
+    'اعمال الصرف الصحي بعد الدفان',
+    'اعمال مابعد صبة النظافة للدور الارضي',
+    'تأسيس السقف',
+    'اعمال الوارشات للاسوار',
+    'اعمال التمديدات',
+    'اعمال بعد اللياصة',
+    'اعمال بعد صب ارضية الاحواش',
+    'اعمال بعد العوازل',
+    'اعمال قبل الجبسوم بورد',
+    'اعمال التفنيش والتشغيل',
+  ];
+
+  static const List<String> _predefinedSubPhases = [
+    'سباكة',
+    'كهرباء',
+    'تمديدات',
+    'عزل',
+    'تركيبات',
+    'تجهيزات',
+    'تشطيبات أولية'
+  ];
+
 
   @override
   void initState() {
@@ -108,9 +135,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
     bool enabled = true,
+    FocusNode? focusNode, // Added for Autocomplete
+    VoidCallback? onFieldSubmitted, // Added for Autocomplete
   }) {
     return TextFormField(
       controller: controller,
+      focusNode: focusNode,
+      onFieldSubmitted: (value) => onFieldSubmitted?.call(),
       maxLines: maxLines,
       keyboardType: keyboardType,
       enabled: enabled,
@@ -447,7 +478,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
   }
 
 
-  Future<void> _addPhaseDialog() async { //
+  Future<void> _addPhaseDialog() async {
     final nameController = TextEditingController();
     bool hasSubPhases = false;
     bool isLoadingDialog = false;
@@ -468,7 +499,51 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildStyledTextField(controller: nameController, labelText: 'اسم المرحلة', icon: Icons.label_important_outline),
+                      // NEW: Autocomplete Text Field
+                      RawAutocomplete<String>(
+                        textEditingController: nameController,
+                        focusNode: FocusNode(),
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) {
+                            return const Iterable<String>.empty();
+                          }
+                          return _predefinedMainPhases.where((String option) {
+                            return option.contains(textEditingValue.text);
+                          });
+                        },
+                        optionsViewBuilder: (context, onSelected, options) {
+                          return Align(
+                            alignment: Alignment.topCenter,
+                            child: Material(
+                              elevation: 4.0,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 200),
+                                child: ListView.builder(
+                                  padding: EdgeInsets.zero,
+                                  shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (BuildContext context, int index) {
+                                    final String option = options.elementAt(index);
+                                    return InkWell(
+                                      onTap: () => onSelected(option),
+                                      child: ListTile(title: Text(option)),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+                          return _buildStyledTextField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            onFieldSubmitted: onSubmitted,
+                            labelText: 'اسم المرحلة (ابحث أو أدخل اسمًا)',
+                            icon: Icons.label_important_outline,
+                          );
+                        },
+                      ),
                       const SizedBox(height: AppConstants.itemSpacing),
                       Row(children: [
                         Checkbox(value: hasSubPhases, onChanged: (val) => setDialogState(() => hasSubPhases = val ?? false), activeColor: AppConstants.infoColor),
@@ -524,6 +599,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
       ),
     );
   }
+
 
   Future<void> _deletePhase(String phaseId, String phaseName) async { //
     bool? confirmDelete = await showDialog<bool>(
@@ -688,7 +764,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
     );
   }
 
-  Future<void> _addSubPhaseDialog(String phaseDocId, String mainPhaseName) async { //
+  Future<void> _addSubPhaseDialog(String phaseDocId, String mainPhaseName) async {
     final nameController = TextEditingController();
     bool isLoadingDialog = false;
 
@@ -704,8 +780,51 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
                   title: const Text('إضافة مرحلة فرعية جديدة', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: AppConstants.primaryColor, fontSize: 20)),
                   content: Form(
-                    key: _subPhaseFormKey, // Use a specific key or ensure it's unique per dialog instance if needed
-                    child: _buildStyledTextField(controller: nameController, labelText: 'اسم المرحلة الفرعية', icon: Icons.add_task_rounded),
+                    key: _subPhaseFormKey,
+                    child: RawAutocomplete<String>(
+                      textEditingController: nameController,
+                      focusNode: FocusNode(),
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        if (textEditingValue.text.isEmpty) {
+                          return const Iterable<String>.empty();
+                        }
+                        return _predefinedSubPhases.where((String option) {
+                          return option.contains(textEditingValue.text);
+                        });
+                      },
+                      optionsViewBuilder: (context, onSelected, options) {
+                        return Align(
+                          alignment: Alignment.topCenter,
+                          child: Material(
+                            elevation: 4.0,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxHeight: 200),
+                              child: ListView.builder(
+                                padding: EdgeInsets.zero,
+                                shrinkWrap: true,
+                                itemCount: options.length,
+                                itemBuilder: (BuildContext context, int index) {
+                                  final String option = options.elementAt(index);
+                                  return InkWell(
+                                    onTap: () => onSelected(option),
+                                    child: ListTile(title: Text(option)),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+                        return _buildStyledTextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          onFieldSubmitted: onSubmitted,
+                          labelText: 'اسم المرحلة الفرعية (ابحث أو أدخل)',
+                          icon: Icons.add_task_rounded,
+                        );
+                      },
+                    ),
                   ),
                   actionsAlignment: MainAxisAlignment.center,
                   actions: [
@@ -785,20 +904,22 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
     DocumentSnapshot projectSnapshot = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
     final String projectName = (projectSnapshot.data() as Map<String, dynamic>)['name'] ?? 'المشروع';
 
-    String reportText = 'تقرير مرحلة "$phaseName" في مشروع "$projectName":\n';
-    if (note.isNotEmpty) reportText += 'ملاحظات: $note\n';
-    if (imageUrl != null && imageUrl.isNotEmpty) reportText += 'صورة عادية: $imageUrl\n';
-    if (image360Url != null && image360Url.isNotEmpty) reportText += 'صورة 360°: $image360Url\n';
+    String reportText = '📋 تقرير مرحلة: "$phaseName"\n';
+    reportText += '🏢 المشروع: "$projectName"\n\n';
+    if (note.isNotEmpty) reportText += '📝 ملاحظات: $note\n\n';
+    if (imageUrl != null && imageUrl.isNotEmpty) reportText += '🖼️ صورة عادية:\n$imageUrl\n\n';
+    if (image360Url != null && image360Url.isNotEmpty) reportText += '🔄 صورة 360°:\n$image360Url\n\n';
 
     final subPhasesSnapshot = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).collection('phases').doc(phaseDocId).collection('subPhases').orderBy('timestamp').get();
     if (subPhasesSnapshot.docs.isNotEmpty) {
-      reportText += '\nالمراحل الفرعية:\n';
+      reportText += '--- المراحل الفرعية ---\n';
       for (var subPhase in subPhasesSnapshot.docs) {
         final subData = subPhase.data();
-        reportText += '- ${subData['name']} (${subData['completed'] ? 'مكتملة' : 'غير مكتملة'})\n';
-        if (subData['note'] != null && subData['note'].isNotEmpty) reportText += '  ملاحظة: ${subData['note']}\n';
-        if (subData['imageUrl'] != null && subData['imageUrl'].isNotEmpty) reportText += '  صورة: ${subData['imageUrl']}\n';
-        if (subData['image360Url'] != null && subData['image360Url'].isNotEmpty) reportText += '  صورة 360°: ${subData['image360Url']}\n';
+        reportText += '• ${subData['name']} (${subData['completed'] ? '✅ مكتملة' : '⏳ قيد التنفيذ'})\n';
+        if (subData['note'] != null && subData['note'].isNotEmpty) reportText += '  - ملاحظة: ${subData['note']}\n';
+        if (subData['imageUrl'] != null && subData['imageUrl'].isNotEmpty) reportText += '  - صورة: ${subData['imageUrl']}\n';
+        if (subData['image360Url'] != null && subData['image360Url'].isNotEmpty) reportText += '  - صورة 360: ${subData['image360Url']}\n';
+        reportText += '\n';
       }
     }
 
@@ -816,20 +937,44 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
               children: [
                 Text('مشاركة تقرير المرحلة "$phaseName"', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
                 const Divider(height: AppConstants.itemSpacing),
-                _buildShareTile(Icons.share_rounded, 'مشاركة عادية (نص)', () {
+                _buildShareTile(Icons.share_rounded, 'مشاركة كنص', () {
                   Navigator.pop(context); Share.share(reportText, subject: 'تقرير مشروع $projectName - مرحلة $phaseName');
                 }),
                 _buildShareTile(Icons.message_rounded, 'مشاركة عبر واتساب', () async {
                   Navigator.pop(context);
                   final whatsappUrl = "whatsapp://send?text=${Uri.encodeComponent(reportText)}";
-                  if (await canLaunchUrl(Uri.parse(whatsappUrl))) await launchUrl(Uri.parse(whatsappUrl));
-                  else if(mounted) _showFeedbackSnackBar(context, 'واتساب غير مثبت.', isError: true);
+                  try {
+                    if (await canLaunchUrl(Uri.parse(whatsappUrl))) await launchUrl(Uri.parse(whatsappUrl));
+                  } catch (e) {
+                    if(mounted) _showFeedbackSnackBar(context, 'لا يمكن فتح واتساب. تأكد من أنه مثبت.', isError: true);
+                  }
                 }),
                 _buildShareTile(Icons.email_rounded, 'مشاركة عبر البريد', () async {
                   Navigator.pop(context);
                   final emailLaunchUri = Uri(scheme: 'mailto', queryParameters: {'subject': 'تقرير مشروع $projectName - مرحلة $phaseName', 'body': reportText});
-                  if (await canLaunchUrl(emailLaunchUri)) await launchUrl(emailLaunchUri);
-                  else if(mounted) _showFeedbackSnackBar(context, 'لا يمكن فتح تطبيق البريد.', isError: true);
+                  try {
+                    if (await canLaunchUrl(emailLaunchUri)) await launchUrl(emailLaunchUri);
+                  } catch (e) {
+                    if(mounted) _showFeedbackSnackBar(context, 'لا يمكن فتح تطبيق البريد.', isError: true);
+                  }
+                }),
+                // NEW: PDF Share Option (Informational)
+                _buildShareTile(Icons.picture_as_pdf_rounded, 'مشاركة كملف PDF (قيد التطوير)', () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('ميزة تصدير PDF قيد التطوير حاليًا وسيتم إضافتها في التحديثات القادمة.', style: TextStyle(color: Colors.white)),
+                      backgroundColor: AppConstants.infoColor, // Using info color for a neutral message
+                    ),
+                  );
+                  // DEVELOPER NOTE: To implement PDF generation:
+                  // 1. Add dependencies to pubspec.yaml: pdf, printing, path_provider, open_file.
+                  // 2. Create a service `PdfGenerator.createPhaseReport(phaseData, projectData)`.
+                  // 3. Inside, use the `pdf` package widgets (pw.Document, pw.Page, pw.Text, etc.).
+                  //    Remember to add an Arabic font for pw.Text to support RTL.
+                  // 4. Use `http` to fetch network images and `pw.MemoryImage` to display them.
+                  // 5. Save the generated PDF to a temp directory using `path_provider`.
+                  // 6. Use `Share.shareFiles` from the `share_plus` package with the file path.
                 }),
                 const SizedBox(height: AppConstants.paddingSmall),
               ],
@@ -960,7 +1105,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
     bool isAdmin = _currentUserRole == 'admin';
     bool isEngineer = _currentUserRole == 'engineer';
     bool canEditPhase = isAdmin || (isEngineer && !completed);
-    bool canShare = completed && isEngineer; // Share only if engineer and phase completed
+    bool canShare = completed || isEngineer; // Allow sharing for engineer and admin anytime
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall),
@@ -1001,9 +1146,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
                   const SizedBox(height: AppConstants.itemSpacing),
                 ],
                 if (imageUrl != null) _buildImageSection('صورة عادية:', imageUrl, phase.id, 'imageUrl', data, canEditPhase),
-                if (image360Url != null) _buildImageSection('صورة 360°:', image360Url, phase.id, 'image360Url', data, canEditPhase),
+                if (image360Url != null) _buildImageSection('صورة 360°:', image360Url, phase.id, 'image360Url', data, canEditPhase, is360: true),
                 if (note.isEmpty && imageUrl == null && image360Url == null && !hasSubPhases)
-                  const Text('لا توجد تفاصيل إضافية لهذه المرحلة.', style: TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                  const Center(child: Text('لا توجد تفاصيل إضافية لهذه المرحلة.', style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, fontStyle: FontStyle.italic))),
                 if (hasSubPhases) _buildSubPhasesSection(phase.id, name, canEditPhase),
               ],
             ),
@@ -1013,7 +1158,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
     );
   }
 
-  Widget _buildImageSection(String title, String? imageUrl, String phaseId, String imageField, Map<String, dynamic> phaseData, bool canEdit) {
+  Widget _buildImageSection(String title, String? imageUrl, String phaseId, String imageField, Map<String, dynamic> phaseData, bool canEdit, {bool is360 = false}) {
     if (imageUrl == null || imageUrl.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1021,7 +1166,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
         Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
         const SizedBox(height: AppConstants.paddingSmall),
         Stack(
-          alignment: Alignment.topLeft,
+          alignment: Alignment.center,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
@@ -1031,6 +1176,19 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
                 errorBuilder: (ctx, err, st) => Container(height: 180, width: double.infinity, color: AppConstants.backgroundColor, child: const Icon(Icons.broken_image_outlined, color: AppConstants.textSecondary, size: 50)),
               ),
             ),
+            // DEVELOPER NOTE: For a true 360 view, replace the Image.network widget with a panorama viewer
+            // when is360 is true. A good package for this is `panorama`. This requires adding it to pubspec.yaml.
+            if (is360)
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: Chip(
+                  label: const Text('360°', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  avatar: const Icon(Icons.threed_rotation_outlined, color: Colors.white, size: 20),
+                  backgroundColor: Colors.black.withOpacity(0.6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+              ),
             if(canEdit)
               Positioned(
                 top: AppConstants.paddingSmall/2,
@@ -1038,10 +1196,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> {
                 child: IconButton(
                   icon: const Icon(Icons.delete_forever, color: AppConstants.deleteColor, shadows: [BoxShadow(color: Colors.black26, blurRadius: 4)]),
                   onPressed: () async {
-                    // Optimistically update UI, then Firestore
                     Map<String, dynamic> updatedData = Map.from(phaseData);
                     updatedData[imageField] = null;
-                    _updatePhaseDialog(phaseId, updatedData); // Re-open dialog with image removed
+                    if (mounted) _updatePhaseDialog(phaseId, updatedData);
                   },
                   tooltip: 'حذف الصورة',
                   style: IconButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.7)),

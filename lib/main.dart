@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/date_symbol_data_local.dart';
-
+import 'firebase_options.dart';
 import 'package:engineer_management_system/pages/auth/login_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_dashboard.dart';
 import 'package:engineer_management_system/pages/engineer/engineer_home.dart';
@@ -21,7 +21,9 @@ import 'package:engineer_management_system/pages/admin/admin_settings_page.dart'
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   await initializeDateFormatting('ar', null);
   runApp(const MyApp());
 }
