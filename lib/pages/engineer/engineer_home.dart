@@ -38,10 +38,10 @@ class EngineerHome extends StatefulWidget {
 }
 
 class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMixin {
-  final String? _currentEngineerUid = FirebaseAuth.instance.currentUser?.uid; //
+  final String? _currentEngineerUid = FirebaseAuth.instance.currentUser?.uid;
   String? _engineerName;
-  bool _isCheckedIn = false; //
-  DateTime? _lastCheckTime; //
+  bool _isCheckedIn = false;
+  DateTime? _lastCheckTime;
   bool _isLoading = true;
 
   late AnimationController _fadeController;
@@ -63,16 +63,18 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
   }
 
   Future<void> _loadInitialData() async {
+    if(!mounted) return;
     setState(() => _isLoading = true);
-    await _fetchEngineerData(); //
-    await _checkCurrentAttendanceStatus(); //
+    await _fetchEngineerData();
+    await _checkCurrentAttendanceStatus();
     if (mounted) {
       setState(() => _isLoading = false);
       _fadeController.forward();
     }
   }
 
-  Future<void> _fetchEngineerData() async { //
+  Future<void> _fetchEngineerData() async {
+    if (_currentEngineerUid == null || !mounted) return;
     try {
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(_currentEngineerUid).get();
       if (userDoc.exists && mounted) {
@@ -82,10 +84,12 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
       }
     } catch (e) {
       print('Error fetching engineer name: $e');
+      // Consider showing a snackbar or a specific error message in the UI
     }
   }
 
-  Future<void> _checkCurrentAttendanceStatus() async { //
+  Future<void> _checkCurrentAttendanceStatus() async {
+    if (_currentEngineerUid == null || !mounted) return;
     try {
       final today = DateTime.now();
       final startOfDay = DateTime(today.year, today.month, today.day);
@@ -100,55 +104,53 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
           .limit(1)
           .get();
 
-      if (attendanceQuery.docs.isNotEmpty) {
-        final lastRecord = attendanceQuery.docs.first.data();
-        if (mounted) {
+      if (mounted) {
+        if (attendanceQuery.docs.isNotEmpty) {
+          final lastRecord = attendanceQuery.docs.first.data();
           setState(() {
             _isCheckedIn = lastRecord['type'] == 'check_in';
             _lastCheckTime = (lastRecord['timestamp'] as Timestamp).toDate();
           });
+        } else {
+          setState(() {
+            _isCheckedIn = false;
+            _lastCheckTime = null;
+          });
         }
-      } else if (mounted) {
-        setState(() { // Ensure _isCheckedIn is false if no records today
-          _isCheckedIn = false;
-          _lastCheckTime = null;
-        });
       }
     } catch (e) {
       print('Error checking attendance status: $e');
+      if (mounted) _showFeedbackSnackBar(context, 'فشل التحقق من حالة الحضور.', isError: true);
     }
   }
 
-  Future<bool> _checkLocationPermissions() async { //
+  Future<bool> _checkLocationPermissions() async {
     bool serviceEnabled;
     LocationPermission permission;
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      if (mounted) _showFeedbackSnackBar(context, 'يجب تفعيل خدمات الموقع (GPS) لتسجيل الحضور والانصراف.', isError: true);
+    if (!serviceEnabled && mounted) {
+      _showFeedbackSnackBar(context, 'يجب تفعيل خدمات الموقع (GPS) لتسجيل الحضور والانصراف.', isError: true);
       return false;
     }
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        if (mounted) _showFeedbackSnackBar(context, 'يجب السماح بالوصول للموقع لتسجيل الحضور والانصراف.', isError: true);
+      if (permission == LocationPermission.denied && mounted) {
+        _showFeedbackSnackBar(context, 'يجب السماح بالوصول للموقع لتسجيل الحضور والانصراف.', isError: true);
         return false;
       }
     }
-    if (permission == LocationPermission.deniedForever) {
-      if (mounted) _showFeedbackSnackBar(context, 'تم رفض إذن الموقع بشكل دائم. يرجى تمكينه من إعدادات التطبيق.', isError: true);
+    if (permission == LocationPermission.deniedForever && mounted) {
+      _showFeedbackSnackBar(context, 'تم رفض إذن الموقع بشكل دائم. يرجى تمكينه من إعدادات التطبيق.', isError: true);
       return false;
     }
     return true;
   }
 
-  // lib/pages/engineer/engineer_home.dart
-// ... (داخل كلاس _EngineerHomeState)
-
   Future<bool?> _showLogoutConfirmationDialog() async {
     return showDialog<bool>(
       context: context,
-      barrierDismissible: false, // المستخدم يجب أن يختار أحد الخيارين
+      barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return Directionality(
           textDirection: ui.TextDirection.rtl,
@@ -178,7 +180,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
                   style: TextStyle(color: AppConstants.textSecondary, fontSize: 16, fontWeight: FontWeight.w500),
                 ),
                 onPressed: () {
-                  Navigator.of(dialogContext).pop(false); // إرجاع false عند الإلغاء
+                  Navigator.of(dialogContext).pop(false);
                 },
               ),
               ElevatedButton(
@@ -195,7 +197,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 onPressed: () {
-                  Navigator.of(dialogContext).pop(true); // إرجاع true عند التأكيد
+                  Navigator.of(dialogContext).pop(true);
                 },
               ),
             ],
@@ -205,7 +207,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     );
   }
 
-  Future<Position?> _getCurrentLocation() async { //
+  Future<Position?> _getCurrentLocation() async {
     try {
       return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 15));
     } catch (e) {
@@ -214,7 +216,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     }
   }
 
-  Future<void> _showSignatureDialog(String type) async { //
+  Future<void> _showSignatureDialog(String type) async {
     final SignatureController controller = SignatureController(penStrokeWidth: 3, penColor: AppConstants.primaryColor, exportBackgroundColor: AppConstants.cardColor.withOpacity(0.8));
     bool isProcessing = false;
 
@@ -223,14 +225,14 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (stfDialogContext, setDialogState) { // استخدام stfDialogContext هنا
             return Directionality(
               textDirection: ui.TextDirection.rtl,
               child: AlertDialog(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
                 title: Text(type == 'check_in' ? 'توقيع تسجيل الحضور' : 'توقيع تسجيل الانصراف', textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
                 content: SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.8,
+                  width: MediaQuery.of(stfDialogContext).size.width * 0.8,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -253,8 +255,9 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
                   TextButton(
                     onPressed: () => Navigator.of(dialogContext).pop(),
                     style: TextButton.styleFrom(foregroundColor: AppConstants.textSecondary),
-                    child: const Text('إلغاء'), // <-- هنا التعديل: استخدام child
-                  ),                  ElevatedButton.icon(
+                    child: const Text('إلغاء'),
+                  ),
+                  ElevatedButton.icon(
                     icon: isProcessing ? const SizedBox.shrink() : Icon(type == 'check_in' ? Icons.login_rounded : Icons.logout_rounded, color: Colors.white),
                     label: isProcessing
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
@@ -262,10 +265,16 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
                     onPressed: isProcessing ? null : () async {
                       if (controller.isNotEmpty) {
                         setDialogState(() => isProcessing = true);
-                        Navigator.of(dialogContext).pop(); // Close dialog before processing
-                        await _processAttendance(type, controller); //
+                        // لا تغلق النافذة هنا مباشرة، دع _processAttendance يغلقها أو يعالج الخطأ
+                        await _processAttendance(type, controller);
+                        // إذا لم يتم إغلاق النافذة في _processAttendance (مثلاً بسبب خطأ قبل الـ pop)
+                        // تأكد من إغلاقها هنا إذا كان لا يزال mounted
+                        if (Navigator.of(dialogContext).canPop()) {
+                          Navigator.of(dialogContext).pop();
+                        }
+                        // لا تستدعي setDialogState هنا لأن الـ widget قد يكون dispose
                       } else {
-                        _showFeedbackSnackBar(context, 'الرجاء وضع التوقيع قبل المتابعة.', isError: true);
+                        if(mounted) _showFeedbackSnackBar(stfDialogContext, 'الرجاء وضع التوقيع قبل المتابعة.', isError: true, useDialogContext: true);
                       }
                     },
                     style: ElevatedButton.styleFrom(backgroundColor: type == 'check_in' ? AppConstants.successColor : AppConstants.warningColor, padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingMedium, vertical: AppConstants.paddingSmall)),
@@ -279,7 +288,8 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     );
   }
 
-  Future<void> _processAttendance(String type, SignatureController signatureController) async { //
+  Future<void> _processAttendance(String type, SignatureController signatureController) async {
+    if (!mounted) return;
     try {
       final hasLocationPermission = await _checkLocationPermissions();
       if (!hasLocationPermission || !mounted) return;
@@ -299,7 +309,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         'type': type,
         'timestamp': FieldValue.serverTimestamp(),
         'location': {'latitude': position.latitude, 'longitude': position.longitude, 'accuracy': position.accuracy},
-        'signatureData': signatureData, //
+        'signatureData': signatureData,
         'deviceInfo': {'platform': 'mobile', 'timestamp': DateTime.now().millisecondsSinceEpoch}
       };
 
@@ -308,7 +318,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
       if (mounted) {
         setState(() {
           _isCheckedIn = type == 'check_in';
-          _lastCheckTime = DateTime.now(); // Approximation, actual time from server
+          _lastCheckTime = DateTime.now();
         });
         final message = type == 'check_in' ? 'تم تسجيل الحضور بنجاح.' : 'تم تسجيل الانصراف بنجاح.';
         _showFeedbackSnackBar(context, message, isError: false);
@@ -318,46 +328,44 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     }
   }
 
-
-
   Future<void> _logout() async {
-    // عرض نافذة التأكيد أولاً
     final bool? confirmed = await _showLogoutConfirmationDialog();
-
-    // التحقق مما إذا كان المستخدم قد أكد تسجيل الخروج (وضمان أن الواجهة لا تزال mounted)
     if (confirmed == true && mounted) {
       try {
         await FirebaseAuth.instance.signOut();
-        if (mounted) { // تحقق مرة أخرى قبل استخدام context
-          Navigator.of(context).pushReplacementNamed('/login');
+        if (mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/login', (Route<dynamic> route) => false); // تعديل هنا
           _showFeedbackSnackBar(context, 'تم تسجيل الخروج بنجاح.', isError: false);
         }
       } catch (e) {
-        if (mounted) { // تحقق مرة أخرى قبل استخدام context
+        if (mounted) {
           _showFeedbackSnackBar(context, 'فشل تسجيل الخروج: $e', isError: true);
         }
       }
     }
   }
 
-  void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: const TextStyle(color: Colors.white)),
-        backgroundColor: isError ? AppConstants.errorColor : AppConstants.successColor,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
-        margin: const EdgeInsets.all(AppConstants.paddingMedium),
-      ),
+  void _showFeedbackSnackBar(BuildContext scaffoldOrDialogContext, String message, {required bool isError, bool useDialogContext = false}) {
+    if (!mounted && !useDialogContext) return; // إذا لم تكن الصفحة mounted ولا نستخدم سياق النافذة، لا تفعل شيئًا
+    if (useDialogContext && !Navigator.of(scaffoldOrDialogContext).canPop() && !mounted) return; // حالة نادرة
+
+    final SnackBar snackBar = SnackBar(
+      content: Text(message, style: const TextStyle(color: Colors.white)),
+      backgroundColor: isError ? AppConstants.errorColor : AppConstants.successColor,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
+      margin: const EdgeInsets.all(AppConstants.paddingMedium),
     );
+
+    // استخدام السياق الصحيح لإظهار SnackBar
+    ScaffoldMessenger.of(scaffoldOrDialogContext).showSnackBar(snackBar);
   }
 
-  String _formatTimeForDisplay(DateTime? dateTime) { //
+
+  String _formatTimeForDisplay(DateTime? dateTime) {
     if (dateTime == null) return 'غير متوفر';
-    return DateFormat('hh:mm a  dd/MM/yyyy', 'ar').format(dateTime); // Arabic AM/PM and date
+    return DateFormat('hh:mm a  dd/MM/yyyy', 'ar').format(dateTime);
   }
-
 
   @override
   void dispose() {
@@ -367,27 +375,30 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    if (_currentEngineerUid == null) {
+    if (_currentEngineerUid == null && !_isLoading) { // التحقق من isLoading لتجنب البناء قبل _loadInitialData
+      // هذا الـ build قد يُستدعى قبل أن يتمكن addPostFrameCallback من تنفيذ _logout
+      // لذا، من الأفضل عرض واجهة تحميل أو خطأ بسيطة هنا أيضًا.
       return Scaffold(
         backgroundColor: AppConstants.backgroundColor,
-        appBar: AppBar(title: const Text('خطأ', style: TextStyle(color: Colors.white)), backgroundColor: AppConstants.primaryColor, centerTitle: true),
+        appBar: AppBar(title: const Text('خطأ في المصادقة', style: TextStyle(color: Colors.white)), backgroundColor: AppConstants.primaryColor, centerTitle: true),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(AppConstants.paddingLarge),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline_rounded, size: 80, color: AppConstants.errorColor),
+                const Icon(Icons.no_accounts_outlined, size: 80, color: AppConstants.errorColor),
                 const SizedBox(height: AppConstants.itemSpacing),
-                const Text('فشل تحميل معلومات المستخدم. الرجاء تسجيل الدخول مرة أخرى.', style: TextStyle(fontSize: 18, color: AppConstants.textPrimary), textAlign: TextAlign.center),
+                const Text('لم يتم التعرف على المستخدم. يتم الآن تسجيل الخروج...', style: TextStyle(fontSize: 16, color: AppConstants.textPrimary), textAlign: TextAlign.center),
                 const SizedBox(height: AppConstants.itemSpacing),
-                ElevatedButton.icon(onPressed: _logout, icon: const Icon(Icons.logout_rounded, color: Colors.white), label: const Text('تسجيل الخروج', style: TextStyle(color: Colors.white)), style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor)),
+                const CircularProgressIndicator(color: AppConstants.primaryColor),
               ],
             ),
           ),
         ),
       );
     }
+
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
@@ -430,7 +441,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         IconButton(
           icon: const Icon(Icons.notifications_outlined, color: Colors.white),
           tooltip: 'الإشعارات',
-          onPressed: () => Navigator.pushNamed(context, '/notifications'), //
+          onPressed: () => Navigator.pushNamed(context, '/notifications'),
         ),
         IconButton(
           icon: const Icon(Icons.logout_rounded, color: Colors.white),
@@ -443,7 +454,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         indicatorWeight: 3.0,
         labelColor: Colors.white,
         unselectedLabelColor: Colors.white.withOpacity(0.7),
-        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.5, fontFamily: 'Tajawal'), // Example using a common Arabic font
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.5, fontFamily: 'Tajawal'),
         unselectedLabelStyle: const TextStyle(fontSize: 16, fontFamily: 'Tajawal'),
         tabs: const [
           Tab(text: 'مشاريعي', icon: Icon(Icons.business_center_outlined)),
@@ -453,13 +464,18 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     );
   }
 
-  Widget _buildMyProjectsTab() { //
+  Widget _buildMyProjectsTab() {
+    if (_currentEngineerUid == null) {
+      return _buildErrorState('لا يمكن تحميل المشاريع بدون معرّف مهندس.');
+    }
     return StreamBuilder<QuerySnapshot>(
+      // ---- التعديل الرئيسي هنا ----
       stream: FirebaseFirestore.instance
           .collection('projects')
-          .where('engineerId', isEqualTo: _currentEngineerUid)
+          .where('engineerUids', arrayContains: _currentEngineerUid) // البحث في مصفوفة UIDs
           .orderBy('createdAt', descending: true)
           .snapshots(),
+      // ---- نهاية التعديل الرئيسي ----
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
@@ -479,10 +495,21 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             final project = projects[index];
             final data = project.data() as Map<String, dynamic>;
             final name = data['name'] ?? 'اسم مشروع غير متوفر';
-            final currentStage = data['currentStage'] ?? 0; //
-            final currentPhaseName = data['currentPhaseName'] ?? 'لا توجد مراحل بعد'; //
+            final currentStage = data['currentStage'] ?? 0;
+            final currentPhaseName = data['currentPhaseName'] ?? 'لا توجد مراحل بعد';
             final clientName = data['clientName'] ?? 'غير معروف';
             final status = data['status'] ?? 'غير محدد';
+
+            // عرض قائمة المهندسين المعينين للمشروع
+            final List<dynamic> assignedEngineersRaw = data['assignedEngineers'] as List<dynamic>? ?? [];
+            String engineersDisplay = "غير محددين";
+            if (assignedEngineersRaw.isNotEmpty) {
+              engineersDisplay = assignedEngineersRaw.map((eng) => eng['name'] ?? 'م.غير معروف').join('، ');
+              if (engineersDisplay.length > 40) { // اقتطاع النص إذا كان طويلاً جداً
+                engineersDisplay = '${engineersDisplay.substring(0, 40)}...';
+              }
+            }
+
 
             IconData statusIcon;
             Color statusColor;
@@ -500,7 +527,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
               child: InkWell(
                 borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-                onTap: () => Navigator.pushNamed(context, '/projectDetails', arguments: project.id), //
+                onTap: () => Navigator.pushNamed(context, '/projectDetails', arguments: project.id),
                 child: Padding(
                   padding: const EdgeInsets.all(AppConstants.paddingMedium),
                   child: Column(
@@ -516,6 +543,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
                       ),
                       const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
                       _buildProjectInfoRow(Icons.stairs_outlined, 'المرحلة الحالية:', '$currentStage - $currentPhaseName'),
+                      _buildProjectInfoRow(Icons.engineering_outlined, 'المهندسون:', engineersDisplay), // عرض المهندسين هنا
                       _buildProjectInfoRow(Icons.person_outline_rounded, 'العميل:', clientName),
                       _buildProjectInfoRow(statusIcon, 'الحالة:', status, valueColor: statusColor),
                     ],
@@ -533,6 +561,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5.0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 18, color: AppConstants.primaryColor),
           const SizedBox(width: 8),
@@ -541,7 +570,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             child: Text(
               value,
               style: TextStyle(fontSize: 14, color: valueColor ?? AppConstants.textPrimary, fontWeight: FontWeight.w600),
-              overflow: TextOverflow.ellipsis,
+              // overflow: TextOverflow.ellipsis, // يمكن إزالته إذا أردت عرض النص كاملاً مع التفاف
             ),
           ),
         ],
@@ -549,8 +578,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     );
   }
 
-
-  Widget _buildAttendanceTab() { //
+  Widget _buildAttendanceTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppConstants.paddingLarge),
       child: Column(
@@ -653,7 +681,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             ),
           ),
           SizedBox(
-            height: 250, // Constrain height for the list
+            height: 250,
             child: _buildTodayAttendanceList(),
           ),
         ],
@@ -661,7 +689,8 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     );
   }
 
-  Widget _buildTodayAttendanceList() { //
+  Widget _buildTodayAttendanceList() {
+    if (_currentEngineerUid == null) return _buildErrorState('لا يمكن تحميل سجل اليوم.'); // تحقق إضافي
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
     final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59);

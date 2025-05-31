@@ -21,12 +21,21 @@ import 'package:engineer_management_system/pages/admin/admin_settings_page.dart'
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+
+  if (Firebase.apps.isEmpty) { // تحقق مما إذا كانت قائمة تطبيقات Firebase فارغة
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } else {
+    // إذا لم تكن فارغة، افترض أن التطبيق الافتراضي موجود بالفعل
+    // يمكنك إضافة تسجيل (log) هنا إذا أردت للتأكد
+    print('Firebase app [DEFAULT] already initialized.');
+  }
+
   await initializeDateFormatting('ar', null);
   runApp(const MyApp());
 }
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
