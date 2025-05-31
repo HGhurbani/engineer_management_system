@@ -4,17 +4,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // لا يزال مطلوبًا لرفع الصور
-import 'dart:io'; // لا يزال مطلوبًا لـ File
-import 'package:http/http.dart' as http; // لا يزال مطلوبًا لرفع الصور عبر PHP
-import 'dart:convert'; // لا يزال مطلوبًا لـ jsonDecode
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:ui' as ui;
 
-import 'edit_assigned_engineers_page.dart'; // For TextDirection
+import 'edit_assigned_engineers_page.dart';
 
-// --- نسخ AppConstants هنا ---
+// ... (AppConstants class remains the same - تأكد من أنها موجودة أو مستوردة)
 class AppConstants {
   static const Color primaryColor = Color(0xFF2563EB);
   static const Color primaryLight = Color(0xFF3B82F6);
@@ -36,9 +35,8 @@ class AppConstants {
     BoxShadow(
         color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 4)),
   ];
-  static const String UPLOAD_URL = 'https://creditphoneqatar.com/eng-app/upload_image.php';
 }
-// --- نهاية نسخ AppConstants ---
+
 
 class AdminProjectDetailsPage extends StatefulWidget {
   final String projectId;
@@ -49,23 +47,20 @@ class AdminProjectDetailsPage extends StatefulWidget {
       _AdminProjectDetailsPageState();
 }
 
-class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with TickerProviderStateMixin { // إضافة TickerProviderStateMixin
+class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with TickerProviderStateMixin {
   Key _projectFutureBuilderKey = UniqueKey();
   String? _currentUserRole;
   bool _isPageLoading = true;
-  DocumentSnapshot? _projectDataSnapshot; // لتخزين بيانات المشروع بعد تحميلها
-  List<QueryDocumentSnapshot> _phasesSnapshots = []; // لتخزين بيانات المراحل
+  DocumentSnapshot? _projectDataSnapshot;
 
-  // متغيرات لحفظ حالة التبويب (Tabs)
   late TabController _tabController;
-
-  // متغيرات لإدارة المهندسين (كما في السابق)
   List<QueryDocumentSnapshot> _allAvailableEngineers = [];
-  List<String> _currentlySelectedEngineerIdsForEdit = [];
-  final GlobalKey<FormState> _editEngineersFormKey = GlobalKey<FormState>();
 
-  // قوائم المراحل والاختبارات (ستكون ثابتة مبدئياً)
+  String? _clientTypeKeyFromFirestore;
+  String? _clientTypeDisplayString;
+
   static const List<Map<String, dynamic>> predefinedPhasesStructure = [
+    // ... (هيكل المراحل كما هو)
     {
       'id': 'phase_01', // معرّف فريد لكل مرحلة
       'name': 'تأسيس الميدة',
@@ -97,7 +92,6 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         {'id': 'sub_02_10', 'name': 'إجراء اختبار التسرب بالماء'},
       ]
     },
-    // ... يمكنك إضافة بقية الـ 13 مرحلة هنا بنفس الطريقة
     {
       'id': 'phase_03',
       'name': 'تمديد مواسير السباكة في الحوائط',
@@ -132,8 +126,19 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       'subPhases': [
         {'id': 'sub_06_01', 'name': 'أعمال الكهرباء: تمديد المواسير وتثبيت العلب بشكل جيد'},
         {'id': 'sub_06_02', 'name': 'أعمال الكهرباء: تعليق المواسير في الجسور والحديد'},
-        {'id': 'sub_06_03', 'name': 'أعمال السباكة: فحص مواقع سليفات الجسور للسباكة المعلقة'},
-        // ... أكمل باقي المراحل الفرعية للأسقف
+        {'id': 'sub_06_03', 'name': 'أعمال الكهرباء: تنظيم المسافات بين المواسير'},
+        {'id': 'sub_06_04', 'name': 'أعمال الكهرباء: حماية العلب بالشريط اللاصق وتثبيتها جيداً'},
+        {'id': 'sub_06_05', 'name': 'أعمال الكهرباء: تسكير الفتحات المعتمدة بالفوم والتأكد من الإحكام'},
+        {'id': 'sub_06_06', 'name': 'أعمال الكهرباء: تمديد شبكة التيار الخفيف'},
+        {'id': 'sub_06_07', 'name': 'أعمال الكهرباء: تمديد سليفات بين الجسور للكهرباء المعلقة'},
+        {'id': 'sub_06_08', 'name': 'أعمال السباكة: فحص مواقع سليفات الجسور للسباكة المعلقة'},
+        {'id': 'sub_06_09', 'name': 'أعمال السباكة: فحص مواقع سليفات الصرف الصحي ومياه الأمطار'},
+        {'id': 'sub_06_10', 'name': 'أعمال السباكة: تركيب سليفات مراوح الشفط بدون تعارض مع الديكور'},
+        {'id': 'sub_06_11', 'name': 'أعمال السباكة: تركيب وتوازن مواسير وسليفات تغذية الحمامات والمطابخ'},
+        {'id': 'sub_06_12', 'name': 'أعمال السباكة: تركيب صحيح لقطع T للصرف والتهوية وحمايتها بالشريط الأسود'},
+        {'id': 'sub_06_13', 'name': 'أعمال السباكة: تأمين وتسكير فتحات المواسير كاملة بالشريط الأسود'},
+        {'id': 'sub_06_14', 'name': 'أعمال السباكة: تأسيس منفذ هواء لمجفف الغسيل حسب رغبة العميل'},
+        {'id': 'sub_06_15', 'name': 'أعمال السباكة: مناسيب الكراسي والصفايات موضحة حسب المواصفات'},
       ]
     },
     {
@@ -148,9 +153,55 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       'id': 'phase_08',
       'name': 'مرحلة التمديدات',
       'subPhases': [
-        {'id': 'sub_08_01', 'name': 'أعمال الكهرباء: تحديد نقاط مخارج الكهرباء'},
-        {'id': 'sub_08_02', 'name': 'أعمال السباكة: تمديد مواسير التغذية بين الخزانات'},
-        // ... أكمل باقي المراحل الفرعية للتمديدات
+        {'id': 'sub_08_01', 'name': 'أعمال الكهرباء: تحديد نقاط مخارج الكهرباء حسب المخطط أو العميل'},
+        {'id': 'sub_08_02', 'name': 'أعمال الكهرباء: تحديد المناسيب بالليزر'},
+        {'id': 'sub_08_03', 'name': 'أعمال الكهرباء: القص بالصاروخ'},
+        {'id': 'sub_08_04', 'name': 'أعمال الكهرباء: تنظيف الربش والكسارات يومياً'},
+        {'id': 'sub_08_05', 'name': 'أعمال الكهرباء: تثبيت العلب من الخلف والجوانب، ومراعاة البروز'},
+        {'id': 'sub_08_06', 'name': 'أعمال الكهرباء: ستاندر المطابخ: مخرج كهرباء لكل ١ متر'},
+        {'id': 'sub_08_07', 'name': 'أعمال الكهرباء: تركيب علب ٠.٣٠×٠.٣٠ سم للأفران والشوايات'},
+        {'id': 'sub_08_08', 'name': 'أعمال الكهرباء: تركيب الطبلونات حسب المواقع'},
+        {'id': 'sub_08_09', 'name': 'أعمال الكهرباء: تحديد ألوان الأسلاك وسحبها حسب الاستاندر'},
+        {'id': 'sub_08_10', 'name': 'أعمال الكهرباء: خط رئيسي للإنارة، ومخارج الكهرباء، والتكييف'},
+        {'id': 'sub_08_11', 'name': 'أعمال الكهرباء: ربط الخزانات الأرضية والعلوية للعوامة'},
+        {'id': 'sub_08_12', 'name': 'أعمال الكهرباء: تأريض لجميع العلب'},
+        {'id': 'sub_08_13', 'name': 'أعمال الكهرباء: تأريض علب المطابخ والغسيل'},
+        {'id': 'sub_08_14', 'name': 'أعمال الكهرباء: تمديد مواسير مرنة مخصصة للإنارة المعلقة داخل الأسقف الجبسية'},
+        {'id': 'sub_08_15', 'name': 'أعمال الكهرباء: تثبيت علب الإنارة خلف فتحات السبوت لايت حسب التصميم'},
+        {'id': 'sub_08_16', 'name': 'أعمال الكهرباء: توصيل جميع نقاط الإنارة المعلقة بخط مستقل من الطبلون'},
+        {'id': 'sub_08_17', 'name': 'أعمال الكهرباء: استخدام كيابل مقاومة للحرارة حسب المواصفات الفنية'},
+        {'id': 'sub_08_18', 'name': 'أعمال الكهرباء: تحديد مواقع الإنارة المعلقة بدقة وتجنب التعارض مع فتحات التكييف أو الستائر'},
+        {'id': 'sub_08_19', 'name': 'أعمال الكهرباء: عدم تمرير كيابل الكهرباء بجانب كيابل الصوت أو البيانات لتفادي التداخل'},
+        {'id': 'sub_08_20', 'name': 'أعمال الكهرباء: استخدام أربطة تثبيت وعدم الاعتماد على الشريط اللاصق فقط'},
+        {'id': 'sub_08_21', 'name': 'أعمال الكهرباء: تمرير السليفات بين الجسور لتسهيل تمديد الأسلاك بشكل خفي'},
+        {'id': 'sub_08_22', 'name': 'أعمال الكهرباء: تسمية كل نقطة لسهولة الصيانة لاحقاً'},
+        {'id': 'sub_08_23', 'name': 'أعمال الكهرباء: الابتعاد عن الشبابيك والأبواب ٠.٢٥ سم على الأقل'},
+        {'id': 'sub_08_24', 'name': 'أعمال الكهرباء: تحديد منطقة كنترول للتيار الخفيف'},
+        {'id': 'sub_08_25', 'name': 'أعمال الكهرباء: فصل شبكة التيار الخفيف عن الكهرباء'},
+        {'id': 'sub_08_26', 'name': 'أعمال الكهرباء: تمديد شبكات التلفزيون، الإنترنت، الصوتيات، والواي فاي'},
+        {'id': 'sub_08_27', 'name': 'أعمال الكهرباء: لكل نقطة تلفزيون: ٣ مخارج كهرباء + نقطة إنترنت'},
+        {'id': 'sub_08_28', 'name': 'أعمال الكهرباء: تمديد الكابلات الرئيسية لكل لوحة مفاتيح'},
+        {'id': 'sub_08_29', 'name': 'أعمال الكهرباء: تركيب باس بار رئيسي داخل سور المبنى'},
+        {'id': 'sub_08_30', 'name': 'أعمال الكهرباء: قاطع خاص للمصعد'},
+        {'id': 'sub_08_31', 'name': 'أعمال الكهرباء: لوحة مفاتيح مستقلة لكل دور وللحوش'},
+        {'id': 'sub_08_32', 'name': 'أعمال الكهرباء: لوحات وقواطع خاصة بالتكييف حسب الطلب'},
+        {'id': 'sub_08_33', 'name': 'أعمال السباكة: تمديد مواسير التغذية بين الخزانات'},
+        {'id': 'sub_08_34', 'name': 'أعمال السباكة: تمديد ماسورة الماء الحلو من الشارع إلى الخزان ثم الفيلا'},
+        {'id': 'sub_08_35', 'name': 'أعمال السباكة: تمديد ٢ إنش للوايت و١ إنش لعداد المياه'},
+        {'id': 'sub_08_36', 'name': 'أعمال السباكة: خط تغذية بارد ٢ إنش وحار ١ إنش لكل دور'},
+        {'id': 'sub_08_37', 'name': 'أعمال السباكة: تمديد خط راجع ٣/٤ للماء الحار حسب الاتفاق'},
+        {'id': 'sub_08_38', 'name': 'أعمال السباكة: تباعد التعليقات حسب الاستاندر باستخدام الشنل والرود'},
+        {'id': 'sub_08_39', 'name': 'أعمال السباكة: استخدام أكواع حرارية بزاوية ٤٥ درجة وتجنب استخدام كوع ٩٠'},
+        {'id': 'sub_08_40', 'name': 'أعمال السباكة: توزيع الحمامات والمطابخ حسب المخطط أو اتفاق العميل'},
+        {'id': 'sub_08_41', 'name': 'أعمال السباكة: تركيب فاصل بين الحار والبارد داخل الجدار'},
+        {'id': 'sub_08_42', 'name': 'أعمال السباكة: تركيب خلاطات مدفونة حسب الاتفاق'},
+        {'id': 'sub_08_43', 'name': 'أعمال السباكة: الدش المطري بارتفاع ٢.٢٠ م'},
+        {'id': 'sub_08_44', 'name': 'أعمال السباكة: سيفون مخفي للمرحاض العربي'},
+        {'id': 'sub_08_45', 'name': 'أعمال السباكة: تأكيد تمديد ماسورة ماء حلو ٣/٤ للمطبخ'},
+        {'id': 'sub_08_46', 'name': 'أعمال السباكة: تثبيت مواسير تصريف ٢ إنش تحت المغاسل'},
+        {'id': 'sub_08_47', 'name': 'أعمال السباكة: تركيب بكس ٠.٤٠×٠.٤٠ سم لغرف الغسيل'},
+        {'id': 'sub_08_48', 'name': 'أعمال السباكة: اختبار الضغط وتثبيت ساعة الضغط لكل دور'},
+        {'id': 'sub_08_49', 'name': 'أعمال السباكة: تثبيت نقاط إسمنتية بعد الاختبارات'},
       ]
     },
     {
@@ -158,7 +209,14 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       'name': 'الصرف الصحي وتصريف الأمطار الداخلي',
       'subPhases': [
         {'id': 'sub_09_01', 'name': 'تعليق وتثبيت المواسير والقطع الصغيرة حسب الاستاندر'},
-        // ... أكمل
+        {'id': 'sub_09_02', 'name': 'فحص الميول بشكل دقيق'},
+        {'id': 'sub_09_03', 'name': 'تسكير الفتحات بإحكام'},
+        {'id': 'sub_09_04', 'name': 'تركيب رداد للمرحاض العربي حسب الرغبة'},
+        {'id': 'sub_09_05', 'name': 'اختبار شبكة الصرف بالماء'},
+        {'id': 'sub_09_06', 'name': 'تركيب المرحاض العربي: قاعدة رملية'},
+        {'id': 'sub_09_07', 'name': 'تركيب المرحاض العربي: إسمنت جانبي'},
+        {'id': 'sub_09_08', 'name': 'تركيب المرحاض العربي: توصيل المرحاض بماسورة السيفون'},
+        {'id': 'sub_09_09', 'name': 'تركيب المرحاض العربي: تركيب رداد ٤ إنش'},
       ]
     },
     {
@@ -166,8 +224,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       'name': 'أعمال الحوش',
       'subPhases': [
         {'id': 'sub_10_01', 'name': 'أعمال الكهرباء: توصيل تأريض الأعمدة'},
-        {'id': 'sub_10_02', 'name': 'أعمال السباكة: تمديد نقاط الغسيل بالحوش بعد الصب'},
-        // ... أكمل
+        {'id': 'sub_10_02', 'name': 'أعمال الكهرباء: تركيب بوكس التأريض وربط النحاس بالحوش'},
+        {'id': 'sub_10_03', 'name': 'أعمال الكهرباء: توصيل الباس بار للتأريض'},
+        {'id': 'sub_10_04', 'name': 'أعمال الكهرباء: إكمال إنارة الحوش والحديقة'},
+        {'id': 'sub_10_05', 'name': 'أعمال الكهرباء: تمديد نقاط الكهرباء للكراج'},
+        {'id': 'sub_10_06', 'name': 'أعمال الكهرباء: تركيب شاحن سيارة'},
+        {'id': 'sub_10_07', 'name': 'أعمال الكهرباء: تثبيت طبلون الحوش'},
+        {'id': 'sub_10_08', 'name': 'أعمال السباكة: تمديد نقاط الغسيل بالحوش بعد الصب'},
       ]
     },
     {
@@ -175,7 +238,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       'name': 'الأعمال بعد اللياسة',
       'subPhases': [
         {'id': 'sub_11_01', 'name': 'أعمال السباكة: تركيب سيفون الكرسي المعلق بمنسوب ٠.٣٣ سم'},
-        // ... أكمل
+        {'id': 'sub_11_02', 'name': 'أعمال السباكة: شبكه بنقطة الصرف والتغذية'},
+        {'id': 'sub_11_03', 'name': 'أعمال السباكة: تثبيت الشطاف المدفون'},
       ]
     },
     {
@@ -183,8 +247,15 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       'name': 'أعمال السطح بعد العزل',
       'subPhases': [
         {'id': 'sub_12_01', 'name': 'ربط تغذية الخزان العلوي من الأرضي فوق العزل'},
-        {'id': 'sub_12_02', 'name': 'أعمال الكهرباء: استلام نقاط الإنارة من فني الجبسوم'},
-        // ... أكمل
+        {'id': 'sub_12_02', 'name': 'نقاط غسيل السطح'},
+        {'id': 'sub_12_03', 'name': 'تصريف التكييف والغليونات: تمديد ماسورة تصريف ١ إنش لكل مكيف'},
+        {'id': 'sub_12_04', 'name': 'تصريف التكييف والغليونات: استخدام كوع ٤٥ بارتفاع ٥ سم عن الأرض'},
+        {'id': 'sub_12_05', 'name': 'تصريف التكييف والغليونات: فحص الميول'},
+        {'id': 'sub_12_06', 'name': 'تصريف التكييف والغليونات: تمديد ٢ إنش من المغاسل إلى الغليون'},
+        {'id': 'sub_12_07', 'name': 'تصريف التكييف والغليونات: توصيل الصفايات الفرعية بالغليون'},
+        {'id': 'sub_12_08', 'name': 'تصريف التكييف والغليونات: تثبيت الاتصالات في الغليون جيداً'},
+        {'id': 'sub_12_09', 'name': 'أعمال الكهرباء: استلام نقاط الإنارة من فني الجبسوم'},
+        {'id': 'sub_12_10', 'name': 'أعمال الكهرباء: توزيع الأسلاك فوق الجبس'},
       ]
     },
     {
@@ -192,13 +263,28 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       'name': 'التفنيش والتشغيل',
       'subPhases': [
         {'id': 'sub_13_01', 'name': 'أعمال الكهرباء: تنظيف العلب جيداً'},
-        {'id': 'sub_13_02', 'name': 'أعمال السباكة: تركيب الكراسي والمغاسل مع اختبار التثبيت'},
-        // ... أكمل
+        {'id': 'sub_13_02', 'name': 'أعمال الكهرباء: تركيب كونكترات للأسلاك'},
+        {'id': 'sub_13_03', 'name': 'أعمال الكهرباء: توصيل التأريض لكل علبة'},
+        {'id': 'sub_13_04', 'name': 'أعمال الكهرباء: ربط الأسلاك بإحكام'},
+        {'id': 'sub_13_05', 'name': 'أعمال الكهرباء: تشغيل تجريبي بعد كل منطقة'},
+        {'id': 'sub_13_06', 'name': 'أعمال الكهرباء: تأمين الإنارة الخارجية بالسيليكون'},
+        {'id': 'sub_13_07', 'name': 'أعمال الكهرباء: عزل مواسير الحديقة جيداً'},
+        {'id': 'sub_13_08', 'name': 'أعمال الكهرباء: تركيب محول ٢٤ فولت للحديقة'},
+        {'id': 'sub_13_09', 'name': 'أعمال الكهرباء: التشغيل الفعلي للمبنى'},
+        {'id': 'sub_13_10', 'name': 'أعمال الكهرباء: اختبار الأحمال وتوزيعها'},
+        {'id': 'sub_13_11', 'name': 'أعمال الكهرباء: طباعة تعريف الخطوط بالطبلون'},
+        {'id': 'sub_13_12', 'name': 'أعمال السباكة: تركيب الكراسي والمغاسل مع اختبار التثبيت'},
+        {'id': 'sub_13_13', 'name': 'أعمال السباكة: استخدام السيليكون للعزل'},
+        {'id': 'sub_13_14', 'name': 'أعمال السباكة: تركيب مضخة أو غطاس بالخزان الأرضي'},
+        {'id': 'sub_13_15', 'name': 'أعمال السباكة: تركيب مضخة ضغط للخزان العلوي'},
+        {'id': 'sub_13_16', 'name': 'أعمال السباكة: تركيب السخانات واختبار التشغيل'},
+        {'id': 'sub_13_17', 'name': 'أعمال السباكة: تشغيل شبكة المياه وربط الخزانات'},
+        {'id': 'sub_13_18', 'name': 'أعمال السباكة: تشغيل الشطافات والمغاسل مع الفحص'},
       ]
     },
   ];
-
   static const List<Map<String, dynamic>> finalCommissioningTests = [
+    // ... (قائمة الاختبارات النهائية كما هي)
     {
       'section_id': 'tests_electricity',
       'section_name': 'أولاً: اختبارات الكهرباء (وفق كود IEC / NFPA / NEC)',
@@ -230,22 +316,33 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     },
   ];
 
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this); // قسمين: المراحل، الاختبارات
+    _tabController = TabController(length: 2, vsync: this);
     _fetchInitialData();
+  }
+
+  String _getClientTypeDisplayValue(String? clientTypeKey) {
+    final Map<String, String> clientTypeDisplayMap = {
+      'individual': 'فردي',
+      'company': 'شركة',
+    };
+    // إذا كان clientTypeKey هو null أو غير موجود في الخريطة، نعرض "غير محدد"
+    return clientTypeDisplayMap[clientTypeKey] ?? "غير محدد";
   }
 
   Future<void> _fetchInitialData() async {
     if (!mounted) return;
     setState(() {
       _isPageLoading = true;
+      // Reset client type strings here to ensure fresh fetch or default state
+      _clientTypeKeyFromFirestore = null;
+      _clientTypeDisplayString = null;
     });
     await _fetchCurrentUserRole();
-    await _loadAllAvailableEngineers(); // تحميل قائمة المهندسين
-    await _fetchProjectAndPhasesData(); // تحميل بيانات المشروع والمراحل
+    await _loadAllAvailableEngineers();
+    await _fetchProjectAndPhasesData();
     if (mounted) {
       setState(() {
         _isPageLoading = false;
@@ -258,13 +355,14 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     if (user != null) {
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       if (mounted && userDoc.exists) {
-        _currentUserRole = userDoc.data()?['role'] as String?;
+        setState(() {
+          _currentUserRole = userDoc.data()?['role'] as String?;
+        });
       }
     }
   }
 
   Future<void> _loadAllAvailableEngineers() async {
-    if (_allAvailableEngineers.isNotEmpty && mounted) return;
     try {
       final engSnap = await FirebaseFirestore.instance
           .collection('users')
@@ -282,15 +380,63 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 
   Future<void> _fetchProjectAndPhasesData() async {
+    // Reset client type state before fetching project data
+    if (mounted) {
+      setState(() {
+        _clientTypeDisplayString = null;
+        _clientTypeKeyFromFirestore = null;
+      });
+    }
+
     try {
       final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
       if (mounted && projectDoc.exists) {
-        _projectDataSnapshot = projectDoc;
-        // لا نحتاج لجلب المراحل بشكل منفصل هنا إذا كنا سنعرضها من Firestore لاحقًا
-        // أو إذا كنا سنعتمد على predefinedPhasesStructure للعرض فقط
+        final projectData = projectDoc.data() as Map<String, dynamic>?;
+        // Set project data first
+        setState(() {
+          _projectDataSnapshot = projectDoc;
+        });
+
+        final String? clientId = projectData?['clientId'] as String?;
+        if (clientId != null && clientId.isNotEmpty) {
+          try {
+            final clientDoc = await FirebaseFirestore.instance.collection('users').doc(clientId).get();
+            if (clientDoc.exists && mounted) {
+              final clientDataMap = clientDoc.data() as Map<String, dynamic>?;
+              final String? fetchedClientTypeKey = clientDataMap?['clientType'] as String?;
+              // Now set client type state, this will trigger a rebuild if needed
+              setState(() {
+                _clientTypeKeyFromFirestore = fetchedClientTypeKey;
+                _clientTypeDisplayString = _getClientTypeDisplayValue(fetchedClientTypeKey);
+              });
+            } else {
+              if (mounted) {
+                setState(() {
+                  _clientTypeKeyFromFirestore = null;
+                  _clientTypeDisplayString = "نوع العميل غير متوفر"; // More specific message
+                });
+              }
+            }
+          } catch (e) {
+            print("Error fetching client type: $e");
+            if (mounted) {
+              setState(() {
+                _clientTypeKeyFromFirestore = null;
+                _clientTypeDisplayString = "خطأ في تحميل نوع العميل";
+              });
+            }
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _clientTypeKeyFromFirestore = null;
+              _clientTypeDisplayString = "لا يوجد عميل مرتبط";
+            });
+          }
+        }
       } else if (mounted) {
         _showFeedbackSnackBar(context, 'المشروع غير موجود.', isError: true);
-        Navigator.pop(context); // العودة إذا لم يتم العثور على المشروع
+        if (Navigator.canPop(context)) Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
@@ -299,6 +445,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     }
   }
 
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError}) {
     if (!mounted) return;
@@ -314,200 +466,46 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 
   Future<void> _showEditAssignedEngineersDialog(Map<String, dynamic> projectDataMap) async {
-    List<dynamic> currentProjectEngineersRaw = projectDataMap['assignedEngineers'] as List<dynamic>? ?? [];
-    _currentlySelectedEngineerIdsForEdit = currentProjectEngineersRaw.map((eng) => eng['uid'].toString()).toList();
-    List<String> initialSelectedEngineerIds = List.from(_currentlySelectedEngineerIdsForEdit);
-
-    bool isLoadingDialog = false;
-
+    if (_projectDataSnapshot == null || !_projectDataSnapshot!.exists) {
+      _showFeedbackSnackBar(context, "بيانات المشروع غير متوفرة حالياً.", isError: true);
+      return;
+    }
     if (_allAvailableEngineers.isEmpty && mounted) {
-      await _loadAllAvailableEngineers(); // Ensure engineers are loaded
+      _showFeedbackSnackBar(context, "جاري تحميل قائمة المهندسين، يرجى المحاولة مرة أخرى بعد قليل.", isError: false);
+      await _loadAllAvailableEngineers();
+      if (_allAvailableEngineers.isEmpty && mounted) {
+        _showFeedbackSnackBar(context, "لا يوجد مهندسون متاحون في النظام.", isError: true);
+        return;
+      }
     }
 
-    await showDialog(
-      context: context,
-      barrierDismissible: !isLoadingDialog,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (stfContext, setDialogState) {
-            return Directionality(
-              textDirection: ui.TextDirection.rtl,
-              child: AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-                ),
-                title: const Text('تعديل المهندسين المسؤولين', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: AppConstants.textPrimary, fontSize: 22)),
-                content: Form(
-                  key: _editEngineersFormKey,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_allAvailableEngineers.isEmpty)
-                          const Center(child: Padding(padding: EdgeInsets.all(16.0), child: Text("جاري تحميل المهندسين...")))
-                        else
-                          Container(
-                            constraints: BoxConstraints(maxHeight: MediaQuery.of(stfContext).size.height * 0.4),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: AppConstants.textSecondary.withOpacity(0.5)),
-                              borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-                            ),
-                            child: ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: _allAvailableEngineers.length,
-                              itemBuilder: (ctx, index) {
-                                final engineerDoc = _allAvailableEngineers[index];
-                                final engineer = engineerDoc.data() as Map<String, dynamic>;
-                                final engineerId = engineerDoc.id;
-                                final engineerName = engineer['name'] ?? 'مهندس غير مسمى';
-                                final bool isSelected = _currentlySelectedEngineerIdsForEdit.contains(engineerId);
+    final currentEngRaw = projectDataMap['assignedEngineers'] as List<dynamic>? ?? [];
+    final List<Map<String, dynamic>> currentEngTyped = currentEngRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
 
-                                return CheckboxListTile(
-                                  title: Text(engineerName, style: const TextStyle(color: AppConstants.textPrimary)),
-                                  value: isSelected,
-                                  onChanged: (bool? value) {
-                                    setDialogState(() {
-                                      if (value == true) {
-                                        if (!_currentlySelectedEngineerIdsForEdit.contains(engineerId)) {
-                                          _currentlySelectedEngineerIdsForEdit.add(engineerId);
-                                        }
-                                      } else {
-                                        _currentlySelectedEngineerIdsForEdit.remove(engineerId);
-                                      }
-                                    });
-                                  },
-                                  activeColor: AppConstants.primaryColor,
-                                  controlAffinity: ListTileControlAffinity.leading,
-                                  dense: true,
-                                );
-                              },
-                            ),
-                          ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: FormField<List<String>>(
-                            initialValue: _currentlySelectedEngineerIdsForEdit,
-                            validator: (value) {
-                              if (_allAvailableEngineers.isNotEmpty && (value == null || value.isEmpty)) {
-                                return 'الرجاء اختيار مهندس واحد على الأقل.';
-                              }
-                              return null;
-                            },
-                            builder: (FormFieldState<List<String>> state) {
-                              return state.hasError
-                                  ? Padding(
-                                padding: const EdgeInsets.only(top: 5.0),
-                                child: Text(
-                                  state.errorText!,
-                                  style: TextStyle(color: Theme.of(stfContext).colorScheme.error, fontSize: 12),
-                                ),
-                              )
-                                  : const SizedBox.shrink();
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                actionsAlignment: MainAxisAlignment.center,
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogContext),
-                    child: const Text('إلغاء', style: TextStyle(color: AppConstants.textSecondary)),
-                  ),
-                  const SizedBox(width: AppConstants.itemSpacing / 2),
-                  ElevatedButton.icon(
-                    onPressed: isLoadingDialog
-                        ? null
-                        : () async {
-                      if (!_editEngineersFormKey.currentState!.validate()) return;
-                      if (_allAvailableEngineers.isNotEmpty && _currentlySelectedEngineerIdsForEdit.isEmpty) {
-                        _showFeedbackSnackBar(stfContext, 'الرجاء اختيار مهندس واحد على الأقل.', isError: true);
-                        return;
-                      }
-                      setDialogState(() => isLoadingDialog = true);
-                      await _saveAssignedEngineersChanges(widget.projectId, initialSelectedEngineerIds, projectDataMap['name'] ?? 'المشروع');
-                      Navigator.pop(dialogContext);
-                    },
-                    icon: isLoadingDialog ? const SizedBox.shrink() : const Icon(Icons.save_alt_rounded, color: Colors.white),
-                    label: isLoadingDialog
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
-                        : const Text('حفظ التعديلات', style: TextStyle(color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppConstants.primaryColor,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditAssignedEngineersPage(
+          projectId: widget.projectId,
+          projectName: projectDataMap['name'] ?? 'مشروع غير مسمى',
+          currentlyAssignedEngineers: currentEngTyped,
+          allAvailableEngineers: _allAvailableEngineers,
+        ),
+      ),
     );
-  }
 
-
-  Future<void> _saveAssignedEngineersChanges(String currentProjectId, List<String> initialEngineerIds, String projectName) async {
-    List<Map<String, String>> updatedAssignedEngineersList = [];
-    List<String> updatedEngineerUidsList = [];
-
-    if (_currentlySelectedEngineerIdsForEdit.isNotEmpty) {
-      for (String engineerId in _currentlySelectedEngineerIdsForEdit) {
-        final engineerDoc = _allAvailableEngineers.firstWhere(
-              (doc) => doc.id == engineerId,
-        );
-        final engineerData = engineerDoc.data() as Map<String, dynamic>;
-        updatedAssignedEngineersList.add({
-          'uid': engineerId,
-          'name': engineerData['name'] ?? 'مهندس غير مسمى',
-        });
-        updatedEngineerUidsList.add(engineerId);
-      }
-    }
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('projects')
-          .doc(currentProjectId)
-          .update({
-        'assignedEngineers': updatedAssignedEngineersList,
-        'engineerUids': updatedEngineerUidsList,
-      });
-
-      List<String> newlyAddedEngineerUids = _currentlySelectedEngineerIdsForEdit.where((uid) => !initialEngineerIds.contains(uid)).toList();
-      if (newlyAddedEngineerUids.isNotEmpty) {
-        // سنفترض أن الإشعار للمشروع ككل
-        _sendNotificationToMultipleEngineers(
-            projectId: currentProjectId,
-            projectName: projectName,
-            title: 'تم تعيينك لمشروع',
-            body: 'لقد تم إضافتك كمهندس مسؤول لمشروع "$projectName".',
-            recipientUids: newlyAddedEngineerUids,
-            notificationType: 'engineer_assignment_project'
-        );
-      }
-
-      _showFeedbackSnackBar(context, 'تم تحديث قائمة المهندسين بنجاح.', isError: false);
-      if (mounted) {
-        setState(() {
-          _projectFutureBuilderKey = UniqueKey(); // لتحديث واجهة المشروع
-        });
-      }
-    } catch (e) {
-      _showFeedbackSnackBar(context, 'فشل تحديث قائمة المهندسين: $e', isError: true);
+    if (result == true && mounted) {
+      _fetchProjectAndPhasesData();
     }
   }
 
-  // دالة إشعارات مجمعة جديدة
   Future<void> _sendNotificationToMultipleEngineers({
     required String projectId,
     required String projectName,
     required String title,
     required String body,
     required List<String> recipientUids,
-    String phaseDocId = '', // اختياري
+    String phaseDocId = '',
     required String notificationType,
   }) async {
     final notificationCollection = FirebaseFirestore.instance.collection('notifications');
@@ -537,17 +535,6 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         if (mounted) _showFeedbackSnackBar(context, 'فشل إرسال إشعار للمهندس $userId: $e', isError: true);
       }
     }
-  }
-
-
-
-  // ... (بقية الدوال مثل _updateProjectCurrentPhaseStatus, _addPhaseDialog, _deletePhase, الخ، تبقى كما هي أو مع تعديلات طفيفة إذا لزم الأمر)
-  // سيتم تبسيطها أو إزالتها مؤقتًا للتركيز على بنية الأقسام.
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   PreferredSizeWidget _buildAppBar() {
@@ -592,11 +579,17 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       default: statusIcon = Icons.help_outline_rounded; statusColor = AppConstants.textSecondary;
     }
 
+    IconData clientTypeIcon = Icons.person_pin_rounded;
+    if (_clientTypeKeyFromFirestore == 'company') {
+      clientTypeIcon = Icons.business_center_rounded;
+    }
+
+
     return Card(
       elevation: AppConstants.cardShadow[0].blurRadius,
       shadowColor: AppConstants.primaryColor.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
-      margin: const EdgeInsets.only(bottom: AppConstants.paddingLarge),
+      margin: const EdgeInsets.only(bottom: AppConstants.paddingLarge, left: AppConstants.paddingSmall, right: AppConstants.paddingSmall, top: AppConstants.paddingSmall),
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.paddingMedium),
         child: Column(
@@ -606,53 +599,26 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
             _buildDetailRow(Icons.engineering_rounded, 'المهندسون:', engineersDisplay),
             _buildDetailRow(Icons.person_rounded, 'العميل:', clientName),
+            // MODIFIED: Display client type using _clientTypeDisplayString
+            if (_clientTypeDisplayString != null &&
+                _clientTypeDisplayString != "لا يوجد عميل مرتبط" &&
+                _clientTypeDisplayString != "خطأ في تحميل نوع العميل" &&
+                _clientTypeDisplayString != "نوع العميل غير متوفر" && // Check against the "not available" message
+                _clientTypeDisplayString != "غير محدد" // Check against default from _getClientTypeDisplayValue
+            )
+              _buildDetailRow(
+                  clientTypeIcon,
+                  'نوع العميل:',
+                  _clientTypeDisplayString!
+              ),
             _buildDetailRow(statusIcon, 'حالة المشروع:', projectStatus, valueColor: statusColor),
             const SizedBox(height: AppConstants.itemSpacing),
-            // ... داخل _buildProjectSummaryCard في AdminProjectDetailsPage ...
             if (_currentUserRole == 'admin')
               Center(
                 child: ElevatedButton.icon(
                   icon: const Icon(Icons.group_add_rounded, color: Colors.white, size: 18),
-                  label: const Text('تعديل المهندسين', style: TextStyle(color: Colors.white)), // تم تعديل النص قليلاً
-                  onPressed: () async {
-                    if (_projectDataSnapshot == null || !_projectDataSnapshot!.exists) {
-                      _showFeedbackSnackBar(context, "بيانات المشروع غير متوفرة حالياً.", isError: true);
-                      return;
-                    }
-                    if (_allAvailableEngineers.isEmpty && mounted) { // التأكد من تحميل المهندسين
-                      _showFeedbackSnackBar(context, "جاري تحميل قائمة المهندسين، يرجى المحاولة مرة أخرى بعد قليل.", isError: false);
-                      await _loadAllAvailableEngineers(); // محاولة تحميلهم إذا كانت فارغة
-                      if (_allAvailableEngineers.isEmpty && mounted) { // التحقق مرة أخرى
-                        _showFeedbackSnackBar(context, "لا يوجد مهندسون متاحون في النظام.", isError: true);
-                        return;
-                      }
-                    }
-
-
-                    final projectDataMap = _projectDataSnapshot!.data() as Map<String, dynamic>;
-                    final List<dynamic> currentEngRaw = projectDataMap['assignedEngineers'] as List<dynamic>? ?? [];
-                    final List<Map<String, dynamic>> currentEngTyped = currentEngRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-
-                    // الانتقال إلى صفحة تعديل المهندسين
-                    final result = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EditAssignedEngineersPage(
-                          projectId: widget.projectId,
-                          projectName: projectDataMap['name'] ?? 'مشروع غير مسمى',
-                          currentlyAssignedEngineers: currentEngTyped,
-                          allAvailableEngineers: _allAvailableEngineers,
-                        ),
-                      ),
-                    );
-
-                    if (result == true && mounted) {
-                      // إذا عادت الصفحة بنتيجة true، قم بتحديث بيانات المشروع في هذه الصفحة
-                      setState(() {
-                        _projectFutureBuilderKey = UniqueKey(); // لإعادة بناء FutureBuilder
-                      });
-                    }
-                  },
+                  label: const Text('تعديل المهندسين', style: TextStyle(color: Colors.white)),
+                  onPressed: () => _showEditAssignedEngineersDialog(projectDataMap),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppConstants.primaryColor,
                     padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingMedium, vertical: AppConstants.paddingSmall),
@@ -660,7 +626,6 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                   ),
                 ),
               )
-// ...
           ],
         ),
       ),
@@ -687,14 +652,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     );
   }
 
-  // --- قسم بناء واجهة المراحل ---
   Widget _buildPhasesTab() {
-    // هنا سنقوم ببناء واجهة المراحل الرئيسية والفرعية
-    // سيتم جلب بيانات إكمال المراحل والملاحظات والصور من Firestore
-    // وسنقارنها مع predefinedPhasesStructure للعرض
-
-    // مثال مبسط جداً لعرض المراحل الرئيسية
+    if (_projectDataSnapshot == null || !_projectDataSnapshot!.exists) {
+      return const Center(child: Text("لا يمكن تحميل تفاصيل المشروع للمراحل."));
+    }
     return ListView.builder(
+      key: const PageStorageKey<String>('adminProjectDetails_phasesTabListView'),
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       itemCount: predefinedPhasesStructure.length,
       itemBuilder: (context, index) {
@@ -703,25 +666,21 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         final phaseName = phaseStructure['name'] as String;
         final subPhasesStructure = phaseStructure['subPhases'] as List<Map<String, dynamic>>;
 
-        // يجب جلب بيانات هذه المرحلة من Firestore إذا كانت موجودة
-        // (مثل: هل هي مكتملة؟ ما هي الملاحظات؟ الصور؟)
-        // هذا StreamBuilder مثال لجلب بيانات مرحلة واحدة، ستحتاج لتكراره أو تجميعه
         return StreamBuilder<DocumentSnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('projects')
                 .doc(widget.projectId)
-                .collection('phases_status') // مجموعة فرعية جديدة لحالة المراحل
-                .doc(phaseId) // استخدام معرّف المرحلة الثابت
+                .collection('phases_status')
+                .doc(phaseId)
                 .snapshots(),
             builder: (context, phaseStatusSnapshot) {
               bool isCompleted = false;
-              List<Map<String, dynamic>> notesAndImages = []; // {type: 'note'/'image', content: '...', engineerName: '...', timestamp: ...}
+              String phaseActualName = phaseName;
 
               if (phaseStatusSnapshot.hasData && phaseStatusSnapshot.data!.exists) {
                 final statusData = phaseStatusSnapshot.data!.data() as Map<String, dynamic>;
                 isCompleted = statusData['completed'] ?? false;
-                // جلب الملاحظات والصور من مجموعة فرعية أخرى مثلاً:
-                // phases_status/{phaseId}/entries (entries يمكن أن تكون ملاحظات أو صور)
+                phaseActualName = statusData['name'] ?? phaseName;
               }
 
               return Card(
@@ -729,12 +688,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 elevation: 2,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
                 child: ExpansionTile(
-                  key: PageStorageKey<String>(phaseId), // للحفاظ على حالة التوسيع
+                  key: PageStorageKey<String>(phaseId),
                   leading: CircleAvatar(
                     backgroundColor: isCompleted ? AppConstants.successColor : AppConstants.primaryColor,
                     child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
-                  title: Text(phaseName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                  title: Text(phaseActualName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
                   subtitle: Text(isCompleted ? 'مكتملة ✅' : 'قيد التنفيذ ⏳', style: TextStyle(color: isCompleted ? AppConstants.successColor : AppConstants.warningColor, fontWeight: FontWeight.w500)),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -742,95 +701,114 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                       if (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isCompleted))
                         IconButton(
                           icon: const Icon(Icons.add_comment_outlined, color: AppConstants.primaryLight),
-                          tooltip: 'إضافة ملاحظة/صورة',
-                          onPressed: () => _showAddNoteOrImageDialog(phaseId, phaseName),
+                          tooltip: 'إضافة ملاحظة/صورة للمرحلة الرئيسية',
+                          onPressed: () => _showAddNoteOrImageDialog(phaseId, phaseActualName),
                         ),
                       if (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isCompleted))
                         Checkbox(
                           value: isCompleted,
                           activeColor: AppConstants.successColor,
                           onChanged: (value) {
-                            _updatePhaseCompletionStatus(phaseId, phaseName, value ?? false);
+                            _updatePhaseCompletionStatus(phaseId, phaseActualName, value ?? false);
                           },
                         ),
                     ],
                   ),
                   children: [
                     Padding(
-                      padding: const EdgeInsets.all(AppConstants.paddingSmall),
+                      padding: const EdgeInsets.all(AppConstants.paddingSmall).copyWith(right: AppConstants.paddingMedium + 8, left: AppConstants.paddingSmall),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // عرض الملاحظات والصور الحالية للمرحلة الرئيسية
-                          // ... (سيتم بناؤه لاحقًا باستخدام StreamBuilder لـ entries) ...
-                          if (notesAndImages.isEmpty && subPhasesStructure.isEmpty)
-                            const Center(child: Text('لا توجد تفاصيل لهذه المرحلة.', style: TextStyle(fontStyle: FontStyle.italic, color: AppConstants.textSecondary))),
-
-                          // المراحل الفرعية
-                          if (subPhasesStructure.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: AppConstants.paddingSmall, right: AppConstants.paddingMedium), // مسافة بادئة للمراحل الفرعية
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: subPhasesStructure.map((subPhaseMap) {
-                                  final subPhaseId = subPhaseMap['id'] as String;
-                                  final subPhaseName = subPhaseMap['name'] as String;
-                                  // جلب حالة المرحلة الفرعية من Firestore
-                                  return StreamBuilder<DocumentSnapshot>(
-                                      stream: FirebaseFirestore.instance
-                                          .collection('projects')
-                                          .doc(widget.projectId)
-                                          .collection('subphases_status') // مجموعة فرعية جديدة لحالة المراحل الفرعية
-                                          .doc(subPhaseId)
-                                          .snapshots(),
-                                      builder: (context, subPhaseStatusSnapshot) {
-                                        bool isSubCompleted = false;
-                                        if (subPhaseStatusSnapshot.hasData && subPhaseStatusSnapshot.data!.exists) {
-                                          isSubCompleted = (subPhaseStatusSnapshot.data!.data() as Map<String,dynamic>)['completed'] ?? false;
-                                        }
-                                        return ListTile(
-                                          dense: true,
-                                          leading: Icon(
-                                            isSubCompleted ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
-                                            color: isSubCompleted ? AppConstants.successColor : AppConstants.textSecondary,
-                                          ),
-                                          title: Text(subPhaseName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: isSubCompleted ? TextDecoration.lineThrough : null)),
-                                          trailing: (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isSubCompleted))
-                                              ? Checkbox(
-                                            value: isSubCompleted,
-                                            activeColor: AppConstants.successColor,
-                                            onChanged: (value) {
-                                              _updateSubPhaseCompletionStatus(phaseId, subPhaseId, subPhaseName, value ?? false);
-                                            },
-                                          )
-                                              : null,
-                                          onTap: () {
-                                            // يمكن إضافة نافذة لإضافة ملاحظات/صور للمرحلة الفرعية
-                                            if (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isSubCompleted)) {
-                                              _showAddNoteOrImageDialog(phaseId, subPhaseName, subPhaseId: subPhaseId);
-                                            }
-                                          },
-                                        );
-                                      }
-                                  );
-                                }).toList(),
-                              ),
-                            ),
+                          const Text("إدخالات المرحلة الرئيسية:", style: TextStyle(fontWeight: FontWeight.bold, color: AppConstants.textPrimary, fontSize: 14)),
+                          _buildEntriesList(phaseId, isCompleted, phaseActualName),
+                          const SizedBox(height: AppConstants.paddingSmall),
                         ],
                       ),
-                    )
+                    ),
+                    if (subPhasesStructure.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                            top: AppConstants.paddingSmall,
+                            right: AppConstants.paddingMedium,
+                            left: AppConstants.paddingSmall,
+                            bottom: AppConstants.paddingSmall
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(bottom: AppConstants.paddingSmall / 2, right: 8.0),
+                              child: Text("المراحل الفرعية:", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                            ),
+                            ...subPhasesStructure.map((subPhaseMap) {
+                              final subPhaseId = subPhaseMap['id'] as String;
+                              final subPhaseName = subPhaseMap['name'] as String;
+                              return StreamBuilder<DocumentSnapshot>(
+                                  stream: FirebaseFirestore.instance
+                                      .collection('projects')
+                                      .doc(widget.projectId)
+                                      .collection('subphases_status')
+                                      .doc(subPhaseId)
+                                      .snapshots(),
+                                  builder: (context, subPhaseStatusSnapshot) {
+                                    bool isSubCompleted = false;
+                                    String subPhaseActualName = subPhaseName;
+
+                                    if (subPhaseStatusSnapshot.hasData && subPhaseStatusSnapshot.data!.exists) {
+                                      final subStatusData = subPhaseStatusSnapshot.data!.data() as Map<String, dynamic>;
+                                      isSubCompleted = subStatusData['completed'] ?? false;
+                                      subPhaseActualName = subStatusData['name'] ?? subPhaseName;
+                                    }
+                                    return Card(
+                                      elevation: 0.5,
+                                      color: AppConstants.backgroundColor,
+                                      margin: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall / 2, horizontal: AppConstants.paddingSmall /2),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
+                                      child: ExpansionTile(
+                                        key: PageStorageKey<String>('sub_$subPhaseId'),
+                                        leading: Icon(
+                                          isSubCompleted ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                                          color: isSubCompleted ? AppConstants.successColor : AppConstants.textSecondary, size: 20,
+                                        ),
+                                        title: Text(subPhaseActualName, style: TextStyle(fontSize: 13.5, color: AppConstants.textSecondary, decoration: isSubCompleted ? TextDecoration.lineThrough : null)),
+                                        trailing: (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isSubCompleted))
+                                            ? Checkbox(
+                                          value: isSubCompleted,
+                                          activeColor: AppConstants.successColor,
+                                          visualDensity: VisualDensity.compact,
+                                          onChanged: (value) {
+                                            _updateSubPhaseCompletionStatus(phaseId, subPhaseId, subPhaseActualName, value ?? false);
+                                          },
+                                        )
+                                            : null,
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.only(left: AppConstants.paddingSmall, right: AppConstants.paddingMedium + 8, bottom: AppConstants.paddingSmall, top: 0),
+                                            child: _buildEntriesList(phaseId, isSubCompleted, subPhaseActualName, subPhaseId: subPhaseId, isSubEntry: true),
+                                          )
+                                        ],
+                                      ),
+                                    );
+                                  });
+                            }).toList(),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               );
-            }
-        );
+            });
       },
     );
   }
 
-  // --- قسم بناء واجهة اختبارات التشغيل ---
   Widget _buildTestsTab() {
+    if (_projectDataSnapshot == null || !_projectDataSnapshot!.exists) {
+      return const Center(child: Text("لا يمكن تحميل تفاصيل المشروع للاختبارات."));
+    }
     return ListView.builder(
+      key: const PageStorageKey<String>('adminProjectDetails_testsTabListView'),
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       itemCount: finalCommissioningTests.length,
       itemBuilder: (context, sectionIndex) {
@@ -850,12 +828,11 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             children: tests.map((test) {
               final testId = test['id'] as String;
               final testName = test['name'] as String;
-              // جلب حالة هذا الاختبار من Firestore
               return StreamBuilder<DocumentSnapshot>(
                   stream: FirebaseFirestore.instance
                       .collection('projects')
                       .doc(widget.projectId)
-                      .collection('tests_status') // مجموعة فرعية جديدة لحالة الاختبارات
+                      .collection('tests_status')
                       .doc(testId)
                       .snapshots(),
                   builder: (context, testStatusSnapshot) {
@@ -863,7 +840,6 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     String testNote = "";
                     String? testImageUrl;
                     String? engineerName;
-
 
                     if (testStatusSnapshot.hasData && testStatusSnapshot.data!.exists) {
                       final statusData = testStatusSnapshot.data!.data() as Map<String, dynamic>;
@@ -907,7 +883,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                               padding: const EdgeInsets.only(top: 4.0),
                               child: InkWell(
                                 onTap: () => _viewImageDialog(testImageUrl!),
-                                child: Row(
+                                child: const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(Icons.image_outlined, size: 16, color: AppConstants.primaryLight),
@@ -925,8 +901,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         }
                       },
                     );
-                  }
-              );
+                  });
             }).toList(),
           ),
         );
@@ -934,313 +909,158 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     );
   }
 
+  Widget _buildEntriesList(String phaseOrMainPhaseId, bool parentCompleted, String parentName, {String? subPhaseId, bool isSubEntry = false}) {
+    String entriesCollectionPath = subPhaseId == null
+        ? 'projects/${widget.projectId}/phases_status/$phaseOrMainPhaseId/entries'
+        : 'projects/${widget.projectId}/subphases_status/$subPhaseId/entries';
 
-  Future<void> _updatePhaseCompletionStatus(String phaseId, String phaseName, bool newStatus) async {
-    // هذه الدالة لتحديث حالة إكمال المرحلة الرئيسية في Firestore
-    try {
-      final phaseDocRef = FirebaseFirestore.instance
-          .collection('projects')
-          .doc(widget.projectId)
-          .collection('phases_status')
-          .doc(phaseId);
+    final String listKeySuffix = subPhaseId ?? phaseOrMainPhaseId;
+    final PageStorageKey entriesListKey = PageStorageKey<String>('entriesList_$listKeySuffix');
 
-      final currentUser = FirebaseAuth.instance.currentUser;
-      String engineerName = "غير معروف";
-      if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
-        engineerName = userDoc.data()?['name'] ?? 'مهندس';
-      }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection(entriesCollectionPath).orderBy('timestamp', descending: true).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Padding(padding: EdgeInsets.all(8.0), child: Center(child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))));
+            }
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Text(isSubEntry ? 'لا توجد إدخالات لهذه المرحلة الفرعية بعد.' : 'لا توجد إدخالات لهذه المرحلة بعد.', style: const TextStyle(color: AppConstants.textSecondary, fontStyle: FontStyle.italic, fontSize: 13)),
+              );
+            }
+            final entries = snapshot.data!.docs;
+            return ListView.builder(
+              key: entriesListKey,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: entries.length,
+              itemBuilder: (context, index) {
+                final entryData = entries[index].data() as Map<String, dynamic>;
+                final String note = entryData['note'] ?? '';
+                final String? imageUrl = entryData['imageUrl'] as String?;
+                final String engineerName = entryData['engineerName'] ?? 'غير معروف';
+                final Timestamp? timestamp = entryData['timestamp'] as Timestamp?;
 
-
-      await phaseDocRef.set({
-        'completed': newStatus,
-        'name': phaseName, // حفظ اسم المرحلة لسهولة الاستعلام لاحقاً إذا أردت
-        'lastUpdatedByUid': currentUser?.uid,
-        'lastUpdatedByName': engineerName,
-        'lastUpdatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      // إرسال إشعار للمسؤول والعميل
-      final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
-      final projectData = projectDoc.data();
-      final projectName = projectData?['name'] ?? 'المشروع';
-      final clientUid = projectData?['clientId'] as String?;
-      final List<dynamic> assignedEngineersRaw = projectData?['assignedEngineers'] as List<dynamic>? ?? [];
-      final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => e['uid'].toString()).toList();
-
-      if (newStatus) { // فقط عند الإكمال
-        _sendNotificationToMultipleEngineers(
-            projectId: widget.projectId,
-            projectName: projectName,
-            title: 'تحديث مشروع: مرحلة مكتملة',
-            body: 'المرحلة "$phaseName" في مشروع "$projectName" أصبحت مكتملة.',
-            recipientUids: ['admin_user_id_placeholder'], // يجب استبداله بـ UIDs للمسؤولين الفعليين
-            notificationType: 'phase_completed_admin',
-            phaseDocId: phaseId
-        );
-        if (clientUid != null) {
-          _sendNotificationToMultipleEngineers(
-              projectId: widget.projectId,
-              projectName: projectName,
-              title: 'تحديث مشروع: مرحلة مكتملة',
-              body: 'المرحلة "$phaseName" في مشروع "$projectName" أصبحت مكتملة. يمكنك الآن مراجعتها.',
-              recipientUids: [clientUid],
-              notificationType: 'phase_completed_client',
-              phaseDocId: phaseId
-          );
-        }
-        // إشعار المهندسين الآخرين إذا كان مهندس هو من أكملها
-        if (_currentUserRole == 'engineer') {
-          final otherEngineers = assignedEngineerUids.where((uid) => uid != currentUser?.uid).toList();
-          if (otherEngineers.isNotEmpty) {
-            _sendNotificationToMultipleEngineers(
-                projectId: widget.projectId,
-                projectName: projectName,
-                title: 'تحديث مشروع: مرحلة مكتملة',
-                body: 'المرحلة "$phaseName" في مشروع "$projectName" أصبحت مكتملة بواسطة المهندس $engineerName.',
-                recipientUids: otherEngineers,
-                notificationType: 'phase_completed_other_engineers',
-                phaseDocId: phaseId
-            );
-          }
-        }
-      }
-
-
-      _showFeedbackSnackBar(context, 'تم تحديث حالة المرحلة "$phaseName".', isError: false);
-    } catch (e) {
-      _showFeedbackSnackBar(context, 'فشل تحديث حالة المرحلة: $e', isError: true);
-    }
-  }
-
-  Future<void> _updateSubPhaseCompletionStatus(String mainPhaseId, String subPhaseId, String subPhaseName, bool newStatus) async {
-    // لتحديث حالة إكمال المرحلة الفرعية
-    try {
-      final subPhaseDocRef = FirebaseFirestore.instance
-          .collection('projects')
-          .doc(widget.projectId)
-          .collection('subphases_status')
-          .doc(subPhaseId);
-
-      final currentUser = FirebaseAuth.instance.currentUser;
-      String engineerName = "غير معروف";
-      if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
-        engineerName = userDoc.data()?['name'] ?? 'مهندس';
-      }
-
-      await subPhaseDocRef.set({
-        'completed': newStatus,
-        'mainPhaseId': mainPhaseId, // لربطها بالمرحلة الرئيسية
-        'name': subPhaseName,
-        'lastUpdatedByUid': currentUser?.uid,
-        'lastUpdatedByName': engineerName,
-        'lastUpdatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
-      final projectData = projectDoc.data();
-      final projectName = projectData?['name'] ?? 'المشروع';
-      final clientUid = projectData?['clientId'] as String?;
-      final List<dynamic> assignedEngineersRaw = projectData?['assignedEngineers'] as List<dynamic>? ?? [];
-      final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => e['uid'].toString()).toList();
-
-      if (newStatus) {
-        _sendNotificationToMultipleEngineers(
-            projectId: widget.projectId,
-            projectName: projectName,
-            title: 'تحديث مشروع: مرحلة فرعية مكتملة',
-            body: 'المرحلة الفرعية "$subPhaseName" في مشروع "$projectName" أصبحت مكتملة.',
-            recipientUids: ['admin_user_id_placeholder'], // للمسؤولين
-            notificationType: 'subphase_completed_admin',
-            phaseDocId: mainPhaseId // نرسل معرف المرحلة الرئيسية
-        );
-        if (clientUid != null) {
-          _sendNotificationToMultipleEngineers(
-              projectId: widget.projectId,
-              projectName: projectName,
-              title: 'تحديث مشروع: مرحلة فرعية مكتملة',
-              body: 'المرحلة الفرعية "$subPhaseName" في مشروع "$projectName" أصبحت مكتملة.',
-              recipientUids: [clientUid],
-              notificationType: 'subphase_completed_client',
-              phaseDocId: mainPhaseId
-          );
-        }
-        if (_currentUserRole == 'engineer') {
-          final otherEngineers = assignedEngineerUids.where((uid) => uid != currentUser?.uid).toList();
-          if (otherEngineers.isNotEmpty) {
-            _sendNotificationToMultipleEngineers(
-                projectId: widget.projectId,
-                projectName: projectName,
-                title: 'تحديث مشروع: مرحلة فرعية مكتملة',
-                body: 'المرحلة الفرعية "$subPhaseName" في مشروع "$projectName" أصبحت مكتملة بواسطة المهندس $engineerName.',
-                recipientUids: otherEngineers,
-                notificationType: 'subphase_completed_other_engineers',
-                phaseDocId: mainPhaseId
-            );
-          }
-        }
-      }
-      _showFeedbackSnackBar(context, 'تم تحديث حالة المرحلة الفرعية "$subPhaseName".', isError: false);
-    } catch (e) {
-      _showFeedbackSnackBar(context, 'فشل تحديث حالة المرحلة الفرعية: $e', isError: true);
-    }
-  }
-
-  Future<void> _updateTestStatus(String testId, String testName, bool newStatus, {String? currentNote, String? currentImageUrl}) async {
-    // لتحديث حالة إكمال الاختبار
-    final noteController = TextEditingController(text: currentNote ?? "");
-    String? tempImageUrl = currentImageUrl; // لتخزين الصورة مؤقتًا أثناء التعديل
-    File? pickedImageFile;
-    bool isUploading = false;
-
-    final currentUser = FirebaseAuth.instance.currentUser;
-    String engineerName = "غير معروف";
-    if (currentUser != null) {
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
-      engineerName = userDoc.data()?['name'] ?? 'مهندس';
-    }
-
-
-    bool? confirmed = await showDialog<bool>(
-        context: context,
-        barrierDismissible: !isUploading,
-        builder: (dialogContext) {
-          return StatefulBuilder(builder: (stfContext, setDialogState) {
-            return Directionality(
-              textDirection: ui.TextDirection.rtl,
-              child: AlertDialog(
-                title: Text('تحديث حالة الاختبار: $testName'),
-                content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CheckboxListTile(
-                        title: const Text('مكتمل'),
-                        value: newStatus,
-                        onChanged: (val) => setDialogState(() => newStatus = val ?? false),
-                        activeColor: AppConstants.successColor,
-                      ),
-                      TextField(
-                        controller: noteController,
-                        decoration: const InputDecoration(labelText: 'ملاحظات (اختياري)'),
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: AppConstants.itemSpacing),
-                      if (tempImageUrl != null)
-                        Column(
+                return Card(
+                  elevation: 1,
+                  margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 0),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppConstants.paddingSmall),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (imageUrl != null)
+                          InkWell(
+                            onTap: () => _viewImageDialog(imageUrl),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
+                              child: Image.network(imageUrl, height: 150, width: double.infinity, fit: BoxFit.cover,
+                                  errorBuilder: (c,e,s) => Container(height: 100, color: AppConstants.backgroundColor, child: Center(child: Icon(Icons.broken_image, color: AppConstants.textSecondary.withOpacity(0.5), size: 40)))),
+                            ),
+                          ),
+                        if (note.isNotEmpty)
+                          Padding(
+                            padding: EdgeInsets.only(top: imageUrl != null ? AppConstants.paddingSmall : 0),
+                            child: ExpandableText(note, valueColor: AppConstants.textPrimary),
+                          ),
+                        const SizedBox(height: AppConstants.paddingSmall / 2),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            const Text("الصورة الحالية:"),
-                            Image.network(tempImageUrl!, height: 100),
-                            TextButton.icon(
-                              icon: const Icon(Icons.delete, color: AppConstants.errorColor),
-                              label: const Text("حذف الصورة الحالية", style: TextStyle(color: AppConstants.errorColor)),
-                              onPressed: () => setDialogState(() => tempImageUrl = null),
-                            )
+                            Text(
+                              'بواسطة: $engineerName - ${timestamp != null ? DateFormat('dd/MM/yy hh:mm a', 'ar').format(timestamp.toDate()) : 'غير معروف'}',
+                              style: const TextStyle(fontSize: 10, color: AppConstants.textSecondary, fontStyle: FontStyle.italic),
+                            ),
                           ],
                         ),
-                      if (pickedImageFile != null)
-                        Image.file(pickedImageFile!, height: 100),
-                      TextButton.icon(
-                        icon: const Icon(Icons.camera_alt_outlined),
-                        label: Text(pickedImageFile == null && tempImageUrl == null ? 'إضافة صورة (اختياري)' : 'تغيير الصورة'),
-                        onPressed: () async {
-                          final picker = ImagePicker();
-                          final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
-                          if (picked != null) {
-                            setDialogState(() => pickedImageFile = File(picked.path));
-                          }
-                        },
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                actions: [
-                  TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
-                  ElevatedButton(
-                    onPressed: isUploading ? null : () => Navigator.pop(dialogContext, true),
-                    child: isUploading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2,)) : const Text('حفظ'),
-                  ),
-                ],
-              ),
+                );
+              },
             );
-          });
-        }
+          },
+        ),
+      ],
     );
+  }
 
-    if (confirmed == true) {
-      setState(() => isUploading = true); // حالة تحميل عامة للصفحة
-      String? finalImageUrl = tempImageUrl; // ابدأ بالصورة الحالية
-      if (pickedImageFile != null) { // إذا تم اختيار صورة جديدة، ارفعها
-        try {
-          final ref = FirebaseStorage.instance.ref().child('project_tests/${widget.projectId}/$testId/${DateTime.now().millisecondsSinceEpoch}.jpg');
-          await ref.putFile(pickedImageFile!);
-          finalImageUrl = await ref.getDownloadURL();
-        } catch (e) {
-          _showFeedbackSnackBar(context, 'فشل رفع صورة الاختبار: $e', isError: true);
-          setState(() => isUploading = false);
-          return;
-        }
-      }
-      setState(() => isUploading = false);
-
-
-      try {
-        final testDocRef = FirebaseFirestore.instance
-            .collection('projects')
-            .doc(widget.projectId)
-            .collection('tests_status')
-            .doc(testId);
-
-        await testDocRef.set({
-          'completed': newStatus,
-          'name': testName, // حفظ اسم الاختبار
-          'note': noteController.text.trim(),
-          'imageUrl': finalImageUrl, // حفظ رابط الصورة
-          'lastUpdatedByUid': currentUser?.uid,
-          'lastUpdatedByName': engineerName,
-          'lastUpdatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-        _showFeedbackSnackBar(context, 'تم تحديث حالة الاختبار "$testName".', isError: false);
-      } catch (e) {
-        _showFeedbackSnackBar(context, 'فشل تحديث حالة الاختبار: $e', isError: true);
-      }
-    }
+  Future<void> _viewImageDialog(String imageUrl) async {
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.transparent,
+        contentPadding: EdgeInsets.zero,
+        insetPadding: const EdgeInsets.all(10),
+        content: InteractiveViewer(
+          panEnabled: true,
+          boundaryMargin: const EdgeInsets.all(20),
+          minScale: 0.5,
+          maxScale: 4,
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.contain,
+            loadingBuilder: (ctx, child, progress) =>
+            progress == null ? child : const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor)),
+            errorBuilder: (ctx, err, st) => const Center(child: Icon(Icons.error_outline, color: AppConstants.errorColor, size: 50)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(backgroundColor: Colors.black.withOpacity(0.5)),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("إغلاق", style: TextStyle(color: Colors.white)),
+          )
+        ],
+        actionsAlignment: MainAxisAlignment.center,
+      ),
+    );
   }
 
   Future<void> _showAddNoteOrImageDialog(String phaseId, String phaseOrSubPhaseName, {String? subPhaseId}) async {
+    if (!mounted) return;
+
     final noteController = TextEditingController();
     File? pickedImageFile;
-    bool isUploading = false;
-    final formKey = GlobalKey<FormState>();
+    bool isUploadingDialog = false;
+    final formKeyDialog = GlobalKey<FormState>();
 
     String dialogTitle = subPhaseId == null
-        ? 'إضافة ملاحظة/صورة للمرحلة: $phaseOrSubPhaseName'
-        : 'إضافة ملاحظة/صورة للمرحلة الفرعية: $phaseOrSubPhaseName';
+        ? 'إضافة إدخال للمرحلة: $phaseOrSubPhaseName'
+        : 'إضافة إدخال للمرحلة الفرعية: $phaseOrSubPhaseName';
 
     String collectionPath = subPhaseId == null
         ? 'projects/${widget.projectId}/phases_status/$phaseId/entries'
         : 'projects/${widget.projectId}/subphases_status/$subPhaseId/entries';
 
-
     await showDialog(
       context: context,
-      barrierDismissible: !isUploading,
+      barrierDismissible: !isUploadingDialog,
       builder: (dialogContext) {
         return StatefulBuilder(builder: (stfContext, setDialogState) {
           return Directionality(
             textDirection: ui.TextDirection.rtl,
             child: AlertDialog(
-              title: Text(dialogTitle),
+              title: Text(dialogTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               content: Form(
-                key: formKey,
+                key: formKeyDialog,
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       TextFormField(
                         controller: noteController,
-                        decoration: const InputDecoration(labelText: 'الملاحظة (اختياري إذا أضفت صورة)'),
+                        decoration: const InputDecoration(
+                            labelText: 'الملاحظة',
+                            hintText: 'أدخل ملاحظتك هنا (اختياري إذا أضفت صورة)',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.notes_rounded)
+                        ),
                         maxLines: 3,
                         validator: (value) {
                           if ((value == null || value.isEmpty) && pickedImageFile == null) {
@@ -1251,10 +1071,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
                       if (pickedImageFile != null)
-                        Image.file(pickedImageFile!, height: 150, fit: BoxFit.contain),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Image.file(pickedImageFile!, height: 120, fit: BoxFit.contain),
+                        ),
                       TextButton.icon(
-                        icon: const Icon(Icons.camera_alt_outlined),
-                        label: Text(pickedImageFile == null ? 'إضافة صورة (اختياري)' : 'تغيير الصورة'),
+                        icon: const Icon(Icons.camera_alt_outlined, color: AppConstants.primaryColor),
+                        label: Text(pickedImageFile == null ? 'إضافة صورة (اختياري)' : 'تغيير الصورة', style: const TextStyle(color: AppConstants.primaryColor)),
                         onPressed: () async {
                           final picker = ImagePicker();
                           final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
@@ -1275,51 +1098,60 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                   child: const Text('إلغاء'),
                 ),
                 ElevatedButton(
-                  onPressed: isUploading ? null : () async {
-                    if (!formKey.currentState!.validate()) return;
+                  onPressed: isUploadingDialog ? null : () async {
+                    if (!formKeyDialog.currentState!.validate()) return;
 
-                    setDialogState(() => isUploading = true);
+                    setDialogState(() => isUploadingDialog = true);
                     String? imageUrl;
                     final currentUser = FirebaseAuth.instance.currentUser;
-                    String engineerName = "غير معروف";
+                    String actorName = "غير معروف";
+
                     if (currentUser != null) {
                       final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
-                      engineerName = userDoc.data()?['name'] ?? 'مهندس';
+                      if (userDoc.exists) {
+                        actorName = userDoc.data()?['name'] ?? (_currentUserRole == 'admin' ? 'المسؤول' : 'مهندس');
+                      } else {
+                        actorName = _currentUserRole == 'admin' ? 'المسؤول' : 'مهندس';
+                      }
                     }
 
                     if (pickedImageFile != null) {
                       try {
+                        final timestampForPath = DateTime.now().millisecondsSinceEpoch;
+                        final imageName = '${currentUser?.uid ?? 'unknown_user'}_${timestampForPath}.jpg';
                         final refPath = subPhaseId == null
-                            ? 'project_phases/${widget.projectId}/$phaseId/entries/${DateTime.now().millisecondsSinceEpoch}.jpg'
-                            : 'project_subphases/${widget.projectId}/$subPhaseId/entries/${DateTime.now().millisecondsSinceEpoch}.jpg';
+                            ? 'project_entries/${widget.projectId}/$phaseId/$imageName'
+                            : 'project_entries/${widget.projectId}/$subPhaseId/$imageName';
+
                         final ref = FirebaseStorage.instance.ref().child(refPath);
                         await ref.putFile(pickedImageFile!);
                         imageUrl = await ref.getDownloadURL();
                       } catch (e) {
-                        if (mounted) _showFeedbackSnackBar(dialogContext, 'فشل رفع الصورة: $e', isError: true);
-                        setDialogState(() => isUploading = false);
+                        if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة: $e', isError: true);
+                        setDialogState(() => isUploadingDialog = false);
                         return;
                       }
                     }
 
                     try {
                       await FirebaseFirestore.instance.collection(collectionPath).add({
-                        'type': imageUrl != null ? 'image_with_note' : 'note',
+                        'type': imageUrl != null ? (noteController.text.trim().isEmpty ? 'image_only' : 'image_with_note') : 'note_only',
                         'note': noteController.text.trim(),
                         'imageUrl': imageUrl,
                         'engineerUid': currentUser?.uid,
-                        'engineerName': engineerName,
+                        'engineerName': actorName,
                         'timestamp': FieldValue.serverTimestamp(),
                       });
                       Navigator.pop(dialogContext);
                       _showFeedbackSnackBar(context, 'تمت إضافة الإدخال بنجاح.', isError: false);
                     } catch (e) {
-                      if (mounted) _showFeedbackSnackBar(dialogContext, 'فشل إضافة الإدخال: $e', isError: true);
+                      if (mounted) _showFeedbackSnackBar(stfContext, 'فشل إضافة الإدخال: $e', isError: true);
                     } finally {
-                      setDialogState(() => isUploading = false);
+                      if(mounted) setDialogState(() => isUploadingDialog = false);
                     }
                   },
-                  child: isUploading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('حفظ'),
+                  style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, foregroundColor: Colors.white),
+                  child: isUploadingDialog ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white),)) : const Text('حفظ الإدخال'),
                 ),
               ],
             ),
@@ -1329,31 +1161,269 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     );
   }
 
-  Future<void> _viewImageDialog(String imageUrl) async {
-    await showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        contentPadding: EdgeInsets.zero,
-        content: InteractiveViewer( // للسماح بالتكبير والتصغير
-          panEnabled: false, // تعطيل التحريك إذا لم يكن ضرورياً
-          boundaryMargin: EdgeInsets.all(20),
-          minScale: 0.5,
-          maxScale: 4,
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.contain,
-            loadingBuilder: (ctx, child, progress) =>
-            progress == null ? child : Center(child: CircularProgressIndicator()),
-            errorBuilder: (ctx, err, st) => Center(child: Text("فشل تحميل الصورة")),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text("إغلاق"),
-          )
-        ],
-      ),
+  Future<void> _updatePhaseCompletionStatus(String phaseId, String phaseName, bool newStatus) async {
+    if (!mounted) return;
+    try {
+      final phaseDocRef = FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .collection('phases_status')
+          .doc(phaseId);
+
+      final currentUser = FirebaseAuth.instance.currentUser;
+      String actorName = "غير معروف";
+      if (currentUser != null) {
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+        if (userDoc.exists) {
+          actorName = userDoc.data()?['name'] ?? (_currentUserRole == 'admin' ? 'المسؤول' : 'مهندس');
+        } else {
+          actorName = _currentUserRole == 'admin' ? 'المسؤول' : 'مهندس';
+        }
+      }
+
+      await phaseDocRef.set({
+        'completed': newStatus,
+        'name': phaseName,
+        'lastUpdatedByUid': currentUser?.uid,
+        'lastUpdatedByName': actorName,
+        'lastUpdatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
+      final projectData = projectDoc.data();
+      final projectNameVal = projectData?['name'] ?? 'المشروع';
+      final clientUid = projectData?['clientId'] as String?;
+      final List<dynamic> assignedEngineersRaw = projectData?['assignedEngineers'] as List<dynamic>? ?? [];
+      final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => e['uid'].toString()).toList();
+
+      if (newStatus) {
+        if (clientUid != null) {
+          _sendNotificationToMultipleEngineers(
+              projectId: widget.projectId,
+              projectName: projectNameVal,
+              title: 'تحديث مشروع: مرحلة مكتملة',
+              body: 'المرحلة "$phaseName" في مشروع "$projectNameVal" أصبحت مكتملة. يمكنك الآن مراجعتها.',
+              recipientUids: [clientUid],
+              notificationType: 'phase_completed_client',
+              phaseDocId: phaseId
+          );
+        }
+        if (_currentUserRole == 'engineer') {
+          final otherEngineers = assignedEngineerUids.where((uid) => uid != currentUser?.uid).toList();
+          if (otherEngineers.isNotEmpty) {
+            _sendNotificationToMultipleEngineers(
+                projectId: widget.projectId,
+                projectName: projectNameVal,
+                title: 'تحديث مشروع: مرحلة مكتملة',
+                body: 'المرحلة "$phaseName" في مشروع "$projectNameVal" أصبحت مكتملة بواسطة المهندس $actorName.',
+                recipientUids: otherEngineers,
+                notificationType: 'phase_completed_other_engineers',
+                phaseDocId: phaseId
+            );
+          }
+        }
+      }
+      _showFeedbackSnackBar(context, 'تم تحديث حالة المرحلة "$phaseName".', isError: false);
+    } catch (e) {
+      _showFeedbackSnackBar(context, 'فشل تحديث حالة المرحلة: $e', isError: true);
+    }
+  }
+
+  Future<void> _updateSubPhaseCompletionStatus(String mainPhaseId, String subPhaseId, String subPhaseName, bool newStatus) async {
+    if (!mounted) return;
+    try {
+      final subPhaseDocRef = FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .collection('subphases_status')
+          .doc(subPhaseId);
+
+      final currentUser = FirebaseAuth.instance.currentUser;
+      String actorName = "غير معروف";
+      if (currentUser != null) {
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+        if (userDoc.exists) {
+          actorName = userDoc.data()?['name'] ?? (_currentUserRole == 'admin' ? 'المسؤول' : 'مهندس');
+        } else {
+          actorName = _currentUserRole == 'admin' ? 'المسؤول' : 'مهندس';
+        }
+      }
+
+      await subPhaseDocRef.set({
+        'completed': newStatus,
+        'mainPhaseId': mainPhaseId,
+        'name': subPhaseName,
+        'lastUpdatedByUid': currentUser?.uid,
+        'lastUpdatedByName': actorName,
+        'lastUpdatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
+      final projectData = projectDoc.data();
+      final projectNameVal = projectData?['name'] ?? 'المشروع';
+      final clientUid = projectData?['clientId'] as String?;
+      final List<dynamic> assignedEngineersRaw = projectData?['assignedEngineers'] as List<dynamic>? ?? [];
+      final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => e['uid'].toString()).toList();
+
+      if (newStatus) {
+        if (clientUid != null) {
+          _sendNotificationToMultipleEngineers(
+              projectId: widget.projectId,
+              projectName: projectNameVal,
+              title: 'تحديث مشروع: مرحلة فرعية مكتملة',
+              body: 'المرحلة الفرعية "$subPhaseName" في مشروع "$projectNameVal" أصبحت مكتملة.',
+              recipientUids: [clientUid],
+              notificationType: 'subphase_completed_client',
+              phaseDocId: mainPhaseId
+          );
+        }
+        if (_currentUserRole == 'engineer') {
+          final otherEngineers = assignedEngineerUids.where((uid) => uid != currentUser?.uid).toList();
+          if (otherEngineers.isNotEmpty) {
+            _sendNotificationToMultipleEngineers(
+                projectId: widget.projectId,
+                projectName: projectNameVal,
+                title: 'تحديث مشروع: مرحلة فرعية مكتملة',
+                body: 'المرحلة الفرعية "$subPhaseName" في مشروع "$projectNameVal" أصبحت مكتملة بواسطة المهندس $actorName.',
+                recipientUids: otherEngineers,
+                notificationType: 'subphase_completed_other_engineers',
+                phaseDocId: mainPhaseId
+            );
+          }
+        }
+      }
+      _showFeedbackSnackBar(context, 'تم تحديث حالة المرحلة الفرعية "$subPhaseName".', isError: false);
+    } catch (e) {
+      _showFeedbackSnackBar(context, 'فشل تحديث حالة المرحلة الفرعية: $e', isError: true);
+    }
+  }
+
+  Future<void> _updateTestStatus(String testId, String testName, bool newStatus, {String? currentNote, String? currentImageUrl}) async {
+    if (!mounted) return;
+
+    final noteController = TextEditingController(text: currentNote ?? "");
+    String? tempImageUrl = currentImageUrl;
+    File? pickedImageFile;
+    bool isUploadingDialog = false;
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    String actorName = "غير معروف";
+    if (currentUser != null) {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+      if (userDoc.exists) {
+        actorName = userDoc.data()?['name'] ?? (_currentUserRole == 'admin' ? 'المسؤول' : 'مهندس');
+      } else {
+        actorName = _currentUserRole == 'admin' ? 'المسؤول' : 'مهندس';
+      }
+    }
+
+    bool? confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: !isUploadingDialog,
+        builder: (dialogContext) {
+          return StatefulBuilder(builder: (stfContext, setDialogState) {
+            return Directionality(
+              textDirection: ui.TextDirection.rtl,
+              child: AlertDialog(
+                title: Text('تحديث حالة الاختبار: $testName', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CheckboxListTile(
+                        title: const Text('الاختبار مكتمل وناجح'),
+                        value: newStatus,
+                        onChanged: (val) => setDialogState(() => newStatus = val ?? false),
+                        activeColor: AppConstants.successColor,
+                        controlAffinity: ListTileControlAffinity.leading,
+                      ),
+                      TextField(
+                        controller: noteController,
+                        decoration: const InputDecoration(labelText: 'ملاحظات (اختياري)', border: OutlineInputBorder()),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      if (tempImageUrl != null && pickedImageFile == null)
+                        Column(
+                          children: [
+                            const Text("الصورة الحالية:", style: TextStyle(fontSize: 12, color: AppConstants.textSecondary)),
+                            Image.network(tempImageUrl!, height: 80, fit: BoxFit.cover),
+                            TextButton.icon(
+                              icon: const Icon(Icons.delete_outline, color: AppConstants.errorColor, size: 18),
+                              label: const Text("إزالة الصورة الحالية", style: TextStyle(color: AppConstants.errorColor, fontSize: 12)),
+                              onPressed: () => setDialogState(() => tempImageUrl = null),
+                            )
+                          ],
+                        ),
+                      if (pickedImageFile != null)
+                        Image.file(pickedImageFile!, height: 80, fit: BoxFit.cover),
+                      TextButton.icon(
+                        icon: const Icon(Icons.camera_alt_outlined, color: AppConstants.primaryColor),
+                        label: Text(pickedImageFile == null && tempImageUrl == null ? 'إضافة صورة (اختياري)' : (pickedImageFile == null ? 'تغيير الصورة الحالية' : 'تغيير الصورة المختارة'), style: const TextStyle(color: AppConstants.primaryColor)),
+                        onPressed: () async {
+                          final picker = ImagePicker();
+                          final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 60);
+                          if (picked != null) {
+                            setDialogState(() {
+                              pickedImageFile = File(picked.path);
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+                  ElevatedButton(
+                    onPressed: isUploadingDialog ? null : () async {
+                      setDialogState(() => isUploadingDialog = true);
+                      String? finalImageUrl = tempImageUrl;
+                      if (pickedImageFile != null) {
+                        try {
+                          final refPath = 'project_tests/${widget.projectId}/$testId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+                          final ref = FirebaseStorage.instance.ref().child(refPath);
+                          await ref.putFile(pickedImageFile!);
+                          finalImageUrl = await ref.getDownloadURL();
+                        } catch (e) {
+                          if(mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع صورة الاختبار: $e', isError: true);
+                          setDialogState(() => isUploadingDialog = false);
+                          return;
+                        }
+                      }
+                      try {
+                        final testDocRef = FirebaseFirestore.instance
+                            .collection('projects')
+                            .doc(widget.projectId)
+                            .collection('tests_status')
+                            .doc(testId);
+
+                        await testDocRef.set({
+                          'completed': newStatus,
+                          'name': testName,
+                          'note': noteController.text.trim(),
+                          'imageUrl': finalImageUrl,
+                          'lastUpdatedByUid': currentUser?.uid,
+                          'lastUpdatedByName': actorName,
+                          'lastUpdatedAt': FieldValue.serverTimestamp(),
+                        }, SetOptions(merge: true));
+                        if(mounted) Navigator.pop(dialogContext, true);
+                        if(mounted) _showFeedbackSnackBar(context, 'تم تحديث حالة الاختبار "$testName".', isError: false);
+
+                      } catch (e) {
+                        if(mounted) _showFeedbackSnackBar(stfContext, 'فشل تحديث حالة الاختبار: $e', isError: true);
+                      } finally {
+                        if(mounted) setDialogState(() => isUploadingDialog = false);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, foregroundColor: Colors.white),
+                    child: isUploadingDialog ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white),)) : const Text('حفظ الحالة'),
+                  ),
+                ],
+              ),
+            );
+          });
+        }
     );
   }
 
@@ -1376,10 +1446,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         appBar: _buildAppBar(),
         body: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(AppConstants.paddingSmall), // تقليل الـ padding هنا
-              child: _buildProjectSummaryCard(projectDataMap),
-            ),
+            _buildProjectSummaryCard(projectDataMap),
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -1393,5 +1460,87 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         ),
       ),
     );
+  }
+}
+
+class ExpandableText extends StatefulWidget {
+  final String text;
+  final int trimLines;
+  final Color? valueColor;
+
+  const ExpandableText(this.text, {super.key, this.trimLines = 2, this.valueColor});
+
+  @override
+  ExpandableTextState createState() => ExpandableTextState();
+}
+
+class ExpandableTextState extends State<ExpandableText> {
+  bool _readMore = true;
+  void _onTapLink() {
+    setState(() => _readMore = !_readMore);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    TextSpan link = TextSpan(
+        text: _readMore ? " عرض المزيد" : " عرض أقل",
+        style: const TextStyle(color: AppConstants.primaryColor, fontWeight: FontWeight.w600, fontSize: 14),
+        recognizer: TapGestureRecognizer()..onTap = _onTapLink
+    );
+    Widget result = LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        assert(constraints.hasBoundedWidth);
+        final double maxWidth = constraints.maxWidth;
+        final text = TextSpan(text: widget.text, style: TextStyle(fontSize: 14.5, color: widget.valueColor ?? AppConstants.textSecondary, height: 1.5));
+        TextPainter textPainter = TextPainter(
+          text: link,
+          textAlign: TextAlign.start,
+          textDirection: ui.TextDirection.rtl,
+          maxLines: widget.trimLines,
+          ellipsis: '...',
+        );
+        textPainter.layout(minWidth: constraints.minWidth, maxWidth: maxWidth);
+        final linkSize = textPainter.size;
+        textPainter.text = text;
+        textPainter.layout(minWidth: constraints.minWidth, maxWidth: maxWidth);
+        final textSize = textPainter.size;
+
+        if (!textPainter.didExceedMaxLines) {
+          return RichText(
+            softWrap: true,
+            overflow: TextOverflow.clip,
+            textAlign: TextAlign.start,
+            textDirection: ui.TextDirection.rtl,
+            text: text,
+          );
+        }
+
+        int endIndex = textPainter.getPositionForOffset(Offset(textSize.width - linkSize.width, textSize.height)).offset;
+        endIndex = (endIndex < 0 || endIndex > widget.text.length) ? widget.text.length : endIndex;
+
+        TextSpan textSpan;
+        if (_readMore) {
+          textSpan = TextSpan(
+            text: widget.text.substring(0, endIndex),
+            style: TextStyle(fontSize: 14.5, color: widget.valueColor ?? AppConstants.textSecondary, height: 1.5),
+            children: <TextSpan>[const TextSpan(text: "... "),link],
+          );
+        } else {
+          textSpan = TextSpan(
+            text: widget.text,
+            style: TextStyle(fontSize: 14.5, color: widget.valueColor ?? AppConstants.textSecondary, height: 1.5),
+            children: <TextSpan>[const TextSpan(text: " "), link],
+          );
+        }
+        return RichText(
+          softWrap: true,
+          overflow: TextOverflow.clip,
+          textAlign: TextAlign.start,
+          textDirection: ui.TextDirection.rtl,
+          text: textSpan,
+        );
+      },
+    );
+    return result;
   }
 }

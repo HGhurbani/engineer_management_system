@@ -3,12 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui; // For TextDirection
 
-// يمكنك استخدام نفس AppConstants الموجودة في admin_projects_page.dart
-// أو تعريفها هنا إذا كنت ستستخدمها بكثرة في هذه الصفحة فقط.
-// للتبسيط، سأفترض أنك ستستوردها أو ستعرفها.
-// import 'admin_projects_page.dart'; // افترض أن AppConstants موجودة هنا أو في ملف منفصل
-
-// --- نسخ AppConstants هنا مؤقتًا ---
+// AppConstants (يفضل أن تكون في ملف مشترك، ولكن للتبسيط نضعها هنا مؤقتاً)
 class AppConstants {
   static const Color primaryColor = Color(0xFF2563EB);
   static const Color primaryLight = Color(0xFF3B82F6);
@@ -24,8 +19,6 @@ class AppConstants {
   static const double borderRadius = 16.0;
   static const double itemSpacing = 16.0;
 }
-// --- نهاية نسخ AppConstants ---
-
 
 class AddProjectPage extends StatefulWidget {
   final List<QueryDocumentSnapshot> availableEngineers;
@@ -71,17 +64,14 @@ class _AddProjectPageState extends State<AddProjectPage> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    // التحقق من اختيار مهندس واحد على الأقل إذا كانت قائمة المهندسين المتاحين غير فارغة
     if (_selectedEngineerIds.isEmpty && widget.availableEngineers.isNotEmpty) {
       _showFeedbackSnackBar('الرجاء اختيار مهندس واحد على الأقل.', isError: true);
       return;
     }
-    // التحقق من اختيار عميل إذا كانت قائمة العملاء المتاحين غير فارغة
     if (_selectedClientId == null && widget.availableClients.isNotEmpty) {
       _showFeedbackSnackBar('الرجاء اختيار العميل.', isError: true);
       return;
     }
-
 
     setState(() => _isLoading = true);
 
@@ -103,9 +93,13 @@ class _AddProjectPageState extends State<AddProjectPage> {
         }
       }
 
+      // --- MODIFICATION START ---
       final clientDoc = widget.availableClients.firstWhere((doc) => doc.id == _selectedClientId);
       final clientData = clientDoc.data() as Map<String, dynamic>;
       final clientName = clientData['name'] ?? 'عميل غير مسمى';
+      final String clientType = clientData['clientType'] ?? 'individual'; // Fetch clientType
+      // --- MODIFICATION END ---
+
 
       await FirebaseFirestore.instance.collection('projects').add({
         'name': _nameController.text.trim(),
@@ -113,6 +107,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
         'engineerUids': engineerUidsList,
         'clientId': _selectedClientId,
         'clientName': clientName,
+        'clientType': clientType, // <<< SAVE clientType HERE
         'currentStage': 0,
         'currentPhaseName': 'لا توجد مراحل بعد',
         'status': 'نشط',
@@ -122,7 +117,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
       _showFeedbackSnackBar('تم إضافة المشروع بنجاح.', isError: false);
       if (mounted) {
-        Navigator.pop(context, true); // إرجاع true للإشارة إلى النجاح
+        Navigator.pop(context, true);
       }
     } catch (e) {
       _showFeedbackSnackBar('فشل إضافة المشروع: $e', isError: true);
@@ -141,7 +136,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
         appBar: AppBar(
           title: const Text('إضافة مشروع جديد', style: TextStyle(color: Colors.white)),
           backgroundColor: AppConstants.primaryColor,
-          iconTheme: const IconThemeData(color: Colors.white), // لتلوين أيقونة الرجوع
+          iconTheme: const IconThemeData(color: Colors.white),
           flexibleSpace: Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -156,7 +151,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
           padding: const EdgeInsets.all(AppConstants.paddingLarge),
           child: Form(
             key: _formKey,
-            child: ListView( // استخدام ListView للسماح بالتمرير إذا كان المحتوى طويلاً
+            child: ListView(
               children: [
                 TextFormField(
                   controller: _nameController,
@@ -172,7 +167,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
                     return null;
                   },
                 ),
-                const SizedBox(height: AppConstants.itemSpacing * 1.5), // زيادة المسافة
+                const SizedBox(height: AppConstants.itemSpacing * 1.5),
 
                 const Text(
                   'اختر المهندسين المسؤولين:',
@@ -232,10 +227,9 @@ class _AddProjectPageState extends State<AddProjectPage> {
                       },
                     ),
                   ),
-                // مدقق للمهندسين
                 if (widget.availableEngineers.isNotEmpty)
                   Padding(
-                    padding: const EdgeInsets.only(top: 0), // تقليل المسافة
+                    padding: const EdgeInsets.only(top: 0),
                     child: FormField<List<String>>(
                       initialValue: _selectedEngineerIds,
                       validator: (value) {
@@ -313,7 +307,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
                       : const Text('إضافة المشروع', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppConstants.primaryColor,
-                    minimumSize: const Size(double.infinity, 50), // جعل الزر بعرض الشاشة
+                    minimumSize: const Size(double.infinity, 50),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
                     padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingMedium / 1.2),
                   ),

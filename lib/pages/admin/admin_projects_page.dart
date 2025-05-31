@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 
-import 'add_project_page.dart'; // For TextDirection
+import 'add_project_page.dart';
 
 // Constants (تبقى كما هي)
 class AppConstants {
@@ -43,7 +43,14 @@ class AdminProjectsPage extends StatefulWidget {
 class _AdminProjectsPageState extends State<AdminProjectsPage> {
   List<QueryDocumentSnapshot> _availableEngineers = [];
   List<QueryDocumentSnapshot> _availableClients = [];
-  bool _isLoadingUsers = true; // لتتبع حالة تحميل المستخدمين عند بدء الصفحة
+  bool _isLoadingUsers = true;
+
+  // --- MODIFICATION START ---
+  final Map<String, String> _clientTypeDisplayMap = {
+    'individual': 'فردي',
+    'company': 'شركة',
+  };
+  // --- MODIFICATION END ---
 
   @override
   void initState() {
@@ -86,264 +93,11 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
     }
   }
 
-  Future<void> _showAddProjectDialog() async {
-    // إذا كانت القوائم لا تزال تُحمّل أو فارغة تمامًا بعد المحاولة الأولى،
-    // قد يكون من الأفضل عدم فتح النافذة وإعلام المستخدم.
-    if (_isLoadingUsers) {
-      _showFeedbackSnackBar(context, 'جاري تحميل بيانات المستخدمين، يرجى الانتظار...', isError: false);
-      return;
-    }
-    // إذا كانت القوائم فارغة بعد انتهاء التحميل، أعلم المستخدم
-    if (_availableEngineers.isEmpty && _availableClients.isEmpty) {
-      _showFeedbackSnackBar(context, 'يجب إضافة مهندسين وعملاء أولاً قبل إضافة مشروع.', isError: true);
-      return;
-    }
-    if (_availableEngineers.isEmpty) {
-      _showFeedbackSnackBar(context, 'لا يوجد مهندسون متاحون. يرجى إضافتهم أولاً.', isError: true);
-      return;
-    }
-    if (_availableClients.isEmpty) {
-      _showFeedbackSnackBar(context, 'لا يوجد عملاء متاحون. يرجى إضافتهم أولاً.', isError: true);
-      return;
-    }
-
-
-    final nameController = TextEditingController();
-    String? selectedClientIdInDialog;
-    List<String> dialogSelectedEngineerIds = []; // متغير محلي للنافذة
-    final formKey = GlobalKey<FormState>();
-    bool isLoadingDialog = false;
-
-    // لا حاجة لاستدعاء _loadUsers() هنا مرة أخرى إذا كان initState يقوم بذلك
-    // وإذا كان زر الإضافة معطلاً أثناء _isLoadingUsers
-
-    await showDialog(
-      context: context,
-      barrierDismissible: !isLoadingDialog,
-      builder: (dialogContext) { // استخدام dialogContext بشكل ثابت
-        return StatefulBuilder(
-          builder: (stfDialogContext, setDialogState) {
-            return Directionality(
-              textDirection: ui.TextDirection.rtl,
-              child: AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-                ),
-                title: const Text(
-                  'إضافة مشروع جديد',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppConstants.textPrimary,
-                    fontSize: 22,
-                  ),
-                ),
-                content: SingleChildScrollView(
-                  child: Form(
-                    key: formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildStyledTextField(
-                          controller: nameController,
-                          labelText: 'اسم المشروع',
-                          icon: Icons.work_outline_rounded,
-                        ),
-                        const SizedBox(height: AppConstants.itemSpacing),
-                        const Text(
-                          'اختر المهندسين المسؤولين:',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppConstants.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: AppConstants.paddingSmall),
-                        // قائمة المهندسين
-                        Container(
-                          constraints: BoxConstraints(
-                            maxHeight: MediaQuery.of(stfDialogContext).size.height * 0.25,
-                          ),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppConstants.textSecondary.withOpacity(0.5)),
-                            borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-                          ),
-                          child: _availableEngineers.isEmpty
-                              ? const Center(child: Padding(padding: EdgeInsets.all(8.0), child: Text("لا يوجد مهندسون متاحون.")))
-                              : ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: _availableEngineers.length,
-                            itemBuilder: (ctx, index) {
-                              final engineerDoc = _availableEngineers[index];
-                              final engineer = engineerDoc.data() as Map<String, dynamic>;
-                              final engineerId = engineerDoc.id;
-                              final engineerName = engineer['name'] ?? 'مهندس غير مسمى';
-                              final bool isSelected = dialogSelectedEngineerIds.contains(engineerId);
-
-                              return CheckboxListTile(
-                                title: Text(engineerName, style: const TextStyle(color: AppConstants.textPrimary)),
-                                value: isSelected,
-                                onChanged: (bool? value) {
-                                  setDialogState(() {
-                                    if (value == true) {
-                                      if (!dialogSelectedEngineerIds.contains(engineerId)) {
-                                        dialogSelectedEngineerIds.add(engineerId);
-                                      }
-                                    } else {
-                                      dialogSelectedEngineerIds.remove(engineerId);
-                                    }
-                                  });
-                                },
-                                activeColor: AppConstants.primaryColor,
-                                controlAffinity: ListTileControlAffinity.leading,
-                                dense: true,
-                              );
-                            },
-                          ),
-                        ),
-                        // مدقق المهندسين
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: FormField<List<String>>(
-                            initialValue: dialogSelectedEngineerIds, // مهم للتحقق الأولي
-                            validator: (value) {
-                              // التحقق فقط إذا كان هناك مهندسون متاحون أصلاً
-                              if (_availableEngineers.isNotEmpty && (value == null || value.isEmpty)) {
-                                return 'الرجاء اختيار مهندس واحد على الأقل.';
-                              }
-                              return null;
-                            },
-                            builder: (FormFieldState<List<String>> fieldState) {
-                              return fieldState.hasError
-                                  ? Padding(
-                                padding: const EdgeInsets.only(top: 5.0),
-                                child: Text(
-                                  fieldState.errorText!,
-                                  style: TextStyle(color: Theme.of(stfDialogContext).colorScheme.error, fontSize: 12),
-                                ),
-                              )
-                                  : const SizedBox.shrink();
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: AppConstants.itemSpacing),
-                        // قائمة العملاء
-                        _buildStyledDropdown(
-                            contextForTheme: stfDialogContext, // تمرير context النافذة للـ theme
-                            hint: 'اختر العميل',
-                            value: selectedClientIdInDialog,
-                            items: _availableClients.map((doc) {
-                              final user = doc.data() as Map<String, dynamic>;
-                              return DropdownMenuItem<String>(
-                                value: doc.id,
-                                child: Text(user['name'] ?? 'عميل غير مسمى'),
-                              );
-                            }).toList(),
-                            onChanged: (value) => setDialogState(() => selectedClientIdInDialog = value),
-                            icon: Icons.person_outline_rounded,
-                            validator: (value) {
-                              if (_availableClients.isNotEmpty && value == null) {
-                                return 'الرجاء اختيار عميل.';
-                              }
-                              return null;
-                            }
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                actionsAlignment: MainAxisAlignment.center,
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogContext),
-                    child: const Text('إلغاء', style: TextStyle(color: AppConstants.textSecondary)),
-                  ),
-                  const SizedBox(width: AppConstants.itemSpacing / 2),
-                  ElevatedButton.icon(
-                    onPressed: isLoadingDialog
-                        ? null
-                        : () async {
-                      if (!formKey.currentState!.validate()) {
-                        return;
-                      }
-                      // لا حاجة للتحقق اليدوي من dialogSelectedEngineerIds و selectedClientIdInDialog هنا
-                      // لأن الـ FormField validator يجب أن يكون قد قام بذلك.
-
-                      setDialogState(() => isLoadingDialog = true);
-
-                      try {
-                        List<Map<String, String>> assignedEngineersList = [];
-                        List<String> engineerUidsList = [];
-
-                        if (dialogSelectedEngineerIds.isNotEmpty) {
-                          for (String engineerIdInLoop in dialogSelectedEngineerIds) {
-                            final engineerDoc = _availableEngineers.firstWhere(
-                                  (doc) => doc.id == engineerIdInLoop,
-                            );
-                            final engineerData = engineerDoc.data() as Map<String, dynamic>;
-                            assignedEngineersList.add({
-                              'uid': engineerIdInLoop,
-                              'name': engineerData['name'] ?? 'مهندس غير مسمى',
-                            });
-                            engineerUidsList.add(engineerIdInLoop);
-                          }
-                        }
-
-                        final cliDoc = _availableClients.firstWhere((c) => c.id == selectedClientIdInDialog);
-                        final clientName = (cliDoc.data() as Map<String, dynamic>)['name'] ?? 'غير معروف';
-
-                        await FirebaseFirestore.instance.collection('projects').add({
-                          'name': nameController.text.trim(),
-                          'assignedEngineers': assignedEngineersList,
-                          'engineerUids': engineerUidsList,
-                          'clientId': selectedClientIdInDialog,
-                          'clientName': clientName,
-                          'currentStage': 0,
-                          'currentPhaseName': 'لا توجد مراحل بعد',
-                          'status': 'نشط',
-                          'createdAt': FieldValue.serverTimestamp(),
-                          'generalNotes': '',
-                        });
-
-                        Navigator.pop(dialogContext); // إغلاق النافذة بعد النجاح
-                        // استخدام context الصفحة الرئيسية لإظهار SnackBar
-                        _showFeedbackSnackBar(context, 'تم إضافة المشروع بنجاح.', isError: false);
-                      } catch (e) {
-                        _showFeedbackSnackBar(dialogContext, 'فشل إضافة المشروع: $e', isError: true, useDialogContext: true);
-                      } finally {
-                        setDialogState(() => isLoadingDialog = false);
-                      }
-                    },
-                    icon: isLoadingDialog
-                        ? const SizedBox.shrink()
-                        : const Icon(Icons.add_circle_outline_rounded, color: Colors.white),
-                    label: isLoadingDialog
-                        ? const SizedBox(
-                      width: 20, height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
-                    )
-                        : const Text('إضافة المشروع', style: TextStyle(color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppConstants.primaryColor,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   Future<void> _deleteProject(String projectId, String projectName) async {
     bool? confirm = await showDialog(
       context: context,
       builder: (dialogContext) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: ui.TextDirection.rtl,
         child: AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
           title: const Text('تأكيد الحذف'),
@@ -370,6 +124,8 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
     if (confirm == true) {
       try {
         final projectRef = FirebaseFirestore.instance.collection('projects').doc(projectId);
+        // Consider deleting subcollections like phases_status, subphases_status, tests_status, entries as well.
+        // This example only deletes main phases and their subPhases for brevity.
         final phasesSnapshot = await projectRef.collection('phases').get();
         for (final phaseDoc in phasesSnapshot.docs) {
           final subPhasesSnapshot = await phaseDoc.reference.collection('subPhases').get();
@@ -404,7 +160,7 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
                 .orderBy('createdAt', descending: true)
                 .snapshots(),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting && !_isLoadingUsers) {
+              if (snapshot.connectionState == ConnectionState.waiting && !_isLoadingUsers) { // Only show main loader if users are also loading
                 return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
               }
               if (snapshot.hasError) {
@@ -445,7 +201,7 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
         IconButton(
           icon: const Icon(Icons.refresh_rounded, color: Colors.white),
           tooltip: 'تحديث القوائم',
-          onPressed: _isLoadingUsers ? null : _loadUsers, // تعطيل أثناء التحميل
+          onPressed: _isLoadingUsers ? null : _loadUsers,
         ),
       ],
     );
@@ -465,12 +221,16 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
         String engineersDisplay = "لم يتم تعيين مهندسين";
         if (assignedEngineersRaw.isNotEmpty) {
           engineersDisplay = assignedEngineersRaw.map((eng) => eng['name'] ?? 'غير معروف').join('، ');
-          if (engineersDisplay.length > 50) { // تحديد طول معين قبل الاقتطاع
+          if (engineersDisplay.length > 50) {
             engineersDisplay = '${engineersDisplay.substring(0, 50)}...';
           }
         }
 
         final clientName = data['clientName'] ?? 'غير معروف';
+        // --- MODIFICATION START ---
+        final String clientTypeKey = data['clientType'] ?? 'individual'; // Default if not set
+        final String clientTypeDisplay = _clientTypeDisplayMap[clientTypeKey] ?? clientTypeKey;
+        // --- MODIFICATION END ---
         final status = data['status'] ?? 'غير محدد';
 
         IconData statusIcon;
@@ -529,6 +289,9 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
                   _buildProjectInfoRow(Icons.stairs_outlined, 'المرحلة الحالية:', '$currentStage - $currentPhaseName'),
                   _buildProjectInfoRow(Icons.engineering_outlined, 'المهندسون:', engineersDisplay),
                   _buildProjectInfoRow(Icons.person_outline_rounded, 'العميل:', clientName),
+                  // --- MODIFICATION START ---
+                  _buildProjectInfoRow(Icons.business_center_outlined, 'نوع العميل:', clientTypeDisplay),
+                  // --- MODIFICATION END ---
                   _buildProjectInfoRow(statusIcon, 'الحالة:', status, valueColor: statusColor),
                 ],
               ),
@@ -559,16 +322,12 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
     );
   }
 
-// داخل _AdminProjectsPageState
-// ...
-
   Widget _buildFloatingActionButton() {
     return FloatingActionButton.extended(
       onPressed: (_isLoadingUsers || _availableEngineers.isEmpty || _availableClients.isEmpty)
           ? null
           : () async {
-        // الانتقال إلى صفحة الإضافة الجديدة وتمرير البيانات
-        final result = await Navigator.push<bool>( // استخدام bool لتتبع نتيجة الإضافة
+        final result = await Navigator.push<bool>(
           context,
           MaterialPageRoute(
             builder: (context) => AddProjectPage(
@@ -577,12 +336,8 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
             ),
           ),
         );
-        // يمكنك تحديث قائمة المشاريع هنا إذا عادت الصفحة بنتيجة إيجابية
         if (result == true && mounted) {
-          // لا حاجة لاستدعاء _loadUsers() هنا بالضرورة لأن StreamBuilder سيحدث تلقائيًا
-          // ولكن إذا كنت تريد تحديث قوائم المهندسين/العملاء أيضًا، يمكنك استدعاؤها
-          // أو يمكنك الاعتماد على RefreshIndicator
-          print("Project added successfully, list should refresh via StreamBuilder.");
+          // List will refresh via StreamBuilder automatically
         }
       },
       backgroundColor: (_isLoadingUsers || _availableEngineers.isEmpty || _availableClients.isEmpty)
@@ -595,8 +350,6 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
           : 'إضافة مشروع جديد',
     );
   }
-
-// ... بقية الكود في AdminProjectsPage
 
   Widget _buildErrorState(String errorMessage) {
     return Center(
@@ -632,7 +385,7 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
           const SizedBox(height: AppConstants.itemSpacing),
           const Text('لا توجد مشاريع بعد', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
           const SizedBox(height: 8),
-          if (_availableEngineers.isEmpty || _availableClients.isEmpty && !_isLoadingUsers) // لا تعرض هذه الرسالة إذا كان التحميل جارياً
+          if (_availableEngineers.isEmpty || _availableClients.isEmpty && !_isLoadingUsers)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingLarge, vertical: AppConstants.paddingSmall),
               child: Text(
@@ -656,81 +409,6 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
     );
   }
 
-  Widget _buildStyledTextField({
-    required TextEditingController controller,
-    required String labelText,
-    required IconData icon,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: labelText,
-        prefixIcon: Icon(icon, color: AppConstants.primaryColor),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.textSecondary, width: 1.5),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.errorColor, width: 1.5),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.errorColor, width: 2),
-        ),
-      ),
-      validator: (value) {
-        if (value == null || value.isEmpty) return 'هذا الحقل مطلوب.';
-        return validator?.call(value);
-      },
-    );
-  }
-
-  Widget _buildStyledDropdown<T>({
-    required BuildContext contextForTheme, // لإعطاء Theme.of السياق الصحيح
-    required String hint,
-    T? value,
-    required List<DropdownMenuItem<T>> items,
-    required ValueChanged<T?> onChanged,
-    required IconData icon,
-    String? Function(T?)? validator,
-  }) {
-    return DropdownButtonFormField<T>(
-      value: value,
-      items: items.isEmpty ? [DropdownMenuItem(value: null, child: Text("لا يوجد خيارات", style: TextStyle(color: AppConstants.textSecondary.withOpacity(0.7))))] : items,
-      onChanged: items.isEmpty ? null : onChanged,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: hint,
-        prefixIcon: Icon(icon, color: AppConstants.primaryColor),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.textSecondary, width: 1.5),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.errorColor, width: 1.5),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.errorColor, width: 2),
-        ),
-      ),
-      isExpanded: true,
-      menuMaxHeight: MediaQuery.of(contextForTheme).size.height * 0.3,
-      disabledHint: items.isEmpty ? const Text("لا يوجد خيارات متاحة") : null,
-    );
-  }
-
   void _showFeedbackSnackBar(BuildContext scaffoldOrDialogContext, String message, {required bool isError, bool useDialogContext = false}) {
     final SnackBar snackBar = SnackBar(
       content: Text(message),
@@ -739,9 +417,6 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
       margin: const EdgeInsets.all(AppConstants.paddingMedium),
     );
-    // استخدام السياق الصحيح لإظهار SnackBar
-    // إذا كنا نريد إظهاره فوق الـ Dialog, نستخدم سياق الـ Dialog (stfDialogContext)
-    // إذا كنا نريد إظهاره على الصفحة الرئيسية, نستخدم سياق الصفحة (this.context)
     ScaffoldMessenger.of(useDialogContext ? scaffoldOrDialogContext : context).showSnackBar(snackBar);
   }
 }

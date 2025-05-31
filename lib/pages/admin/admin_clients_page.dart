@@ -3,6 +3,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui; // For TextDirection
 
 // Constants for consistent styling, aligned with the admin dashboard's style.
 class AppConstants {
@@ -28,6 +29,7 @@ class AppConstants {
   // Spacing and dimensions
   static const double paddingLarge = 24.0;
   static const double paddingMedium = 16.0;
+  static const double paddingSmall = 8.0; // Added for finer control
   static const double borderRadius = 16.0;
   static const double itemSpacing = 16.0;
 
@@ -49,15 +51,17 @@ class AdminClientsPage extends StatefulWidget {
 }
 
 class _AdminClientsPageState extends State<AdminClientsPage> {
-  /// Deletes a client from Firestore.
-  ///
-  /// Note: Deleting from Firebase Auth requires admin privileges and is best handled
-  /// via a backend function (e.g., Cloud Functions) for security reasons.
+  // Map to store display names for client types
+  final Map<String, String> _clientTypeDisplay = {
+    'individual': 'فردي',
+    'company': 'شركة',
+  };
+
   Future<void> _deleteClient(String uid, String email) async {
     bool? confirm = await showDialog(
       context: context,
       builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
+        textDirection: ui.TextDirection.rtl,
         child: AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppConstants.borderRadius),
@@ -87,28 +91,40 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
 
     if (confirm == true) {
       try {
+        // Consider associated data: Before deleting the user, you might want to handle projects
+        // or other data linked to this client (e.g., unassign them or delete related records).
+        // This example only deletes the user document.
+
+        // Optional: Delete user from Firebase Authentication (requires backend function or re-authentication)
+        // This is a more complex operation. For now, we only delete from Firestore.
+        // User? userToDelete = await FirebaseAuth.instance.userChanges().firstWhere((user) => user?.uid == uid);
+        // if (userToDelete != null) {
+        //   // Requires recent login for the user being deleted, or Admin SDK
+        // }
+
         await FirebaseFirestore.instance.collection('users').doc(uid).delete();
-        _showFeedbackSnackBar(context, 'تم حذف العميل $email بنجاح.', isError: false);
+        _showFeedbackSnackBar(context, 'تم حذف العميل $email من قاعدة البيانات بنجاح.', isError: false);
       } catch (e) {
         _showFeedbackSnackBar(context, 'فشل حذف العميل: $e', isError: true);
       }
     }
   }
 
-  /// Displays the dialog for adding a new client.
   Future<void> _showAddClientDialog() async {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
+    String? selectedClientType = 'individual'; // Default client type
     final formKey = GlobalKey<FormState>();
     bool isLoading = false;
 
     await showDialog(
       context: context,
+      barrierDismissible: !isLoading, // Prevent dismissal while loading
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) {
           return Directionality(
-            textDirection: TextDirection.rtl,
+            textDirection: ui.TextDirection.rtl,
             child: AlertDialog(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppConstants.borderRadius),
@@ -140,7 +156,8 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                         icon: Icons.email_outlined,
                         keyboardType: TextInputType.emailAddress,
                         validator: (value) {
-                          if (value != null && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                          if (value == null || value.isEmpty) return 'الرجاء إدخال البريد الإلكتروني.';
+                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
                             return 'صيغة بريد إلكتروني غير صحيحة.';
                           }
                           return null;
@@ -153,11 +170,31 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                         icon: Icons.lock_outline,
                         obscureText: true,
                         validator: (value) {
-                          if (value != null && value.length < 6) {
+                          if (value == null || value.isEmpty) return 'الرجاء إدخال كلمة المرور.';
+                          if (value.length < 6) {
                             return 'يجب أن تكون كلمة المرور 6 أحرف على الأقل.';
                           }
                           return null;
                         },
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      // Client Type Dropdown
+                      _buildStyledDropdown<String>(
+                        hint: 'نوع العميل',
+                        value: selectedClientType,
+                        items: _clientTypeDisplay.entries.map((entry) {
+                          return DropdownMenuItem<String>(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setDialogState(() {
+                            selectedClientType = value;
+                          });
+                        },
+                        icon: Icons.business_center_outlined, // Or Icons.person_outline for individual
+                        validator: (value) => value == null ? 'الرجاء اختيار نوع العميل.' : null,
                       ),
                     ],
                   ),
@@ -177,7 +214,7 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                     setDialogState(() => isLoading = true);
 
                     try {
-                      final userCred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                      UserCredential userCred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
                         email: emailController.text.trim(),
                         password: passwordController.text.trim(),
                       );
@@ -187,17 +224,19 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                         'email': emailController.text.trim(),
                         'name': nameController.text.trim(),
                         'role': 'client',
+                        'clientType': selectedClientType, // Save client type
                         'createdAt': FieldValue.serverTimestamp(),
                       });
 
-                      Navigator.pop(dialogContext);
+                      Navigator.pop(dialogContext); // Close dialog
                       _showFeedbackSnackBar(context, 'تم إضافة العميل بنجاح.', isError: false);
                     } on FirebaseAuthException catch (e) {
-                      _showFeedbackSnackBar(context, _getFirebaseErrorMessage(e.code), isError: true);
-                      Navigator.pop(dialogContext); // Close dialog on error
+                      _showFeedbackSnackBar(dialogContext, _getFirebaseErrorMessage(e.code), isError: true);
+                      // Keep dialog open on Firebase Auth error to allow correction
                     } catch (e) {
-                      _showFeedbackSnackBar(context, 'فشل الإضافة: $e', isError: true);
-                      Navigator.pop(dialogContext); // Close dialog on error
+                      _showFeedbackSnackBar(dialogContext, 'فشل الإضافة: $e', isError: true);
+                    } finally {
+                      if(mounted) setDialogState(() => isLoading = false);
                     }
                   },
                   icon: isLoading
@@ -228,10 +267,129 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     );
   }
 
+  // New method to show the edit client dialog
+  Future<void> _showEditClientDialog(DocumentSnapshot clientDoc) async {
+    final clientData = clientDoc.data() as Map<String, dynamic>;
+    final String currentUid = clientDoc.id;
+
+    final nameController = TextEditingController(text: clientData['name'] ?? '');
+    final emailController = TextEditingController(text: clientData['email'] ?? '');
+    // Password is not edited here for security reasons.
+    String? selectedClientType = clientData['clientType'] ?? 'individual';
+
+    final formKey = GlobalKey<FormState>();
+    bool isLoading = false;
+
+    await showDialog(
+        context: context,
+        barrierDismissible: !isLoading,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Directionality(
+              textDirection: ui.TextDirection.rtl,
+              child: AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+                title: const Text('تعديل بيانات العميل', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: AppConstants.textPrimary, fontSize: 22)),
+                content: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildStyledTextField(
+                          controller: nameController,
+                          labelText: 'الاسم الكامل',
+                          icon: Icons.person_outline,
+                        ),
+                        const SizedBox(height: AppConstants.itemSpacing),
+                        _buildStyledTextField(
+                          controller: emailController,
+                          labelText: 'البريد الإلكتروني',
+                          icon: Icons.email_outlined,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) return 'الرجاء إدخال البريد الإلكتروني.';
+                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                              return 'صيغة بريد إلكتروني غير صحيحة.';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppConstants.itemSpacing),
+                        _buildStyledDropdown<String>(
+                          hint: 'نوع العميل',
+                          value: selectedClientType,
+                          items: _clientTypeDisplay.entries.map((entry) {
+                            return DropdownMenuItem<String>(
+                              value: entry.key,
+                              child: Text(entry.value),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setDialogState(() {
+                              selectedClientType = value;
+                            });
+                          },
+                          icon: Icons.business_center_outlined,
+                          validator: (value) => value == null ? 'الرجاء اختيار نوع العميل.' : null,
+                        ),
+                        const SizedBox(height: AppConstants.itemSpacing),
+                        const Text(
+                          "ملاحظة: لتغيير كلمة المرور أو البريد الإلكتروني الخاص بالمصادقة، يجب إجراء ذلك من خلال وحدة تحكم Firebase أو طلب إعادة تعيين من المستخدم.",
+                          style: TextStyle(fontSize: 12, color: AppConstants.textSecondary, fontStyle: FontStyle.italic),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                actionsAlignment: MainAxisAlignment.center,
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text('إلغاء', style: TextStyle(color: AppConstants.textSecondary)),
+                  ),
+                  const SizedBox(width: AppConstants.itemSpacing / 2),
+                  ElevatedButton.icon(
+                    onPressed: isLoading ? null : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDialogState(() => isLoading = true);
+                      try {
+                        await FirebaseFirestore.instance.collection('users').doc(currentUid).update({
+                          'name': nameController.text.trim(),
+                          'email': emailController.text.trim(), // Updates Firestore email
+                          'clientType': selectedClientType,
+                          // 'updatedAt': FieldValue.serverTimestamp(), // Optional: track updates
+                        });
+                        Navigator.pop(dialogContext);
+                        _showFeedbackSnackBar(context, 'تم تحديث بيانات العميل بنجاح.', isError: false);
+                      } catch (e) {
+                        _showFeedbackSnackBar(dialogContext, 'فشل تحديث البيانات: $e', isError: true);
+                      } finally {
+                        if(mounted) setDialogState(() => isLoading = false);
+                      }
+                    },
+                    icon: isLoading ? const SizedBox.shrink() : const Icon(Icons.save_alt_rounded, color: Colors.white),
+                    label: isLoading
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
+                        : const Text('حفظ التعديلات', style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConstants.primaryColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        )
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppConstants.backgroundColor,
         appBar: _buildAppBar(),
@@ -261,7 +419,6 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     );
   }
 
-  /// Builds the main application bar.
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       title: const Text(
@@ -287,17 +444,20 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     );
   }
 
-  /// Builds the list of client cards.
   Widget _buildClientsList(List<QueryDocumentSnapshot> clients) {
     return ListView.builder(
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       itemCount: clients.length,
       itemBuilder: (context, index) {
-        final client = clients[index];
-        final data = client.data() as Map<String, dynamic>;
+        final clientDoc = clients[index]; // Get the DocumentSnapshot
+        final data = clientDoc.data() as Map<String, dynamic>;
         final name = data['name'] ?? 'اسم غير متوفر';
         final email = data['email'] ?? 'بريد غير متوفر';
-        final uid = client.id;
+        final clientTypeKey = data['clientType'] ?? 'individual'; // Default if not set
+        final clientTypeDisplay = _clientTypeDisplay[clientTypeKey] ?? clientTypeKey; // Get display name
+        final uid = clientDoc.id;
+
+        IconData clientIcon = clientTypeKey == 'company' ? Icons.business_rounded : Icons.person_outline_rounded;
 
         return Card(
           margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
@@ -313,7 +473,7 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                 CircleAvatar(
                   radius: 28,
                   backgroundColor: AppConstants.primaryLight.withOpacity(0.15),
-                  child: const Icon(Icons.person_outline, size: 30, color: AppConstants.primaryColor),
+                  child: Icon(clientIcon, size: 30, color: AppConstants.primaryColor),
                 ),
                 const SizedBox(width: AppConstants.itemSpacing),
                 Expanded(
@@ -338,8 +498,23 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: 4), // Space before client type
+                      Text(
+                        'النوع: $clientTypeDisplay', // Display client type
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: AppConstants.textSecondary.withOpacity(0.8),
+                            fontStyle: FontStyle.italic
+                        ),
+                      ),
                     ],
                   ),
+                ),
+                // Edit Button
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, color: AppConstants.infoColor),
+                  onPressed: () => _showEditClientDialog(clientDoc), // Pass the DocumentSnapshot
+                  tooltip: 'تعديل العميل',
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: AppConstants.deleteColor),
@@ -354,7 +529,6 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     );
   }
 
-  /// Builds the floating action button for adding new clients.
   Widget _buildFloatingActionButton() {
     return FloatingActionButton.extended(
       onPressed: _showAddClientDialog,
@@ -368,7 +542,6 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     );
   }
 
-  /// Builds a widget to display when there's an error fetching data.
   Widget _buildErrorState(String errorMessage) {
     return Center(
       child: Padding(
@@ -378,9 +551,9 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
           children: [
             const Icon(Icons.cloud_off, size: 80, color: AppConstants.textSecondary),
             const SizedBox(height: AppConstants.itemSpacing),
-            Text(
+            const Text(
               'عذراً، حدث خطأ',
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -395,7 +568,6 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     );
   }
 
-  /// Builds a widget to display when there are no clients.
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -417,7 +589,6 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     );
   }
 
-  /// Creates a consistently styled text field for dialogs.
   Widget _buildStyledTextField({
     required TextEditingController controller,
     required String labelText,
@@ -432,15 +603,31 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
       obscureText: obscureText,
       decoration: InputDecoration(
         labelText: labelText,
+        labelStyle: const TextStyle(color: AppConstants.textSecondary), // Added for consistency
         prefixIcon: Icon(icon, color: AppConstants.primaryColor),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.textSecondary, width: 1.5),
+          borderSide: const BorderSide(color: AppConstants.textSecondary, width: 1), // Default border
         ),
-        focusedBorder: OutlineInputBorder(
+        enabledBorder: OutlineInputBorder( // Border when not focused
           borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
+          borderSide: BorderSide(color: AppConstants.textSecondary.withOpacity(0.5), width: 1),
         ),
+        focusedBorder: OutlineInputBorder( // Border when focused
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: const BorderSide(color: AppConstants.primaryColor, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder( // Border when error
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: const BorderSide(color: AppConstants.errorColor, width: 1),
+        ),
+        focusedErrorBorder: OutlineInputBorder( // Border when error and focused
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: const BorderSide(color: AppConstants.errorColor, width: 1.5),
+        ),
+        filled: true, // Added for better visual separation
+        fillColor: AppConstants.cardColor.withOpacity(0.7), // Slightly transparent fill
+        contentPadding: const EdgeInsets.symmetric(vertical: AppConstants.paddingMedium -2, horizontal: AppConstants.paddingSmall),
       ),
       validator: (value) {
         if (value == null || value.isEmpty) {
@@ -454,18 +641,67 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     );
   }
 
-  /// Shows a feedback SnackBar (for success or error).
+  // Helper for styled DropdownButtonFormField
+  Widget _buildStyledDropdown<T>({
+    required String hint,
+    T? value,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+    required IconData icon,
+    String? Function(T?)? validator,
+  }) {
+    return DropdownButtonFormField<T>(
+      value: value,
+      items: items,
+      onChanged: onChanged,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: hint,
+        labelStyle: const TextStyle(color: AppConstants.textSecondary),
+        prefixIcon: Icon(icon, color: AppConstants.primaryColor),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: BorderSide(color: AppConstants.textSecondary.withOpacity(0.5), width: 1),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: BorderSide(color: AppConstants.textSecondary.withOpacity(0.5), width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: const BorderSide(color: AppConstants.primaryColor, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: const BorderSide(color: AppConstants.errorColor, width: 1),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: const BorderSide(color: AppConstants.errorColor, width: 1.5),
+        ),
+        filled: true,
+        fillColor: AppConstants.cardColor.withOpacity(0.7),
+        contentPadding: const EdgeInsets.symmetric(vertical: AppConstants.paddingMedium - 4, horizontal: AppConstants.paddingSmall).copyWith(left:12), // Adjust padding
+      ),
+      isExpanded: true,
+      alignment: AlignmentDirectional.centerStart,
+    );
+  }
+
+
   void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError}) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: isError ? AppConstants.errorColor : AppConstants.successColor,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
+        margin: const EdgeInsets.all(AppConstants.paddingMedium),
       ),
     );
   }
 
-  /// Translates Firebase Auth error codes into Arabic.
   String _getFirebaseErrorMessage(String errorCode) {
     switch (errorCode) {
       case 'email-already-in-use':

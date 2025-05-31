@@ -4,10 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:signature/signature.dart';
-import 'package:intl/intl.dart'; // For date formatting
-import 'dart:ui' as ui; // For TextDirection
+import 'package:intl/intl.dart';
+import 'dart:ui' as ui;
 
-// Constants for consistent styling, aligned with the admin dashboard's style.
+// Constants (تبقى كما هي)
 class AppConstants {
   static const Color primaryColor = Color(0xFF2563EB);
   static const Color primaryLight = Color(0xFF3B82F6);
@@ -47,6 +47,13 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
+  // --- MODIFICATION START ---
+  final Map<String, String> _clientTypeDisplayMap = {
+    'individual': 'فردي',
+    'company': 'شركة',
+  };
+  // --- MODIFICATION END ---
+
   @override
   void initState() {
     super.initState();
@@ -84,7 +91,6 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
       }
     } catch (e) {
       print('Error fetching engineer name: $e');
-      // Consider showing a snackbar or a specific error message in the UI
     }
   }
 
@@ -147,6 +153,14 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     return true;
   }
 
+  Future<Position?> _getCurrentLocation() async {
+    try {
+      return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 15));
+    } catch (e) {
+      if (mounted) _showFeedbackSnackBar(context, 'فشل في الحصول على الموقع الحالي. حاول مرة أخرى.', isError: true);
+      return null;
+    }
+  }
   Future<bool?> _showLogoutConfirmationDialog() async {
     return showDialog<bool>(
       context: context,
@@ -207,14 +221,6 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     );
   }
 
-  Future<Position?> _getCurrentLocation() async {
-    try {
-      return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 15));
-    } catch (e) {
-      if (mounted) _showFeedbackSnackBar(context, 'فشل في الحصول على الموقع الحالي. حاول مرة أخرى.', isError: true);
-      return null;
-    }
-  }
 
   Future<void> _showSignatureDialog(String type) async {
     final SignatureController controller = SignatureController(penStrokeWidth: 3, penColor: AppConstants.primaryColor, exportBackgroundColor: AppConstants.cardColor.withOpacity(0.8));
@@ -225,7 +231,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (stfDialogContext, setDialogState) { // استخدام stfDialogContext هنا
+          builder: (stfDialogContext, setDialogState) {
             return Directionality(
               textDirection: ui.TextDirection.rtl,
               child: AlertDialog(
@@ -265,14 +271,10 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
                     onPressed: isProcessing ? null : () async {
                       if (controller.isNotEmpty) {
                         setDialogState(() => isProcessing = true);
-                        // لا تغلق النافذة هنا مباشرة، دع _processAttendance يغلقها أو يعالج الخطأ
                         await _processAttendance(type, controller);
-                        // إذا لم يتم إغلاق النافذة في _processAttendance (مثلاً بسبب خطأ قبل الـ pop)
-                        // تأكد من إغلاقها هنا إذا كان لا يزال mounted
                         if (Navigator.of(dialogContext).canPop()) {
                           Navigator.of(dialogContext).pop();
                         }
-                        // لا تستدعي setDialogState هنا لأن الـ widget قد يكون dispose
                       } else {
                         if(mounted) _showFeedbackSnackBar(stfDialogContext, 'الرجاء وضع التوقيع قبل المتابعة.', isError: true, useDialogContext: true);
                       }
@@ -309,7 +311,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         'type': type,
         'timestamp': FieldValue.serverTimestamp(),
         'location': {'latitude': position.latitude, 'longitude': position.longitude, 'accuracy': position.accuracy},
-        'signatureData': signatureData,
+        'signatureData': signatureData, // Storing as Blob (Uint8List gets converted)
         'deviceInfo': {'platform': 'mobile', 'timestamp': DateTime.now().millisecondsSinceEpoch}
       };
 
@@ -334,7 +336,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
       try {
         await FirebaseAuth.instance.signOut();
         if (mounted) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/login', (Route<dynamic> route) => false); // تعديل هنا
+          Navigator.of(context).pushNamedAndRemoveUntil('/login', (Route<dynamic> route) => false);
           _showFeedbackSnackBar(context, 'تم تسجيل الخروج بنجاح.', isError: false);
         }
       } catch (e) {
@@ -346,8 +348,8 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
   }
 
   void _showFeedbackSnackBar(BuildContext scaffoldOrDialogContext, String message, {required bool isError, bool useDialogContext = false}) {
-    if (!mounted && !useDialogContext) return; // إذا لم تكن الصفحة mounted ولا نستخدم سياق النافذة، لا تفعل شيئًا
-    if (useDialogContext && !Navigator.of(scaffoldOrDialogContext).canPop() && !mounted) return; // حالة نادرة
+    if (!mounted && !useDialogContext) return;
+    if (useDialogContext && !Navigator.of(scaffoldOrDialogContext).canPop() && !mounted) return;
 
     final SnackBar snackBar = SnackBar(
       content: Text(message, style: const TextStyle(color: Colors.white)),
@@ -356,8 +358,6 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
       margin: const EdgeInsets.all(AppConstants.paddingMedium),
     );
-
-    // استخدام السياق الصحيح لإظهار SnackBar
     ScaffoldMessenger.of(scaffoldOrDialogContext).showSnackBar(snackBar);
   }
 
@@ -375,9 +375,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    if (_currentEngineerUid == null && !_isLoading) { // التحقق من isLoading لتجنب البناء قبل _loadInitialData
-      // هذا الـ build قد يُستدعى قبل أن يتمكن addPostFrameCallback من تنفيذ _logout
-      // لذا، من الأفضل عرض واجهة تحميل أو خطأ بسيطة هنا أيضًا.
+    if (_currentEngineerUid == null && !_isLoading) {
       return Scaffold(
         backgroundColor: AppConstants.backgroundColor,
         appBar: AppBar(title: const Text('خطأ في المصادقة', style: TextStyle(color: Colors.white)), backgroundColor: AppConstants.primaryColor, centerTitle: true),
@@ -398,7 +396,6 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         ),
       );
     }
-
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
@@ -469,13 +466,11 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
       return _buildErrorState('لا يمكن تحميل المشاريع بدون معرّف مهندس.');
     }
     return StreamBuilder<QuerySnapshot>(
-      // ---- التعديل الرئيسي هنا ----
       stream: FirebaseFirestore.instance
           .collection('projects')
-          .where('engineerUids', arrayContains: _currentEngineerUid) // البحث في مصفوفة UIDs
+          .where('engineerUids', arrayContains: _currentEngineerUid)
           .orderBy('createdAt', descending: true)
           .snapshots(),
-      // ---- نهاية التعديل الرئيسي ----
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
@@ -498,18 +493,20 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             final currentStage = data['currentStage'] ?? 0;
             final currentPhaseName = data['currentPhaseName'] ?? 'لا توجد مراحل بعد';
             final clientName = data['clientName'] ?? 'غير معروف';
+            // --- MODIFICATION START ---
+            final String clientTypeKey = data['clientType'] ?? 'individual';
+            final String clientTypeDisplay = _clientTypeDisplayMap[clientTypeKey] ?? clientTypeKey;
+            // --- MODIFICATION END ---
             final status = data['status'] ?? 'غير محدد';
 
-            // عرض قائمة المهندسين المعينين للمشروع
             final List<dynamic> assignedEngineersRaw = data['assignedEngineers'] as List<dynamic>? ?? [];
             String engineersDisplay = "غير محددين";
             if (assignedEngineersRaw.isNotEmpty) {
               engineersDisplay = assignedEngineersRaw.map((eng) => eng['name'] ?? 'م.غير معروف').join('، ');
-              if (engineersDisplay.length > 40) { // اقتطاع النص إذا كان طويلاً جداً
+              if (engineersDisplay.length > 40) {
                 engineersDisplay = '${engineersDisplay.substring(0, 40)}...';
               }
             }
-
 
             IconData statusIcon;
             Color statusColor;
@@ -543,8 +540,11 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
                       ),
                       const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
                       _buildProjectInfoRow(Icons.stairs_outlined, 'المرحلة الحالية:', '$currentStage - $currentPhaseName'),
-                      _buildProjectInfoRow(Icons.engineering_outlined, 'المهندسون:', engineersDisplay), // عرض المهندسين هنا
+                      _buildProjectInfoRow(Icons.engineering_outlined, 'المهندسون:', engineersDisplay),
                       _buildProjectInfoRow(Icons.person_outline_rounded, 'العميل:', clientName),
+                      // --- MODIFICATION START ---
+                      _buildProjectInfoRow(Icons.business_center_outlined, 'نوع العميل:', clientTypeDisplay),
+                      // --- MODIFICATION END ---
                       _buildProjectInfoRow(statusIcon, 'الحالة:', status, valueColor: statusColor),
                     ],
                   ),
@@ -570,7 +570,6 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             child: Text(
               value,
               style: TextStyle(fontSize: 14, color: valueColor ?? AppConstants.textPrimary, fontWeight: FontWeight.w600),
-              // overflow: TextOverflow.ellipsis, // يمكن إزالته إذا أردت عرض النص كاملاً مع التفاف
             ),
           ),
         ],
@@ -681,7 +680,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             ),
           ),
           SizedBox(
-            height: 250,
+            height: 250, // Adjust height as needed or use Flexible/Expanded if in a Column
             child: _buildTodayAttendanceList(),
           ),
         ],
@@ -690,7 +689,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
   }
 
   Widget _buildTodayAttendanceList() {
-    if (_currentEngineerUid == null) return _buildErrorState('لا يمكن تحميل سجل اليوم.'); // تحقق إضافي
+    if (_currentEngineerUid == null) return _buildErrorState('لا يمكن تحميل سجل اليوم.');
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
     final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59);
