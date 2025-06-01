@@ -1,19 +1,25 @@
 // lib/pages/engineer/project_details_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:firebase_storage/firebase_storage.dart'; // لن نستخدمه للرفع المباشر
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:http/http.dart' as http; // مستخدم بالفعل
-import 'package:http_parser/http_parser.dart'; // لإرسال نوع المحتوى الصحيح
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:intl/intl.dart';
-import 'dart:convert'; // مستخدم بالفعل
-import 'package:url_launcher/url_launcher.dart';
-import 'package:share_plus/share_plus.dart';
+import 'dart:convert';
+// import 'package:url_launcher/url_launcher.dart'; // Not used directly for notifications
+// import 'package:share_plus/share_plus.dart'; // Not used directly for notifications
 import 'dart:ui' as ui; // For TextDirection
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:share_plus/share_plus.dart';
+
+// --- MODIFICATION START: Import notification helper functions ---
+// Make sure the path to your main.dart (or a dedicated notification service file) is correct.
+import '../../main.dart'; // Assuming helper functions are in main.dart
+// --- MODIFICATION END ---
+
 
 // ... (AppConstants remains the same, ensure UPLOAD_URL is correct) ...
 class AppConstants {
@@ -38,7 +44,7 @@ class AppConstants {
         color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 4)),
   ];
   // تأكد أن هذا الرابط صحيح
-  static const String UPLOAD_URL = 'https://creditphoneqatar.com/eng-app/upload_image.php';
+  static const String UPLOAD_URL = 'https://creditphoneqatar.com/eng-app/upload_image.php'; //
 }
 
 class ProjectDetailsPage extends StatefulWidget {
@@ -58,7 +64,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   late TabController _tabController;
 
   // --- قوائم المراحل والاختبارات (تبقى كما هي) ---
-  static const List<Map<String, dynamic>> predefinedPhasesStructure = [
+  static const List<Map<String, dynamic>> predefinedPhasesStructure = [ //
     // ... (قائمة المراحل كما هي في الكود الأصلي) ...
     {
       'id': 'phase_01', // معرّف فريد لكل مرحلة
@@ -282,7 +288,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       ]
     },
   ];
-  static const List<Map<String, dynamic>> finalCommissioningTests = [
+  static const List<Map<String, dynamic>> finalCommissioningTests = [ //
     // ... (قائمة الاختبارات كما هي في الكود الأصلي) ...
     {
       'section_id': 'tests_electricity',
@@ -1427,11 +1433,11 @@ class ExpandableTextState extends State<ExpandableText> {
         endIndex = (endIndex < 0 || endIndex > widget.text.length) ? widget.text.length : endIndex;
 
         TextSpan textSpan;
-        if (_readMore) {
+        if (_readMore && widget.text.length > endIndex && endIndex > 0) { // Added checks for endIndex
           textSpan = TextSpan(
-            text: widget.text.substring(0, endIndex),
+            text: widget.text.substring(0, endIndex) + "...",
             style: TextStyle(fontSize: 14.5, color: widget.valueColor ?? AppConstants.textSecondary, height: 1.5),
-            children: <TextSpan>[const TextSpan(text: "... "),link],
+            children: <TextSpan>[link],
           );
         } else {
           textSpan = TextSpan(

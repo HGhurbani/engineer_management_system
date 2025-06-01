@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:signature/signature.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
+import '../../main.dart';
 
 // Constants (تبقى كما هي)
 class AppConstants {
@@ -292,12 +293,24 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
 
   Future<void> _processAttendance(String type, SignatureController signatureController) async {
     if (!mounted) return;
+
+    // --- MODIFICATION START: Show loading indicator ---
+    // You might want to add a _isLoadingProcessAttendance = true; setState(() {}); here
+    // and set it to false in a finally block if you have a loading indicator in UI.
+    // For now, we'll proceed without explicit UI loading state in this snippet.
+    // --- MODIFICATION END ---
+
     try {
       final hasLocationPermission = await _checkLocationPermissions();
-      if (!hasLocationPermission || !mounted) return;
+      if (!hasLocationPermission || !mounted) {
+        // _showFeedbackSnackBar might already handle !mounted
+        return;
+      }
 
       final position = await _getCurrentLocation();
-      if (position == null || !mounted) return;
+      if (position == null || !mounted) {
+        return;
+      }
 
       final signatureData = await signatureController.toPngBytes();
       if (signatureData == null || !mounted) {
@@ -311,22 +324,48 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         'type': type,
         'timestamp': FieldValue.serverTimestamp(),
         'location': {'latitude': position.latitude, 'longitude': position.longitude, 'accuracy': position.accuracy},
-        'signatureData': signatureData,
+        'signatureData': signatureData, // Storing as Uint8List directly might be large for Firestore. Consider uploading to Firebase Storage and storing URL.
+        // However, based on the current structure, we assume it's being handled.
         'deviceInfo': {'platform': 'mobile', 'timestamp': DateTime.now().millisecondsSinceEpoch}
       };
 
       await FirebaseFirestore.instance.collection('attendance').add(attendanceData);
 
+      // --- MODIFICATION START: Send notification to admins ---
+      if (_currentEngineerUid != null && _engineerName != null) {
+        List<String> adminUids = await getAdminUids(); // Call the helper function
+        if (adminUids.isNotEmpty) {
+          String notificationTitle = type == 'check_in' ? "تسجيل حضور مهندس" : "تسجيل انصراف مهندس";
+          String notificationBody = "المهندس ${_engineerName ?? 'غير معروف'} قام بتسجيل ${type == 'check_in' ? 'الحضور' : 'الانصراف'}.";
+          String notificationType = type == 'check_in' ? "attendance_check_in" : "attendance_check_out";
+
+          await sendNotificationsToMultiple(
+            recipientUserIds: adminUids,
+            title: notificationTitle,
+            body: notificationBody,
+            type: notificationType,
+            itemId: _currentEngineerUid, // Pass engineer's UID as itemId for context
+            senderName: _engineerName,
+          );
+        }
+      }
+      // --- MODIFICATION END ---
+
       if (mounted) {
         setState(() {
           _isCheckedIn = type == 'check_in';
           _lastCheckTime = DateTime.now();
+          // If you have a signature pad, clear it after successful submission
+          signatureController.clear();
         });
         final message = type == 'check_in' ? 'تم تسجيل الحضور بنجاح.' : 'تم تسجيل الانصراف بنجاح.';
         _showFeedbackSnackBar(context, message, isError: false);
       }
     } catch (e) {
       if (mounted) _showFeedbackSnackBar(context, 'فشل تسجيل ${type == 'check_in' ? 'الحضور' : 'الانصراف'}: $e', isError: true);
+    } finally { // --- MODIFICATION START: Hide loading indicator ---
+      // if (mounted) setState(() => _isLoadingProcessAttendance = false);
+      // --- MODIFICATION END ---
     }
   }
 

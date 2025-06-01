@@ -1,7 +1,15 @@
 // lib/pages/admin/add_project_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // --- MODIFICATION: Added ---
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui; // For TextDirection
+
+// --- MODIFICATION START: Import notification helper functions ---
+// Make sure the path to your main.dart (or a dedicated notification service file) is correct.
+// If you created a separate service file, import that instead.
+import '../../main.dart'; // Assuming helper functions are in main.dart
+// --- MODIFICATION END ---
+
 
 // AppConstants (يفضل أن تكون في ملف مشترك، ولكن للتبسيط نضعها هنا مؤقتاً)
 class AppConstants {
@@ -40,6 +48,55 @@ class _AddProjectPageState extends State<AddProjectPage> {
   List<String> _selectedEngineerIds = [];
   String? _selectedClientId;
   bool _isLoading = false;
+
+  // --- MODIFICATION START: Variable to store current admin's name ---
+  String? _currentAdminName;
+  // --- MODIFICATION END ---
+
+  @override
+  void initState() { // --- MODIFICATION: Added initState ---
+    super.initState();
+    _getCurrentAdminName(); // Fetch admin name when the page loads
+  }
+
+  // --- MODIFICATION START: Function to get current admin's name ---
+  Future<void> _getCurrentAdminName() async {
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      try {
+        final DocumentSnapshot adminDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+        if (mounted && adminDoc.exists) {
+          setState(() {
+            _currentAdminName = (adminDoc.data() as Map<String, dynamic>)['name'] ?? 'المسؤول';
+          });
+        } else {
+          if (mounted) {
+            setState(() {
+              _currentAdminName = 'المسؤول';
+            });
+          }
+        }
+      } catch (e) {
+        print("Error fetching admin name: $e");
+        if (mounted) {
+          setState(() {
+            _currentAdminName = 'المسؤول'; // Fallback name
+          });
+        }
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _currentAdminName = 'المسؤول'; // Fallback if no current user (should not happen if page is protected)
+        });
+      }
+    }
+  }
+  // --- MODIFICATION END ---
+
 
   @override
   void dispose() {
@@ -93,27 +150,40 @@ class _AddProjectPageState extends State<AddProjectPage> {
         }
       }
 
-      // --- MODIFICATION START ---
       final clientDoc = widget.availableClients.firstWhere((doc) => doc.id == _selectedClientId);
       final clientData = clientDoc.data() as Map<String, dynamic>;
       final clientName = clientData['name'] ?? 'عميل غير مسمى';
-      final String clientType = clientData['clientType'] ?? 'individual'; // Fetch clientType
-      // --- MODIFICATION END ---
+      final String clientType = clientData['clientType'] ?? 'individual';
 
 
-      await FirebaseFirestore.instance.collection('projects').add({
+      // --- MODIFICATION START: Get new project ID and send notifications ---
+      DocumentReference projectRef = await FirebaseFirestore.instance.collection('projects').add({
         'name': _nameController.text.trim(),
         'assignedEngineers': assignedEngineersList,
         'engineerUids': engineerUidsList,
         'clientId': _selectedClientId,
         'clientName': clientName,
-        'clientType': clientType, // <<< SAVE clientType HERE
+        'clientType': clientType,
         'currentStage': 0,
         'currentPhaseName': 'لا توجد مراحل بعد',
         'status': 'نشط',
         'createdAt': FieldValue.serverTimestamp(),
         'generalNotes': '',
       });
+
+      String newProjectId = projectRef.id; // Get the ID of the newly created project
+
+      if (engineerUidsList.isNotEmpty) {
+        await sendNotificationsToMultiple(
+          recipientUserIds: engineerUidsList,
+          title: "تم تعيينك لمشروع جديد",
+          body: "لقد تم تعيينك لمشروع: ${_nameController.text.trim()}.",
+          type: "project_assignment",
+          projectId: newProjectId,
+          senderName: _currentAdminName ?? "المسؤول", // Use fetched admin name
+        );
+      }
+      // --- MODIFICATION END ---
 
       _showFeedbackSnackBar('تم إضافة المشروع بنجاح.', isError: false);
       if (mounted) {

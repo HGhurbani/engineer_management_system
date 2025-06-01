@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'firebase_options.dart';
+import 'firebase_options.dart'; //
 import 'package:engineer_management_system/pages/auth/login_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_dashboard.dart';
 import 'package:engineer_management_system/pages/engineer/engineer_home.dart';
@@ -26,12 +26,12 @@ void main() async {
 
   if (Firebase.apps.isEmpty) { // تحقق مما إذا كانت قائمة تطبيقات Firebase فارغة
     await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
+      options: DefaultFirebaseOptions.currentPlatform, //
     );
   } else {
     // إذا لم تكن فارغة، افترض أن التطبيق الافتراضي موجود بالفعل
     // يمكنك إضافة تسجيل (log) هنا إذا أردت للتأكد
-    print('Firebase app [DEFAULT] already initialized.');
+    print('Firebase app [DEFAULT] already initialized.'); //
   }
 
   await initializeDateFormatting('ar', null);
@@ -76,37 +76,45 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => const AuthWrapper(),
-        '/login': (context) => const LoginPage(),
-        '/admin': (context) => const AdminDashboard(),
-        '/engineer': (context) => const EngineerHome(),
-        '/client': (context) => const ClientHome(),
-        '/admin/engineers': (context) => const AdminEngineersPage(),
-        '/admin/clients': (context) => const AdminClientsPage(),
-        '/admin/employees': (context) => const AdminEmployeesPage(),
-        '/admin/projects': (context) => const AdminProjectsPage(),
-        '/admin/projectDetails': (context) {
-          final projectId = ModalRoute.of(context)!.settings.arguments as String;
+        '/login': (context) => const LoginPage(), //
+        '/admin': (context) => const AdminDashboard(), //
+        '/engineer': (context) => const EngineerHome(), //
+        '/client': (context) => const ClientHome(), //
+        '/admin/engineers': (context) => const AdminEngineersPage(), //
+        '/admin/clients': (context) => const AdminClientsPage(), //
+        '/admin/employees': (context) => const AdminEmployeesPage(), //
+        '/admin/projects': (context) => const AdminProjectsPage(), //
+        '/admin/projectDetails': (context) { //
+          final route = ModalRoute.of(context);
+          if (route == null || route.settings.arguments == null) {
+            return const LoginPage(); // أو صفحة خطأ
+          }
+          final projectId = route.settings.arguments as String;
           return AdminProjectDetailsPage(projectId: projectId);
         },
-        '/projectDetails': (context) {
-          final projectId = ModalRoute.of(context)!.settings.arguments as String;
+        '/projectDetails': (context) { //
+          final route = ModalRoute.of(context);
+          if (route == null || route.settings.arguments == null) {
+            return const LoginPage(); // أو صفحة خطأ
+          }
+          final projectId = route.settings.arguments as String;
           return ProjectDetailsPage(projectId: projectId);
         },
-        '/admin/settings': (context) => const AdminSettingsPage(),
-        '/admin/attendance': (context) => const AdminAttendancePage(),
-        '/notifications': (context) => const NotificationsPage(),
+        '/admin/settings': (context) => const AdminSettingsPage(), //
+        '/admin/attendance': (context) => const AdminAttendancePage(), //
+        '/notifications': (context) => const NotificationsPage(), //
         // New route for requesting parts
-        '/engineer/request_part': (context) {
+        '/engineer/request_part': (context) { //
           final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
           if (args != null && args.containsKey('engineerId') && args.containsKey('engineerName')) {
-            return RequestPartPage(
+            return RequestPartPage( //
               engineerId: args['engineerId'] as String,
               engineerName: args['engineerName'] as String,
             );
           }
           // Fallback or error handling if arguments are missing
           // You might want to redirect to login or show an error page
-          print('Error: Missing arguments for /engineer/request_part route.');
+          print('Error: Missing arguments for /engineer/request_part route.'); //
           return const LoginPage(); // Or a dedicated error screen
         },
       },
@@ -128,7 +136,9 @@ class AuthWrapper extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         } else if (snapshot.hasData) {
           return FutureBuilder<DocumentSnapshot>(
-            future: FirebaseFirestore.instance.collection('users').doc(snapshot.data!.uid).get(),
+            future: snapshot.data != null
+                ? FirebaseFirestore.instance.collection('users').doc(snapshot.data!.uid).get()
+                : Future.error('User data is null'),
             builder: (context, userDocSnapshot) {
               if (userDocSnapshot.connectionState == ConnectionState.waiting) {
                 return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -137,18 +147,22 @@ class AuthWrapper extends StatelessWidget {
               } else if (userDocSnapshot.hasData && userDocSnapshot.data!.exists) {
                 final data = userDocSnapshot.data!.data() as Map<String, dynamic>;
                 final role = data['role'];
-                if (role == 'admin') return const AdminDashboard();
-                if (role == 'engineer') return const EngineerHome();
-                if (role == 'client') return const ClientHome();
+                if (role == null) {
+                  print('User document missing "role" field');
+                  return const LoginPage();
+                }
+                if (role == 'admin') return const AdminDashboard(); //
+                if (role == 'engineer') return const EngineerHome(); //
+                if (role == 'client') return const ClientHome(); //
                 return const LoginPage(); // Fallback for unknown role
               } else {
                 // If user is authenticated but no document in 'users' collection,
                 // might indicate an issue or a new user whose document creation failed.
                 // For now, redirect to login. Consider more robust handling.
-                print('User authenticated but no user document found in Firestore. UID: ${snapshot.data!.uid}');
+                print('User authenticated but no user document found in Firestore. UID: ${snapshot.data!.uid}'); //
                 // Optionally sign out the user if their Firestore record is missing
                 // FirebaseAuth.instance.signOut();
-                return const LoginPage();
+                return const LoginPage(); //
               }
             },
           );
@@ -159,3 +173,76 @@ class AuthWrapper extends StatelessWidget {
     );
   }
 }
+
+// --- MODIFICATION START: Notification Helper Functions ---
+// It's generally better to put these in a separate service/utility file,
+// but for simplicity, we'll add them here as requested.
+
+/// Sends a single notification to a specific user.
+Future<void> sendNotification({
+  required String recipientUserId,
+  required String title,
+  required String body,
+  required String type,
+  String? projectId,
+  String? itemId, // Generic ID for phase, test, part request, etc.
+  String? senderName,
+}) async {
+  try {
+    await FirebaseFirestore.instance.collection('notifications').add({
+      'userId': recipientUserId,
+      'title': title,
+      'body': body,
+      'type': type,
+      'projectId': projectId,
+      'itemId': itemId,
+      'isRead': false,
+      'timestamp': FieldValue.serverTimestamp(),
+      'senderName': senderName ?? 'النظام', // Default sender name
+    });
+  } catch (e) {
+    print('Error sending notification to $recipientUserId: $e');
+    // Consider more robust error handling or logging
+  }
+}
+
+/// Sends the same notification to multiple users.
+Future<void> sendNotificationsToMultiple({
+  required List<String> recipientUserIds,
+  required String title,
+  required String body,
+  required String type,
+  String? projectId,
+  String? itemId,
+  String? senderName,
+}) async {
+  for (String userId in recipientUserIds) {
+    // Consider adding a small delay or batching if sending to a very large number of users
+    // to avoid hitting Firestore write limits too quickly, though for typical admin/engineer lists
+    // this direct loop should be fine.
+    await sendNotification(
+      recipientUserId: userId,
+      title: title,
+      body: body,
+      type: type,
+      projectId: projectId,
+      itemId: itemId,
+      senderName: senderName,
+    );
+  }
+}
+
+/// Fetches a list of UIDs for all users with the 'admin' role.
+Future<List<String>> getAdminUids() async {
+  try {
+    final adminSnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where('role', isEqualTo: 'admin')
+        .get();
+    return adminSnapshot.docs.map((doc) => doc.id).toList();
+  } catch (e) {
+    print('Error fetching admin UIDs: $e');
+    return []; // Return empty list on error
+  }
+}
+// --- MODIFICATION END: Notification Helper Functions ---

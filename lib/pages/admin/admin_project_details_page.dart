@@ -1,17 +1,23 @@
 // lib/pages/admin/admin_project_details_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart'; // لا يزال يستخدم في _showAddNoteOrImageDialog الخاصة بالمسؤول
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // لا يزال يستخدم في _showAddNoteOrImageDialog الخاصة بالمسؤول
-import 'dart:io'; // لا يزال يستخدم في _showAddNoteOrImageDialog الخاصة بالمسؤول
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:share_plus/share_plus.dart';
+// import 'package:url_launcher/url_launcher.dart'; // Not used directly for notifications
+// import 'package:share_plus/share_plus.dart'; // Not used directly for notifications
 import 'dart:ui' as ui;
 
 import 'edit_assigned_engineers_page.dart';
+
+// --- MODIFICATION START: Import notification helper functions ---
+// Make sure the path to your main.dart (or a dedicated notification service file) is correct.
+import '../../main.dart'; // Assuming helper functions are in main.dart
+// --- MODIFICATION END ---
+
 
 // ... (AppConstants class remains the same) ...
 class AppConstants {
@@ -50,6 +56,9 @@ class AdminProjectDetailsPage extends StatefulWidget {
 class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with TickerProviderStateMixin {
   Key _projectFutureBuilderKey = UniqueKey();
   String? _currentUserRole;
+  // --- MODIFICATION START: Variable for current admin name ---
+  String? _currentAdminName;
+  // --- MODIFICATION END ---
   bool _isPageLoading = true;
   DocumentSnapshot? _projectDataSnapshot;
 
@@ -340,7 +349,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       _clientTypeKeyFromFirestore = null;
       _clientTypeDisplayString = null;
     });
-    await _fetchCurrentUserRole();
+    await _fetchCurrentUserRoleAndName(); // --- MODIFICATION: Renamed and combined ---
     await _loadAllAvailableEngineers();
     await _fetchProjectAndPhasesData(); // This will also fetch client type
     if (mounted) {
@@ -350,17 +359,33 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     }
   }
 
-  Future<void> _fetchCurrentUserRole() async {
+  // --- MODIFICATION START: Combined function to get current user's role and name ---
+  Future<void> _fetchCurrentUserRoleAndName() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      if (mounted && userDoc.exists) {
-        setState(() {
-          _currentUserRole = userDoc.data()?['role'] as String?;
-        });
+      try {
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (mounted && userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          setState(() {
+            _currentUserRole = userData['role'] as String?;
+            _currentAdminName = userData['name'] as String? ?? (_currentUserRole == 'admin' ? 'المسؤول' : 'مستخدم');
+          });
+        } else if (mounted) {
+          _currentAdminName = _currentUserRole == 'admin' ? 'المسؤول' : 'مستخدم';
+        }
+      } catch (e) {
+        print("Error fetching current user data: $e");
+        if (mounted) {
+          _currentAdminName = _currentUserRole == 'admin' ? 'المسؤول' : 'مستخدم'; // Fallback
+        }
       }
+    } else if (mounted) {
+      _currentAdminName = 'زائر'; // Fallback if no user
     }
   }
+  // --- MODIFICATION END ---
+
 
   Future<void> _loadAllAvailableEngineers() async {
     try {
@@ -479,47 +504,53 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     }
   }
 
-  Future<void> _sendNotificationToMultipleEngineers({
-    required String projectId,
-    required String projectName,
+  // --- MODIFICATION START: Renamed and adapted this function ---
+  // This function was originally _sendNotificationToMultipleEngineers
+  // It's now more generic but still used here primarily by admin.
+  // For a truly generic solution, use the helpers from main.dart
+  Future<void> _notifyProjectStakeholders({
     required String title,
     required String body,
-    required List<String> recipientUids,
-    String phaseDocId = '',
     required String notificationType,
+    String? phaseOrItemId, // Can be phaseId, subPhaseId, testId
+    List<String>? specificRecipientUids, // If null, send to assigned engineers and client
   }) async {
-    // ... (same as provided)
-    final notificationCollection = FirebaseFirestore.instance.collection('notifications');
-    final currentUser = FirebaseAuth.instance.currentUser;
-    String senderName = "النظام"; // Default sender name
+    if (_projectDataSnapshot == null || !_projectDataSnapshot!.exists) return;
+    final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>;
+    final projectNameVal = projectData['name'] ?? 'المشروع';
+    final clientUid = projectData['clientId'] as String?;
+    final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
+    final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
 
-    // Try to get the sender's name from Firestore
-    if (currentUser != null) {
-      final senderDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
-      senderName = senderDoc.data()?['name'] ?? (_currentUserRole == 'admin' ? 'المسؤول' : 'مهندس');
-    }
-
-
-    for (String userId in recipientUids) {
-      try {
-        await notificationCollection.add({
-          'userId': userId, // The UID of the recipient
-          'projectId': projectId,
-          'phaseDocId': phaseDocId, // Optional: specific phase/subphase doc ID
-          'title': title,
-          'body': body,
-          'type': notificationType, // e.g., 'phase_completed', 'new_assignment'
-          'isRead': false,
-          'timestamp': FieldValue.serverTimestamp(),
-          'senderName': senderName, // Who triggered the notification (e.g., "المسؤول" or engineer's name)
-        });
-        print('Notification sent to $userId for project $projectName');
-      } catch(e) {
-        print('Failed to send notification to $userId: $e');
-        if (mounted) _showFeedbackSnackBar(context, 'فشل إرسال إشعار للمهندس $userId: $e', isError: true);
+    List<String> recipients = [];
+    if (specificRecipientUids != null) {
+      recipients.addAll(specificRecipientUids);
+    } else {
+      recipients.addAll(assignedEngineerUids);
+      if (clientUid != null && clientUid.isNotEmpty) {
+        recipients.add(clientUid);
       }
     }
+    // Remove duplicates just in case
+    recipients = recipients.toSet().toList();
+
+
+    if (recipients.isEmpty) {
+      print("No recipients found for notification type: $notificationType");
+      return;
+    }
+
+    await sendNotificationsToMultiple(
+      recipientUserIds: recipients,
+      title: title,
+      body: body,
+      type: notificationType,
+      projectId: widget.projectId,
+      itemId: phaseOrItemId,
+      senderName: _currentAdminName ?? "المسؤول",
+    );
   }
+  // --- MODIFICATION END ---
 
 
   PreferredSizeWidget _buildAppBar() {
@@ -688,15 +719,15 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                   trailing: Row( // Combine icons in a Row
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Admin can always add notes/images, Engineers only if not completed
-                      if (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isCompleted))
+                      // Admin can always add notes/images
+                      if (_currentUserRole == 'admin')
                         IconButton(
                           icon: const Icon(Icons.add_comment_outlined, color: AppConstants.primaryLight),
                           tooltip: 'إضافة ملاحظة/صورة للمرحلة الرئيسية',
                           onPressed: () => _showAddNoteOrImageDialog(phaseId, phaseActualName),
                         ),
-                      // Admin can always toggle, Engineers only if not completed
-                      if (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isCompleted))
+                      // Admin can always toggle
+                      if (_currentUserRole == 'admin')
                         Checkbox(
                           value: isCompleted,
                           activeColor: AppConstants.successColor,
@@ -764,8 +795,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                                           color: isSubCompleted ? AppConstants.successColor : AppConstants.textSecondary, size: 20,
                                         ),
                                         title: Text(subPhaseActualName, style: TextStyle(fontSize: 13.5, color: AppConstants.textSecondary, decoration: isSubCompleted ? TextDecoration.lineThrough : null)),
-                                        trailing: (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isSubCompleted))
-                                            ? Checkbox( // Admin or Engineer (if not completed) can mark sub-phase
+                                        trailing: (_currentUserRole == 'admin')
+                                            ? Checkbox( // Admin can mark sub-phase
                                           value: isSubCompleted,
                                           activeColor: AppConstants.successColor,
                                           visualDensity: VisualDensity.compact,
@@ -773,7 +804,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                                             _updateSubPhaseCompletionStatus(phaseId, subPhaseId, subPhaseActualName, value ?? false);
                                           },
                                         )
-                                            : null, // No action if completed by someone else and current user is engineer
+                                            : null,
                                         children: [
                                           Padding(
                                             padding: const EdgeInsets.only(left: AppConstants.paddingSmall, right: AppConstants.paddingMedium + 8, bottom: AppConstants.paddingSmall, top: 0),
@@ -796,14 +827,11 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 
   Widget _buildTestsTab() {
-    // ... (remains structurally similar, calls the updated _buildEntriesList if tests were to have multi-image entries)
-    // For now, tests in the provided code seem to have a single imageUrl. If that changes, this needs review.
-    // The current request is focused on phases/sub-phases entries.
     if (_projectDataSnapshot == null || !_projectDataSnapshot!.exists) {
       return const Center(child: Text("لا يمكن تحميل تفاصيل المشروع للاختبارات."));
     }
     return ListView.builder(
-      key: const PageStorageKey<String>('adminProjectDetails_testsTabListView'), // For scroll position restoration
+      key: const PageStorageKey<String>('adminProjectDetails_testsTabListView'),
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       itemCount: finalCommissioningTests.length,
       itemBuilder: (context, sectionIndex) {
@@ -817,7 +845,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
           child: ExpansionTile(
-            key: PageStorageKey<String>(sectionId), // For scroll position restoration
+            key: PageStorageKey<String>(sectionId),
             title: Text(sectionName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
             childrenPadding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingSmall, vertical: AppConstants.paddingSmall / 2),
             children: tests.map((test) {
@@ -833,15 +861,15 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                   builder: (context, testStatusSnapshot) {
                     bool isTestCompleted = false;
                     String testNote = "";
-                    String? testImageUrl; // Tests currently use single imageUrl
-                    String? engineerName;
+                    String? testImageUrl;
+                    String? engineerName; // Name of engineer who completed, if any
 
                     if (testStatusSnapshot.hasData && testStatusSnapshot.data!.exists) {
                       final statusData = testStatusSnapshot.data!.data() as Map<String, dynamic>;
                       isTestCompleted = statusData['completed'] ?? false;
                       testNote = statusData['note'] ?? '';
-                      testImageUrl = statusData['imageUrl'] as String?; // Assuming tests still use single imageUrl
-                      engineerName = statusData['engineerName'] as String?;
+                      testImageUrl = statusData['imageUrl'] as String?;
+                      engineerName = statusData['lastUpdatedByName'] as String?; // Changed from 'engineerName' for consistency
                     }
 
                     return ListTile(
@@ -851,11 +879,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         color: isTestCompleted ? AppConstants.successColor : AppConstants.textSecondary,
                         size: 20,
                       ),
-                      trailing: (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isTestCompleted))
+                      trailing: (_currentUserRole == 'admin') // Only admin can mark tests as complete/incomplete directly from this view
                           ? Checkbox(
                         value: isTestCompleted,
                         activeColor: AppConstants.successColor,
                         onChanged: (value) {
+                          // Admin updates test status, potentially overwriting engineer's completion.
+                          // The dialog allows admin to add their own notes/image.
                           _updateTestStatus(testId, testName, value ?? false, currentNote: testNote, currentImageUrl: testImageUrl);
                         },
                       )
@@ -863,10 +893,10 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (engineerName != null && engineerName.isNotEmpty)
+                          if (engineerName != null && engineerName.isNotEmpty && isTestCompleted)
                             Padding(
                               padding: const EdgeInsets.only(top: 4.0),
-                              child: Text("بواسطة: $engineerName", style: const TextStyle(fontSize: 10, color: AppConstants.textSecondary, fontStyle: FontStyle.italic)),
+                              child: Text("أكمل بواسطة: $engineerName", style: const TextStyle(fontSize: 10, color: AppConstants.textSecondary, fontStyle: FontStyle.italic)),
                             ),
                           if (testNote.isNotEmpty)
                             Padding(
@@ -877,7 +907,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                             Padding(
                               padding: const EdgeInsets.only(top: 4.0),
                               child: InkWell(
-                                onTap: () => _viewImageDialog(testImageUrl!), // viewImageDialog can handle single URL
+                                onTap: () => _viewImageDialog(testImageUrl!),
                                 child: const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -891,8 +921,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         ],
                       ),
                       onTap: () {
-                        // Allow admin to edit, or engineer if not completed
-                        if (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isTestCompleted)) {
+                        // Allow admin to edit details or mark complete/incomplete
+                        if (_currentUserRole == 'admin') {
                           _updateTestStatus(testId, testName, !isTestCompleted, currentNote: testNote, currentImageUrl: testImageUrl);
                         }
                       },
@@ -905,7 +935,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     );
   }
 
-  // --- MODIFIED _buildEntriesList ---
+
   Widget _buildEntriesList(String phaseOrMainPhaseId, bool parentCompleted, String parentName, {String? subPhaseId, bool isSubEntry = false}) {
     String entriesCollectionPath = subPhaseId == null
         ? 'projects/${widget.projectId}/phases_status/$phaseOrMainPhaseId/entries'
@@ -941,17 +971,15 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 final String engineerName = entryData['engineerName'] ?? 'غير معروف';
                 final Timestamp? timestamp = entryData['timestamp'] as Timestamp?;
 
-                // --- Logic to handle both imageUrl (single) and imageUrls (list) ---
                 final List<String> imageUrlsToDisplay = [];
-                final dynamic imagesField = entryData['imageUrls']; // Prefer new field 'imageUrls' (list)
-                final dynamic singleImageField = entryData['imageUrl']; // Fallback to old field 'imageUrl' (string)
+                final dynamic imagesField = entryData['imageUrls'];
+                final dynamic singleImageField = entryData['imageUrl'];
 
                 if (imagesField is List) {
                   imageUrlsToDisplay.addAll(imagesField.map((e) => e.toString()).toList());
                 } else if (singleImageField is String && singleImageField.isNotEmpty) {
                   imageUrlsToDisplay.add(singleImageField);
                 }
-                // --- End of image handling logic ---
 
                 return Card(
                   elevation: 1,
@@ -975,7 +1003,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                                     borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
                                     child: Image.network(
                                       url,
-                                      height: 100, // Consistent small preview size
+                                      height: 100,
                                       width: 100,
                                       fit: BoxFit.cover,
                                       loadingBuilder: (ctx, child, progress) =>
@@ -1010,36 +1038,32 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             );
           },
         ),
-        // The "Add Entry" button for admin is part of the ExpansionTile's trailing in _buildPhasesTab
-        // So no separate button needed here in _buildEntriesList for admin viewing.
       ],
     );
   }
-  // --- END OF MODIFIED _buildEntriesList ---
 
 
   Future<void> _viewImageDialog(String imageUrl) async {
-    // ... (same as provided)
     await showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.transparent, // Make background transparent
-        contentPadding: EdgeInsets.zero, // Remove default padding
-        insetPadding: const EdgeInsets.all(10), // Padding around the dialog
+        backgroundColor: Colors.transparent,
+        contentPadding: EdgeInsets.zero,
+        insetPadding: const EdgeInsets.all(10),
         content: InteractiveViewer(
-          panEnabled: true, // Enable panning
-          boundaryMargin: const EdgeInsets.all(20), // Margin around the content
-          minScale: 0.5, // Minimum scale factor
-          maxScale: 4,   // Maximum scale factor
+          panEnabled: true,
+          boundaryMargin: const EdgeInsets.all(20),
+          minScale: 0.5,
+          maxScale: 4,
           child: Image.network(
             imageUrl,
-            fit: BoxFit.contain, // Ensure the whole image is visible
+            fit: BoxFit.contain,
             loadingBuilder: (ctx, child, progress) =>
             progress == null ? child : const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor)),
             errorBuilder: (ctx, err, st) => const Center(child: Icon(Icons.error_outline, color: AppConstants.errorColor, size: 50)),
           ),
         ),
-        actions: [ // Add a clear close button
+        actions: [
           TextButton(
             style: TextButton.styleFrom(backgroundColor: Colors.black.withOpacity(0.5)),
             onPressed: () => Navigator.pop(dialogContext),
@@ -1051,14 +1075,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     );
   }
 
+  // --- MODIFICATION START: _showAddNoteOrImageDialog - Send notifications ---
   Future<void> _showAddNoteOrImageDialog(String phaseId, String phaseOrSubPhaseName, {String? subPhaseId}) async {
-    // ... (This dialog in admin page currently uses Firebase Storage and single image)
-    // ... (It should ideally be updated to match engineer's multi-image PHP upload for consistency)
-    // ... (For now, it remains as is, but _buildEntriesList will handle viewing its output)
     if (!mounted) return;
 
     final noteController = TextEditingController();
-    File? pickedImageFile; // Admin's dialog still uses single File
+    File? pickedImageFile;
     bool isUploadingDialog = false;
     final formKeyDialog = GlobalKey<FormState>();
 
@@ -1066,14 +1088,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         ? 'إضافة إدخال للمرحلة: $phaseOrSubPhaseName'
         : 'إضافة إدخال للمرحلة الفرعية: $phaseOrSubPhaseName';
 
-    // Path for entries collection
     String collectionPath = subPhaseId == null
         ? 'projects/${widget.projectId}/phases_status/$phaseId/entries'
         : 'projects/${widget.projectId}/subphases_status/$subPhaseId/entries';
 
     await showDialog(
       context: context,
-      barrierDismissible: !isUploadingDialog, // Prevent dismissal during upload
+      barrierDismissible: !isUploadingDialog,
       builder: (dialogContext) {
         return StatefulBuilder(builder: (stfContext, setDialogState) {
           return Directionality(
@@ -1113,9 +1134,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         label: Text(pickedImageFile == null ? 'إضافة صورة (اختياري)' : 'تغيير الصورة', style: const TextStyle(color: AppConstants.primaryColor)),
                         onPressed: () async {
                           final picker = ImagePicker();
-                          final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 70); // Can be gallery too
+                          final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
                           if (picked != null) {
-                            setDialogState(() { // Use the dialog's state setter
+                            setDialogState(() {
                               pickedImageFile = File(picked.path);
                             });
                           }
@@ -1135,28 +1156,19 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     if (!formKeyDialog.currentState!.validate()) return;
 
                     setDialogState(() => isUploadingDialog = true);
-                    String? imageUrl; // For single image from admin
+                    String? imageUrl;
                     final currentUser = FirebaseAuth.instance.currentUser;
-                    String actorName = "غير معروف"; // Default
+                    // _currentAdminName should be fetched in initState or similar
+                    String actorName = _currentAdminName ?? "المسؤول";
 
-                    if (currentUser != null) {
-                      final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
-                      if (userDoc.exists) {
-                        actorName = userDoc.data()?['name'] ?? (_currentUserRole == 'admin' ? 'المسؤول' : 'مهندس');
-                      } else {
-                        // Fallback if user doc not found but role is known
-                        actorName = _currentUserRole == 'admin' ? 'المسؤول' : 'مهندس';
-                      }
-                    }
 
                     if (pickedImageFile != null) {
                       try {
-                        // Admin uploads to Firebase Storage (current logic)
                         final timestampForPath = DateTime.now().millisecondsSinceEpoch;
                         final imageName = '${currentUser?.uid ?? 'unknown_user'}_${timestampForPath}.jpg';
                         final refPath = subPhaseId == null
-                            ? 'project_entries/${widget.projectId}/$phaseId/$imageName' // Path for main phase entry image
-                            : 'project_entries/${widget.projectId}/$subPhaseId/$imageName'; // Path for sub-phase entry image
+                            ? 'project_entries/${widget.projectId}/$phaseId/$imageName'
+                            : 'project_entries/${widget.projectId}/$subPhaseId/$imageName';
 
                         final ref = FirebaseStorage.instance.ref().child(refPath);
                         await ref.putFile(pickedImageFile!);
@@ -1170,15 +1182,51 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
                     try {
                       await FirebaseFirestore.instance.collection(collectionPath).add({
-                        // Admin adds 'imageUrl', engineers add 'imageUrls'
                         'type': imageUrl != null ? (noteController.text.trim().isEmpty ? 'image_only' : 'image_with_note') : 'note_only',
                         'note': noteController.text.trim(),
-                        'imageUrl': imageUrl, // Admin saves single imageUrl
-                        // 'imageUrls': null, // Explicitly null for admin entries if using this dialog
-                        'engineerUid': currentUser?.uid, // Could be admin's UID
-                        'engineerName': actorName, // Could be "المسؤول"
+                        'imageUrl': imageUrl,
+                        'engineerUid': currentUser?.uid,
+                        'engineerName': actorName,
                         'timestamp': FieldValue.serverTimestamp(),
                       });
+
+                      // --- Notification Logic for Admin Adding Entry ---
+                      if (_projectDataSnapshot != null && _projectDataSnapshot!.exists) {
+                        final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>;
+                        final projectNameVal = projectData['name'] ?? 'المشروع';
+                        final clientUid = projectData['clientId'] as String?;
+                        final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
+                        final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
+
+                        String notificationBody = "قام المسؤول '$actorName' بإضافة ${imageUrl != null ? 'صورة وملاحظة' : 'ملاحظة'} جديدة في ${subPhaseId != null ? 'المرحلة الفرعية' : 'المرحلة'}: '$phaseOrSubPhaseName'.";
+
+                        // Notify Assigned Engineers
+                        if(assignedEngineerUids.isNotEmpty) {
+                          await sendNotificationsToMultiple(
+                            recipientUserIds: assignedEngineerUids,
+                            title: "إضافة جديدة في مشروع: $projectNameVal",
+                            body: notificationBody,
+                            type: "project_entry_admin",
+                            projectId: widget.projectId,
+                            itemId: subPhaseId ?? phaseId,
+                            senderName: actorName,
+                          );
+                        }
+                        // Notify Client
+                        if (clientUid != null && clientUid.isNotEmpty) {
+                          await sendNotification(
+                            recipientUserId: clientUid,
+                            title: "تحديث في مشروعك: $projectNameVal",
+                            body: notificationBody, // Same body for client for simplicity
+                            type: "project_entry_admin_to_client", // More specific type if needed for client handling
+                            projectId: widget.projectId,
+                            itemId: subPhaseId ?? phaseId,
+                            senderName: actorName,
+                          );
+                        }
+                      }
+                      // --- End Notification Logic ---
+
                       Navigator.pop(dialogContext);
                       _showFeedbackSnackBar(context, 'تمت إضافة الإدخال بنجاح.', isError: false);
                     } catch (e) {
@@ -1197,9 +1245,10 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       },
     );
   }
+  // --- MODIFICATION END ---
 
+  // --- MODIFICATION START: _updatePhaseCompletionStatus - Send notifications ---
   Future<void> _updatePhaseCompletionStatus(String phaseId, String phaseName, bool newStatus) async {
-    // ... (same as provided)
     if (!mounted) return;
     try {
       final phaseDocRef = FirebaseFirestore.instance
@@ -1209,68 +1258,47 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           .doc(phaseId);
 
       final currentUser = FirebaseAuth.instance.currentUser;
-      String actorName = "غير معروف";
-      if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
-        if (userDoc.exists) {
-          actorName = userDoc.data()?['name'] ?? (_currentUserRole == 'admin' ? 'المسؤول' : 'مهندس');
-        } else {
-          actorName = _currentUserRole == 'admin' ? 'المسؤول' : 'مهندس';
-        }
-      }
+      // _currentAdminName should be fetched in initState or similar
+      String actorName = _currentAdminName ?? "المسؤول";
+
 
       await phaseDocRef.set({
         'completed': newStatus,
-        'name': phaseName, // Ensure the name is also set/updated
+        'name': phaseName,
         'lastUpdatedByUid': currentUser?.uid,
         'lastUpdatedByName': actorName,
         'lastUpdatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true)); // Use merge to avoid overwriting other fields if any
+      }, SetOptions(merge: true));
 
-      // --- Notification Logic ---
-      final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
-      final projectData = projectDoc.data();
-      final projectNameVal = projectData?['name'] ?? 'المشروع';
-      final clientUid = projectData?['clientId'] as String?;
-      final List<dynamic> assignedEngineersRaw = projectData?['assignedEngineers'] as List<dynamic>? ?? [];
-      final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => e['uid'].toString()).toList();
+      if (newStatus && _projectDataSnapshot != null && _projectDataSnapshot!.exists) {
+        final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>;
+        final projectNameVal = projectData['name'] ?? 'المشروع';
+        final clientUid = projectData['clientId'] as String?;
+        final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
+        final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
 
-      if (newStatus) { // Send notifications only on completion
-        // Notify Client
-        if (clientUid != null) {
-          _sendNotificationToMultipleEngineers(
+        // Notify Assigned Engineers
+        if (assignedEngineerUids.isNotEmpty) {
+          await sendNotificationsToMultiple(
+              recipientUserIds: assignedEngineerUids,
+              title: 'تحديث مرحلة مشروع: $projectNameVal',
+              body: 'المرحلة "$phaseName" في مشروع "$projectNameVal" أصبحت مكتملة (بواسطة المسؤول).',
+              type: 'phase_update_by_admin',
               projectId: widget.projectId,
-              projectName: projectNameVal,
-              title: 'تحديث مشروع: مرحلة مكتملة',
-              body: 'المرحلة "$phaseName" في مشروع "$projectNameVal" أصبحت مكتملة. يمكنك الآن مراجعتها.',
-              recipientUids: [clientUid],
-              notificationType: 'phase_completed_client',
-              phaseDocId: phaseId
+              itemId: phaseId,
+              senderName: actorName
           );
         }
-        // Notify other engineers if an engineer completed it, or all engineers if admin completed it
-        if (_currentUserRole == 'engineer') {
-          final otherEngineers = assignedEngineerUids.where((uid) => uid != currentUser?.uid).toList();
-          if (otherEngineers.isNotEmpty) {
-            _sendNotificationToMultipleEngineers(
-                projectId: widget.projectId,
-                projectName: projectNameVal,
-                title: 'تحديث مشروع: مرحلة مكتملة',
-                body: 'المرحلة "$phaseName" في مشروع "$projectNameVal" أصبحت مكتملة بواسطة المهندس $actorName.',
-                recipientUids: otherEngineers,
-                notificationType: 'phase_completed_other_engineers',
-                phaseDocId: phaseId
-            );
-          }
-        } else if (_currentUserRole == 'admin' && assignedEngineerUids.isNotEmpty) {
-          _sendNotificationToMultipleEngineers(
+        // Notify Client
+        if (clientUid != null && clientUid.isNotEmpty) {
+          await sendNotification(
+              recipientUserId: clientUid,
+              title: 'تحديث مشروعك: $projectNameVal',
+              body: 'المرحلة "$phaseName" في مشروعك "$projectNameVal" أصبحت مكتملة.',
+              type: 'phase_completed_for_client',
               projectId: widget.projectId,
-              projectName: projectNameVal,
-              title: 'تحديث مشروع: مرحلة مكتملة',
-              body: 'المرحلة "$phaseName" في مشروع "$projectNameVal" أصبحت مكتملة بواسطة المسؤول.',
-              recipientUids: assignedEngineerUids, // Notify all assigned engineers
-              notificationType: 'phase_completed_admin_to_engineers',
-              phaseDocId: phaseId
+              itemId: phaseId,
+              senderName: actorName
           );
         }
       }
@@ -1279,9 +1307,10 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       _showFeedbackSnackBar(context, 'فشل تحديث حالة المرحلة: $e', isError: true);
     }
   }
+  // --- MODIFICATION END ---
 
+  // --- MODIFICATION START: _updateSubPhaseCompletionStatus - Send notifications ---
   Future<void> _updateSubPhaseCompletionStatus(String mainPhaseId, String subPhaseId, String subPhaseName, bool newStatus) async {
-    // ... (same as provided)
     if (!mounted) return;
     try {
       final subPhaseDocRef = FirebaseFirestore.instance
@@ -1291,67 +1320,46 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           .doc(subPhaseId);
 
       final currentUser = FirebaseAuth.instance.currentUser;
-      String actorName = "غير معروف";
-      if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
-        if (userDoc.exists) {
-          actorName = userDoc.data()?['name'] ?? (_currentUserRole == 'admin' ? 'المسؤول' : 'مهندس');
-        } else {
-          actorName = _currentUserRole == 'admin' ? 'المسؤول' : 'مهندس';
-        }
-      }
+      String actorName = _currentAdminName ?? "المسؤول";
 
       await subPhaseDocRef.set({
         'completed': newStatus,
-        'mainPhaseId': mainPhaseId, // Good to keep track of parent
-        'name': subPhaseName, // Ensure the name is also set/updated
+        'mainPhaseId': mainPhaseId,
+        'name': subPhaseName,
         'lastUpdatedByUid': currentUser?.uid,
         'lastUpdatedByName': actorName,
         'lastUpdatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // --- Notification Logic for Sub-Phases ---
-      final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
-      final projectData = projectDoc.data();
-      final projectNameVal = projectData?['name'] ?? 'المشروع';
-      final clientUid = projectData?['clientId'] as String?;
-      final List<dynamic> assignedEngineersRaw = projectData?['assignedEngineers'] as List<dynamic>? ?? [];
-      final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => e['uid'].toString()).toList();
+      if (newStatus && _projectDataSnapshot != null && _projectDataSnapshot!.exists) {
+        final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>;
+        final projectNameVal = projectData['name'] ?? 'المشروع';
+        final clientUid = projectData['clientId'] as String?;
+        final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
+        final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
 
-      if (newStatus) { // Send notifications only on completion
-        if (clientUid != null) {
-          _sendNotificationToMultipleEngineers(
+        // Notify Assigned Engineers
+        if (assignedEngineerUids.isNotEmpty) {
+          await sendNotificationsToMultiple(
+              recipientUserIds: assignedEngineerUids,
+              title: 'تحديث مرحلة مشروع: $projectNameVal',
+              body: 'المرحلة الفرعية "$subPhaseName" في مشروع "$projectNameVal" أصبحت مكتملة (بواسطة المسؤول).',
+              type: 'subphase_update_by_admin',
               projectId: widget.projectId,
-              projectName: projectNameVal,
-              title: 'تحديث مشروع: مرحلة فرعية مكتملة',
-              body: 'المرحلة الفرعية "$subPhaseName" في مشروع "$projectNameVal" أصبحت مكتملة.',
-              recipientUids: [clientUid],
-              notificationType: 'subphase_completed_client',
-              phaseDocId: mainPhaseId // Can refer to the main phase
+              itemId: subPhaseId, // Use subPhaseId as itemId
+              senderName: actorName
           );
         }
-        if (_currentUserRole == 'engineer') {
-          final otherEngineers = assignedEngineerUids.where((uid) => uid != currentUser?.uid).toList();
-          if (otherEngineers.isNotEmpty) {
-            _sendNotificationToMultipleEngineers(
-                projectId: widget.projectId,
-                projectName: projectNameVal,
-                title: 'تحديث مشروع: مرحلة فرعية مكتملة',
-                body: 'المرحلة الفرعية "$subPhaseName" في مشروع "$projectNameVal" أصبحت مكتملة بواسطة المهندس $actorName.',
-                recipientUids: otherEngineers,
-                notificationType: 'subphase_completed_other_engineers',
-                phaseDocId: mainPhaseId
-            );
-          }
-        } else if (_currentUserRole == 'admin' && assignedEngineerUids.isNotEmpty) {
-          _sendNotificationToMultipleEngineers(
+        // Notify Client
+        if (clientUid != null && clientUid.isNotEmpty) {
+          await sendNotification(
+              recipientUserId: clientUid,
+              title: 'تحديث مشروعك: $projectNameVal',
+              body: 'المرحلة الفرعية "$subPhaseName" في مشروعك "$projectNameVal" أصبحت مكتملة.',
+              type: 'subphase_completed_for_client',
               projectId: widget.projectId,
-              projectName: projectNameVal,
-              title: 'تحديث مشروع: مرحلة فرعية مكتملة',
-              body: 'المرحلة الفرعية "$subPhaseName" في مشروع "$projectNameVal" أصبحت مكتملة بواسطة المسؤول.',
-              recipientUids: assignedEngineerUids,
-              notificationType: 'subphase_completed_admin_to_engineers',
-              phaseDocId: mainPhaseId
+              itemId: subPhaseId, // Use subPhaseId as itemId
+              senderName: actorName
           );
         }
       }
@@ -1360,33 +1368,24 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       _showFeedbackSnackBar(context, 'فشل تحديث حالة المرحلة الفرعية: $e', isError: true);
     }
   }
+  // --- MODIFICATION END ---
 
+  // --- MODIFICATION START: _updateTestStatus - Send notifications ---
   Future<void> _updateTestStatus(String testId, String testName, bool newStatus, {String? currentNote, String? currentImageUrl}) async {
-    // ... (same as provided - this dialog uses single image and Firebase Storage)
     if (!mounted) return;
 
     final noteController = TextEditingController(text: currentNote ?? "");
     String? tempImageUrl = currentImageUrl;
-    File? pickedImageFile; // For single image in test status
+    File? pickedImageFile;
     bool isUploadingDialog = false;
 
     final currentUser = FirebaseAuth.instance.currentUser;
-    String actorName = "غير معروف";
-    if (currentUser != null) {
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
-      if (userDoc.exists) {
-        actorName = userDoc.data()?['name'] ?? (_currentUserRole == 'admin' ? 'المسؤول' : 'مهندس');
-      } else {
-        actorName = _currentUserRole == 'admin' ? 'المسؤول' : 'مهندس';
-      }
-    }
+    String actorName = _currentAdminName ?? "المسؤول";
 
-    // Show confirmation dialog with editing options
     bool? confirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: !isUploadingDialog,
         builder: (dialogContext) {
-          // Use a local state for newStatus inside the dialog to allow changes before saving
           bool dialogNewStatus = newStatus;
           return StatefulBuilder(builder: (stfContext, setDialogState) {
             return Directionality(
@@ -1399,7 +1398,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     children: [
                       CheckboxListTile(
                         title: const Text('الاختبار مكتمل وناجح'),
-                        value: dialogNewStatus, // Use local dialog state
+                        value: dialogNewStatus,
                         onChanged: (val) => setDialogState(() => dialogNewStatus = val ?? false),
                         activeColor: AppConstants.successColor,
                         controlAffinity: ListTileControlAffinity.leading,
@@ -1410,7 +1409,6 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         maxLines: 2,
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
-                      // Image handling logic (single image for tests)
                       if (tempImageUrl != null && pickedImageFile == null)
                         Column(
                           children: [
@@ -1449,7 +1447,6 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                       String? finalImageUrl = tempImageUrl;
                       if (pickedImageFile != null) {
                         try {
-                          // Tests use Firebase Storage (as per existing admin code)
                           final refPath = 'project_tests/${widget.projectId}/$testId/${DateTime.now().millisecondsSinceEpoch}.jpg';
                           final ref = FirebaseStorage.instance.ref().child(refPath);
                           await ref.putFile(pickedImageFile!);
@@ -1457,10 +1454,10 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         } catch (e) {
                           if(mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع صورة الاختبار: $e', isError: true);
                           setDialogState(() => isUploadingDialog = false);
-                          return; // Stop if image upload fails
+                          return;
                         }
                       }
-                      // Update Firestore
+
                       try {
                         final testDocRef = FirebaseFirestore.instance
                             .collection('projects')
@@ -1469,16 +1466,51 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                             .doc(testId);
 
                         await testDocRef.set({
-                          'completed': dialogNewStatus, // Use status from dialog
+                          'completed': dialogNewStatus,
                           'name': testName,
                           'note': noteController.text.trim(),
-                          'imageUrl': finalImageUrl, // Single image URL for tests
+                          'imageUrl': finalImageUrl,
                           'lastUpdatedByUid': currentUser?.uid,
                           'lastUpdatedByName': actorName,
                           'lastUpdatedAt': FieldValue.serverTimestamp(),
                         }, SetOptions(merge: true));
 
-                        if(mounted) Navigator.pop(dialogContext, true); // Close dialog and indicate success
+                        // --- Notification Logic for Admin Updating Test ---
+                        if (dialogNewStatus && _projectDataSnapshot != null && _projectDataSnapshot!.exists) { // Only notify on completion
+                          final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>;
+                          final projectNameVal = projectData['name'] ?? 'المشروع';
+                          final clientUid = projectData['clientId'] as String?;
+                          final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
+                          final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
+
+                          // Notify Assigned Engineers
+                          if (assignedEngineerUids.isNotEmpty) {
+                            await sendNotificationsToMultiple(
+                                recipientUserIds: assignedEngineerUids,
+                                title: 'تحديث اختبار مشروع: $projectNameVal',
+                                body: 'الاختبار "$testName" في مشروع "$projectNameVal" أصبح مكتملًا (بواسطة المسؤول).',
+                                type: 'test_update_by_admin',
+                                projectId: widget.projectId,
+                                itemId: testId,
+                                senderName: actorName
+                            );
+                          }
+                          // Notify Client
+                          if (clientUid != null && clientUid.isNotEmpty) {
+                            await sendNotification(
+                                recipientUserId: clientUid,
+                                title: 'تحديث مشروعك: $projectNameVal',
+                                body: 'الاختبار "$testName" في مشروعك "$projectNameVal" أصبح مكتملًا.',
+                                type: 'test_completed_for_client',
+                                projectId: widget.projectId,
+                                itemId: testId,
+                                senderName: actorName
+                            );
+                          }
+                        }
+                        // --- End Notification Logic ---
+
+                        if(mounted) Navigator.pop(dialogContext, true);
                         if(mounted) _showFeedbackSnackBar(context, 'تم تحديث حالة الاختبار "$testName".', isError: false);
 
                       } catch (e) {
@@ -1496,8 +1528,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           });
         }
     );
-    // 'confirmed' will be true if saved, false if cancelled. Can be used if needed.
   }
+  // --- MODIFICATION END ---
 
 
   @override
@@ -1604,11 +1636,11 @@ class ExpandableTextState extends State<ExpandableText> {
         endIndex = textPainter.getOffsetBefore(pos.offset) ?? 0;
 
         var textSpan;
-        if (_readMore) {
+        if (_readMore && widget.text.length > endIndex && endIndex > 0) { // Added checks for endIndex
           textSpan = TextSpan(
-            text: widget.text.substring(0, endIndex),
+            text: widget.text.substring(0, endIndex) + "...",
             style: TextStyle(fontSize: 14.5, color: widget.valueColor ?? AppConstants.textSecondary, height: 1.5),
-            children: <TextSpan>[const TextSpan(text: "... "),link],
+            children: <TextSpan>[link], // Removed const TextSpan(text: "... ")
           );
         } else {
           textSpan = TextSpan(

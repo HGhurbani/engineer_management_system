@@ -756,7 +756,7 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
       },
     );
   }
-  
+
 
   Widget _buildEntriesListForClient(String projectId, String mainPhaseId, {String? subPhaseId, bool isSubEntry = false}) {
     String entriesCollectionPath = subPhaseId == null

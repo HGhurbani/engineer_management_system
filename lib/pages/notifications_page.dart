@@ -125,31 +125,110 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
-  void _handleNotificationTap(String projectId, String? phaseDocId, String notificationType) { //
+  // --- MODIFICATION START: _handleNotificationTap ---
+  void _handleNotificationTap(String? projectId, String? itemId, String notificationType) {
     if (!mounted) return;
     String route = '';
+    // dynamic arguments; // To pass arguments like projectId or itemId
+
+    // Determine base route by role
     if (_currentUserRole == 'admin') {
-      route = '/admin/projectDetails';
+      route = '/admin'; // Base for admin
     } else if (_currentUserRole == 'engineer') {
-      route = '/projectDetails';
+      route = '/engineer'; // Base for engineer
     } else if (_currentUserRole == 'client') {
-      route = '/client';
+      route = '/client'; // Client home, already shows project details.
+      // For client, direct navigation to project is usually sufficient.
+      if (projectId != null && projectId.isNotEmpty) {
+        // ClientHome will show the project, no specific itemId needed for deep link here usually
+      } else if (notificationType.startsWith('part_request_')) {
+        // Client doesn't typically see part requests directly
+        _showFeedbackSnackBar(context, 'تفاصيل هذا الإشعار تعرض ضمن تحديثات المشروع.', isError: false, isInfo: true);
+        return;
+      }
+      Navigator.pushNamed(context, route);
+      return;
+    } else {
+      _showFeedbackSnackBar(context, 'لا يمكن تحديد وجهة الانتقال.', isError: true);
+      return;
     }
 
-    if (route.isNotEmpty) {
-      if (route.contains('projectDetails')) { // For admin and engineer
-        if (projectId.isNotEmpty) {
-          Navigator.pushNamed(context, route, arguments: projectId);
-        } else {
-          _showFeedbackSnackBar(context, 'معرّف المشروع غير متوفر في هذا الإشعار.', isError: true);
+    // Specific routing based on notification type
+    switch (notificationType) {
+      case 'attendance_check_in':
+      case 'attendance_check_out':
+        if (_currentUserRole == 'admin') {
+          Navigator.pushNamed(context, '/admin/attendance');
         }
-      } else { // For client, navigate to their home
-        Navigator.pushNamed(context, route);
-      }
-    } else {
-      _showFeedbackSnackBar(context, 'لا يمكن تحديد وجهة الانتقال لهذا الإشعار.', isError: true);
+        break;
+
+      case 'project_assignment':
+        if (_currentUserRole == 'engineer' && projectId != null && projectId.isNotEmpty) {
+          Navigator.pushNamed(context, '/projectDetails', arguments: projectId);
+        }
+        break;
+
+    // Phase, Sub-phase, Test, and Entry updates by Admin or Engineer
+      case 'phase_update_by_admin':
+      case 'subphase_update_by_admin':
+      case 'test_update_by_admin':
+      case 'project_entry_admin':
+      case 'phase_completed_by_engineer':
+      case 'subphase_completed_by_engineer':
+      case 'test_completed_by_engineer':
+      case 'project_entry_engineer':
+        if ((_currentUserRole == 'admin' || _currentUserRole == 'engineer') && projectId != null && projectId.isNotEmpty) {
+          String detailRoute = _currentUserRole == 'admin' ? '/admin/projectDetails' : '/projectDetails';
+          Navigator.pushNamed(context, detailRoute, arguments: projectId);
+          // Future enhancement: pass itemId to scroll to the specific phase/test/entry.
+        }
+        break;
+
+    // Client notifications for completions
+      case 'phase_completed_for_client':
+      case 'subphase_completed_for_client':
+      case 'test_completed_for_client':
+        if (_currentUserRole == 'client' && projectId != null && projectId.isNotEmpty) {
+          // ClientHome is already the destination, it will show the project.
+        }
+        break;
+
+      case 'part_request_new':
+        if (_currentUserRole == 'admin') {
+          // Admin might navigate to a specific part request management page or project.
+          // For now, let's assume project details, then admin can find requests.
+          // A dedicated '/admin/partRequests' or '/admin/projectDetails/partRequests?id=itemId' would be better.
+          if (projectId != null && projectId.isNotEmpty) {
+            Navigator.pushNamed(context, '/admin/projects'); // Or a more specific page if available
+            _showFeedbackSnackBar(context, 'يرجى مراجعة طلبات القطع للمشروع ذو الصلة.', isError: false, isInfo: true);
+          } else {
+            Navigator.pushNamed(context, '/admin/projects'); // Fallback
+          }
+        }
+        break;
+
+      case 'part_request_status_update':
+        if (_currentUserRole == 'engineer') {
+          // Engineer navigates to their list of part requests.
+          // This might be a new tab in EngineerHome or a dedicated page.
+          // For now, navigate to engineer home, they can check the tab.
+          Navigator.pushNamed(context, '/engineer');
+          _showFeedbackSnackBar(context, 'تم تحديث حالة طلب قطعة. يرجى مراجعة طلباتك.', isError: false, isInfo: true);
+        }
+        break;
+
+      default:
+        if (projectId != null && projectId.isNotEmpty && (_currentUserRole == 'admin' || _currentUserRole == 'engineer')) {
+          String detailRoute = _currentUserRole == 'admin' ? '/admin/projectDetails' : '/projectDetails';
+          Navigator.pushNamed(context, detailRoute, arguments: projectId);
+        } else if (_currentUserRole == 'client'){
+          Navigator.pushNamed(context, '/client'); // Default for client
+        } else {
+          _showFeedbackSnackBar(context, 'نوع الإشعار غير معروف أو لا يمكن الانتقال إليه.', isError: true);
+        }
     }
   }
+  // --- MODIFICATION END: _handleNotificationTap ---
 
   void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError, bool isInfo = false}) {
     if (!mounted) return;
@@ -272,8 +351,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 final String title = data['title'] as String? ?? 'إشعار جديد'; //
                 final String body = data['body'] as String? ?? 'لا توجد تفاصيل.'; //
                 final Timestamp timestamp = data['timestamp'] as Timestamp? ?? Timestamp.now(); //
-                final String projectId = data['projectId'] as String? ?? ''; //
-                final String? phaseDocId = data['phaseDocId'] as String?; // Nullable
+
+                // --- MODIFICATION START: Read projectId and itemId ---
+                final String? projectId = data['projectId'] as String?;
+                final String? itemId = data['itemId'] as String?; // Generic item ID
+                // --- MODIFICATION END ---
                 final String notificationType = data['type'] as String? ?? ''; //
 
                 return Card(
@@ -326,7 +408,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     ),
                     onTap: () {
                       if (!isRead) _markAsRead(notification.id);
-                      _handleNotificationTap(projectId, phaseDocId, notificationType); //
+                      // --- MODIFICATION START: Call updated _handleNotificationTap ---
+                      _handleNotificationTap(projectId, itemId, notificationType);
+                      // --- MODIFICATION END ---
                     },
                     trailing: PopupMenuButton<String>( //
                       icon: Icon(Icons.more_vert_rounded, color: AppConstants.textSecondary.withOpacity(0.8)),
