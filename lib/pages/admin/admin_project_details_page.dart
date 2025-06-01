@@ -1,11 +1,11 @@
 // lib/pages/admin/admin_project_details_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_storage/firebase_storage.dart'; // لا يزال يستخدم في _showAddNoteOrImageDialog الخاصة بالمسؤول
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'package:image_picker/image_picker.dart'; // لا يزال يستخدم في _showAddNoteOrImageDialog الخاصة بالمسؤول
+import 'dart:io'; // لا يزال يستخدم في _showAddNoteOrImageDialog الخاصة بالمسؤول
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
@@ -13,7 +13,7 @@ import 'dart:ui' as ui;
 
 import 'edit_assigned_engineers_page.dart';
 
-// ... (AppConstants class remains the same - تأكد من أنها موجودة أو مستوردة)
+// ... (AppConstants class remains the same) ...
 class AppConstants {
   static const Color primaryColor = Color(0xFF2563EB);
   static const Color primaryLight = Color(0xFF3B82F6);
@@ -59,6 +59,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   String? _clientTypeKeyFromFirestore;
   String? _clientTypeDisplayString;
 
+  // ... (predefinedPhasesStructure and finalCommissioningTests remain the same) ...
   static const List<Map<String, dynamic>> predefinedPhasesStructure = [
     // ... (هيكل المراحل كما هو)
     {
@@ -316,6 +317,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     },
   ];
 
+
   @override
   void initState() {
     super.initState();
@@ -328,7 +330,6 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       'individual': 'فردي',
       'company': 'شركة',
     };
-    // إذا كان clientTypeKey هو null أو غير موجود في الخريطة، نعرض "غير محدد"
     return clientTypeDisplayMap[clientTypeKey] ?? "غير محدد";
   }
 
@@ -336,13 +337,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     if (!mounted) return;
     setState(() {
       _isPageLoading = true;
-      // Reset client type strings here to ensure fresh fetch or default state
       _clientTypeKeyFromFirestore = null;
       _clientTypeDisplayString = null;
     });
     await _fetchCurrentUserRole();
     await _loadAllAvailableEngineers();
-    await _fetchProjectAndPhasesData();
+    await _fetchProjectAndPhasesData(); // This will also fetch client type
     if (mounted) {
       setState(() {
         _isPageLoading = false;
@@ -380,19 +380,16 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 
   Future<void> _fetchProjectAndPhasesData() async {
-    // Reset client type state before fetching project data
     if (mounted) {
       setState(() {
         _clientTypeDisplayString = null;
         _clientTypeKeyFromFirestore = null;
       });
     }
-
     try {
       final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
       if (mounted && projectDoc.exists) {
         final projectData = projectDoc.data() as Map<String, dynamic>?;
-        // Set project data first
         setState(() {
           _projectDataSnapshot = projectDoc;
         });
@@ -404,35 +401,18 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             if (clientDoc.exists && mounted) {
               final clientDataMap = clientDoc.data() as Map<String, dynamic>?;
               final String? fetchedClientTypeKey = clientDataMap?['clientType'] as String?;
-              // Now set client type state, this will trigger a rebuild if needed
               setState(() {
                 _clientTypeKeyFromFirestore = fetchedClientTypeKey;
                 _clientTypeDisplayString = _getClientTypeDisplayValue(fetchedClientTypeKey);
               });
             } else {
-              if (mounted) {
-                setState(() {
-                  _clientTypeKeyFromFirestore = null;
-                  _clientTypeDisplayString = "نوع العميل غير متوفر"; // More specific message
-                });
-              }
+              if (mounted) setState(() => _clientTypeDisplayString = "نوع العميل غير متوفر");
             }
           } catch (e) {
-            print("Error fetching client type: $e");
-            if (mounted) {
-              setState(() {
-                _clientTypeKeyFromFirestore = null;
-                _clientTypeDisplayString = "خطأ في تحميل نوع العميل";
-              });
-            }
+            if (mounted) setState(() => _clientTypeDisplayString = "خطأ في تحميل نوع العميل");
           }
         } else {
-          if (mounted) {
-            setState(() {
-              _clientTypeKeyFromFirestore = null;
-              _clientTypeDisplayString = "لا يوجد عميل مرتبط";
-            });
-          }
+          if (mounted) setState(() => _clientTypeDisplayString = "لا يوجد عميل مرتبط");
         }
       } else if (mounted) {
         _showFeedbackSnackBar(context, 'المشروع غير موجود.', isError: true);
@@ -464,8 +444,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       ),
     );
   }
-
   Future<void> _showEditAssignedEngineersDialog(Map<String, dynamic> projectDataMap) async {
+    // ... (same as provided)
     if (_projectDataSnapshot == null || !_projectDataSnapshot!.exists) {
       _showFeedbackSnackBar(context, "بيانات المشروع غير متوفرة حالياً.", isError: true);
       return;
@@ -495,7 +475,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     );
 
     if (result == true && mounted) {
-      _fetchProjectAndPhasesData();
+      _fetchProjectAndPhasesData(); // Re-fetch to update the UI
     }
   }
 
@@ -508,26 +488,30 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     String phaseDocId = '',
     required String notificationType,
   }) async {
+    // ... (same as provided)
     final notificationCollection = FirebaseFirestore.instance.collection('notifications');
     final currentUser = FirebaseAuth.instance.currentUser;
-    String senderName = "النظام";
+    String senderName = "النظام"; // Default sender name
+
+    // Try to get the sender's name from Firestore
     if (currentUser != null) {
       final senderDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
       senderName = senderDoc.data()?['name'] ?? (_currentUserRole == 'admin' ? 'المسؤول' : 'مهندس');
     }
 
+
     for (String userId in recipientUids) {
       try {
         await notificationCollection.add({
-          'userId': userId,
+          'userId': userId, // The UID of the recipient
           'projectId': projectId,
-          'phaseDocId': phaseDocId,
+          'phaseDocId': phaseDocId, // Optional: specific phase/subphase doc ID
           'title': title,
           'body': body,
-          'type': notificationType,
+          'type': notificationType, // e.g., 'phase_completed', 'new_assignment'
           'isRead': false,
           'timestamp': FieldValue.serverTimestamp(),
-          'senderName': senderName,
+          'senderName': senderName, // Who triggered the notification (e.g., "المسؤول" or engineer's name)
         });
         print('Notification sent to $userId for project $projectName');
       } catch(e) {
@@ -537,7 +521,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     }
   }
 
+
   PreferredSizeWidget _buildAppBar() {
+    // ... (same as provided)
     return AppBar(
       title: const Text('تفاصيل المشروع', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 22)),
       backgroundColor: AppConstants.primaryColor,
@@ -558,6 +544,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 
   Widget _buildProjectSummaryCard(Map<String, dynamic> projectDataMap) {
+    // ... (same as provided, but ensure _clientTypeDisplayString is used correctly)
     final projectName = projectDataMap['name'] ?? 'مشروع غير مسمى';
     final clientName = projectDataMap['clientName'] ?? 'غير محدد';
     final projectStatus = projectDataMap['status'] ?? 'غير محدد';
@@ -565,7 +552,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     String engineersDisplay = "لم يتم تعيين مهندسين";
     if (assignedEngineersRaw.isNotEmpty) {
       engineersDisplay = assignedEngineersRaw.map((eng) => eng['name'] ?? 'غير معروف').join('، ');
-      if (engineersDisplay.length > 70) {
+      if (engineersDisplay.length > 70) { // Adjusted length for better display
         engineersDisplay = '${engineersDisplay.substring(0, 70)}...';
       }
     }
@@ -579,11 +566,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       default: statusIcon = Icons.help_outline_rounded; statusColor = AppConstants.textSecondary;
     }
 
-    IconData clientTypeIcon = Icons.person_pin_rounded;
+    IconData clientTypeIcon = Icons.person_pin_rounded; // Default icon
     if (_clientTypeKeyFromFirestore == 'company') {
       clientTypeIcon = Icons.business_center_rounded;
     }
-
+    // If _clientTypeDisplayString is still loading or failed, it might be null or an error message.
+    // We handle this by conditionally showing the row.
 
     return Card(
       elevation: AppConstants.cardShadow[0].blurRadius,
@@ -599,7 +587,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
             _buildDetailRow(Icons.engineering_rounded, 'المهندسون:', engineersDisplay),
             _buildDetailRow(Icons.person_rounded, 'العميل:', clientName),
-            // MODIFIED: Display client type using _clientTypeDisplayString
+            // Conditionally display client type
             if (_clientTypeDisplayString != null &&
                 _clientTypeDisplayString != "لا يوجد عميل مرتبط" &&
                 _clientTypeDisplayString != "خطأ في تحميل نوع العميل" &&
@@ -633,6 +621,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 
   Widget _buildDetailRow(IconData icon, String label, String value, {Color? valueColor}) {
+    // ... (same as provided)
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall / 1.2),
       child: Row(
@@ -653,11 +642,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 
   Widget _buildPhasesTab() {
+    // ... (remains structurally similar, calls the updated _buildEntriesList) ...
     if (_projectDataSnapshot == null || !_projectDataSnapshot!.exists) {
       return const Center(child: Text("لا يمكن تحميل تفاصيل المشروع للمراحل."));
     }
     return ListView.builder(
-      key: const PageStorageKey<String>('adminProjectDetails_phasesTabListView'),
+      key: const PageStorageKey<String>('adminProjectDetails_phasesTabListView'), // For scroll position restoration
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       itemCount: predefinedPhasesStructure.length,
       itemBuilder: (context, index) {
@@ -675,12 +665,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 .snapshots(),
             builder: (context, phaseStatusSnapshot) {
               bool isCompleted = false;
-              String phaseActualName = phaseName;
+              String phaseActualName = phaseName; // Default to predefined name
 
               if (phaseStatusSnapshot.hasData && phaseStatusSnapshot.data!.exists) {
                 final statusData = phaseStatusSnapshot.data!.data() as Map<String, dynamic>;
                 isCompleted = statusData['completed'] ?? false;
-                phaseActualName = statusData['name'] ?? phaseName;
+                phaseActualName = statusData['name'] ?? phaseName; // Use stored name if available
               }
 
               return Card(
@@ -688,22 +678,24 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 elevation: 2,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
                 child: ExpansionTile(
-                  key: PageStorageKey<String>(phaseId),
+                  key: PageStorageKey<String>(phaseId), // For scroll position restoration of individual tiles
                   leading: CircleAvatar(
                     backgroundColor: isCompleted ? AppConstants.successColor : AppConstants.primaryColor,
                     child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                   title: Text(phaseActualName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
                   subtitle: Text(isCompleted ? 'مكتملة ✅' : 'قيد التنفيذ ⏳', style: TextStyle(color: isCompleted ? AppConstants.successColor : AppConstants.warningColor, fontWeight: FontWeight.w500)),
-                  trailing: Row(
+                  trailing: Row( // Combine icons in a Row
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Admin can always add notes/images, Engineers only if not completed
                       if (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isCompleted))
                         IconButton(
                           icon: const Icon(Icons.add_comment_outlined, color: AppConstants.primaryLight),
                           tooltip: 'إضافة ملاحظة/صورة للمرحلة الرئيسية',
                           onPressed: () => _showAddNoteOrImageDialog(phaseId, phaseActualName),
                         ),
+                      // Admin can always toggle, Engineers only if not completed
                       if (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isCompleted))
                         Checkbox(
                           value: isCompleted,
@@ -721,7 +713,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text("إدخالات المرحلة الرئيسية:", style: TextStyle(fontWeight: FontWeight.bold, color: AppConstants.textPrimary, fontSize: 14)),
-                          _buildEntriesList(phaseId, isCompleted, phaseActualName),
+                          _buildEntriesList(phaseId, isCompleted, phaseActualName), // This will show entries
                           const SizedBox(height: AppConstants.paddingSmall),
                         ],
                       ),
@@ -762,18 +754,18 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                                     }
                                     return Card(
                                       elevation: 0.5,
-                                      color: AppConstants.backgroundColor,
+                                      color: AppConstants.backgroundColor, // Slightly different background for sub-phase cards
                                       margin: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall / 2, horizontal: AppConstants.paddingSmall /2),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
-                                      child: ExpansionTile(
-                                        key: PageStorageKey<String>('sub_$subPhaseId'),
+                                      child: ExpansionTile( // Sub-phases are also ExpansionTiles
+                                        key: PageStorageKey<String>('sub_$subPhaseId'), // Key for sub-phase tile
                                         leading: Icon(
                                           isSubCompleted ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
                                           color: isSubCompleted ? AppConstants.successColor : AppConstants.textSecondary, size: 20,
                                         ),
                                         title: Text(subPhaseActualName, style: TextStyle(fontSize: 13.5, color: AppConstants.textSecondary, decoration: isSubCompleted ? TextDecoration.lineThrough : null)),
                                         trailing: (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isSubCompleted))
-                                            ? Checkbox(
+                                            ? Checkbox( // Admin or Engineer (if not completed) can mark sub-phase
                                           value: isSubCompleted,
                                           activeColor: AppConstants.successColor,
                                           visualDensity: VisualDensity.compact,
@@ -781,11 +773,11 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                                             _updateSubPhaseCompletionStatus(phaseId, subPhaseId, subPhaseActualName, value ?? false);
                                           },
                                         )
-                                            : null,
+                                            : null, // No action if completed by someone else and current user is engineer
                                         children: [
                                           Padding(
                                             padding: const EdgeInsets.only(left: AppConstants.paddingSmall, right: AppConstants.paddingMedium + 8, bottom: AppConstants.paddingSmall, top: 0),
-                                            child: _buildEntriesList(phaseId, isSubCompleted, subPhaseActualName, subPhaseId: subPhaseId, isSubEntry: true),
+                                            child: _buildEntriesList(phaseId, isSubCompleted, subPhaseActualName, subPhaseId: subPhaseId, isSubEntry: true), // Show entries for sub-phase
                                           )
                                         ],
                                       ),
@@ -804,11 +796,14 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 
   Widget _buildTestsTab() {
+    // ... (remains structurally similar, calls the updated _buildEntriesList if tests were to have multi-image entries)
+    // For now, tests in the provided code seem to have a single imageUrl. If that changes, this needs review.
+    // The current request is focused on phases/sub-phases entries.
     if (_projectDataSnapshot == null || !_projectDataSnapshot!.exists) {
       return const Center(child: Text("لا يمكن تحميل تفاصيل المشروع للاختبارات."));
     }
     return ListView.builder(
-      key: const PageStorageKey<String>('adminProjectDetails_testsTabListView'),
+      key: const PageStorageKey<String>('adminProjectDetails_testsTabListView'), // For scroll position restoration
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       itemCount: finalCommissioningTests.length,
       itemBuilder: (context, sectionIndex) {
@@ -822,7 +817,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
           child: ExpansionTile(
-            key: PageStorageKey<String>(sectionId),
+            key: PageStorageKey<String>(sectionId), // For scroll position restoration
             title: Text(sectionName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
             childrenPadding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingSmall, vertical: AppConstants.paddingSmall / 2),
             children: tests.map((test) {
@@ -838,14 +833,14 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                   builder: (context, testStatusSnapshot) {
                     bool isTestCompleted = false;
                     String testNote = "";
-                    String? testImageUrl;
+                    String? testImageUrl; // Tests currently use single imageUrl
                     String? engineerName;
 
                     if (testStatusSnapshot.hasData && testStatusSnapshot.data!.exists) {
                       final statusData = testStatusSnapshot.data!.data() as Map<String, dynamic>;
                       isTestCompleted = statusData['completed'] ?? false;
                       testNote = statusData['note'] ?? '';
-                      testImageUrl = statusData['imageUrl'] as String?;
+                      testImageUrl = statusData['imageUrl'] as String?; // Assuming tests still use single imageUrl
                       engineerName = statusData['engineerName'] as String?;
                     }
 
@@ -882,7 +877,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                             Padding(
                               padding: const EdgeInsets.only(top: 4.0),
                               child: InkWell(
-                                onTap: () => _viewImageDialog(testImageUrl!),
+                                onTap: () => _viewImageDialog(testImageUrl!), // viewImageDialog can handle single URL
                                 child: const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -896,6 +891,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         ],
                       ),
                       onTap: () {
+                        // Allow admin to edit, or engineer if not completed
                         if (_currentUserRole == 'admin' || (_currentUserRole == 'engineer' && !isTestCompleted)) {
                           _updateTestStatus(testId, testName, !isTestCompleted, currentNote: testNote, currentImageUrl: testImageUrl);
                         }
@@ -909,6 +905,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     );
   }
 
+  // --- MODIFIED _buildEntriesList ---
   Widget _buildEntriesList(String phaseOrMainPhaseId, bool parentCompleted, String parentName, {String? subPhaseId, bool isSubEntry = false}) {
     String entriesCollectionPath = subPhaseId == null
         ? 'projects/${widget.projectId}/phases_status/$phaseOrMainPhaseId/entries'
@@ -941,9 +938,20 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
               itemBuilder: (context, index) {
                 final entryData = entries[index].data() as Map<String, dynamic>;
                 final String note = entryData['note'] ?? '';
-                final String? imageUrl = entryData['imageUrl'] as String?;
                 final String engineerName = entryData['engineerName'] ?? 'غير معروف';
                 final Timestamp? timestamp = entryData['timestamp'] as Timestamp?;
+
+                // --- Logic to handle both imageUrl (single) and imageUrls (list) ---
+                final List<String> imageUrlsToDisplay = [];
+                final dynamic imagesField = entryData['imageUrls']; // Prefer new field 'imageUrls' (list)
+                final dynamic singleImageField = entryData['imageUrl']; // Fallback to old field 'imageUrl' (string)
+
+                if (imagesField is List) {
+                  imageUrlsToDisplay.addAll(imagesField.map((e) => e.toString()).toList());
+                } else if (singleImageField is String && singleImageField.isNotEmpty) {
+                  imageUrlsToDisplay.add(singleImageField);
+                }
+                // --- End of image handling logic ---
 
                 return Card(
                   elevation: 1,
@@ -954,18 +962,34 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (imageUrl != null)
-                          InkWell(
-                            onTap: () => _viewImageDialog(imageUrl),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
-                              child: Image.network(imageUrl, height: 150, width: double.infinity, fit: BoxFit.cover,
-                                  errorBuilder: (c,e,s) => Container(height: 100, color: AppConstants.backgroundColor, child: Center(child: Icon(Icons.broken_image, color: AppConstants.textSecondary.withOpacity(0.5), size: 40)))),
+                        if (imageUrlsToDisplay.isNotEmpty)
+                          Padding(
+                            padding: EdgeInsets.only(bottom: note.isNotEmpty ? AppConstants.paddingSmall : 0),
+                            child: Wrap(
+                              spacing: AppConstants.paddingSmall / 1.5,
+                              runSpacing: AppConstants.paddingSmall / 1.5,
+                              children: imageUrlsToDisplay.map((url) {
+                                return InkWell(
+                                  onTap: () => _viewImageDialog(url),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
+                                    child: Image.network(
+                                      url,
+                                      height: 100, // Consistent small preview size
+                                      width: 100,
+                                      fit: BoxFit.cover,
+                                      loadingBuilder: (ctx, child, progress) =>
+                                      progress == null ? child : Container(height:100, width: 100, alignment: Alignment.center, child: const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppConstants.primaryLight))),
+                                      errorBuilder: (c, e, s) => Container(height: 100, width: 100, color: AppConstants.backgroundColor.withOpacity(0.5), child: Center(child: Icon(Icons.broken_image_outlined, color: AppConstants.textSecondary.withOpacity(0.7), size: 30))),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
                             ),
                           ),
                         if (note.isNotEmpty)
                           Padding(
-                            padding: EdgeInsets.only(top: imageUrl != null ? AppConstants.paddingSmall : 0),
+                            padding: EdgeInsets.only(top: imageUrlsToDisplay.isNotEmpty ? AppConstants.paddingSmall : 0),
                             child: ExpandableText(note, valueColor: AppConstants.textPrimary),
                           ),
                         const SizedBox(height: AppConstants.paddingSmall / 2),
@@ -986,31 +1010,36 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             );
           },
         ),
+        // The "Add Entry" button for admin is part of the ExpansionTile's trailing in _buildPhasesTab
+        // So no separate button needed here in _buildEntriesList for admin viewing.
       ],
     );
   }
+  // --- END OF MODIFIED _buildEntriesList ---
+
 
   Future<void> _viewImageDialog(String imageUrl) async {
+    // ... (same as provided)
     await showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.transparent,
-        contentPadding: EdgeInsets.zero,
-        insetPadding: const EdgeInsets.all(10),
+        backgroundColor: Colors.transparent, // Make background transparent
+        contentPadding: EdgeInsets.zero, // Remove default padding
+        insetPadding: const EdgeInsets.all(10), // Padding around the dialog
         content: InteractiveViewer(
-          panEnabled: true,
-          boundaryMargin: const EdgeInsets.all(20),
-          minScale: 0.5,
-          maxScale: 4,
+          panEnabled: true, // Enable panning
+          boundaryMargin: const EdgeInsets.all(20), // Margin around the content
+          minScale: 0.5, // Minimum scale factor
+          maxScale: 4,   // Maximum scale factor
           child: Image.network(
             imageUrl,
-            fit: BoxFit.contain,
+            fit: BoxFit.contain, // Ensure the whole image is visible
             loadingBuilder: (ctx, child, progress) =>
             progress == null ? child : const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor)),
             errorBuilder: (ctx, err, st) => const Center(child: Icon(Icons.error_outline, color: AppConstants.errorColor, size: 50)),
           ),
         ),
-        actions: [
+        actions: [ // Add a clear close button
           TextButton(
             style: TextButton.styleFrom(backgroundColor: Colors.black.withOpacity(0.5)),
             onPressed: () => Navigator.pop(dialogContext),
@@ -1023,10 +1052,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 
   Future<void> _showAddNoteOrImageDialog(String phaseId, String phaseOrSubPhaseName, {String? subPhaseId}) async {
+    // ... (This dialog in admin page currently uses Firebase Storage and single image)
+    // ... (It should ideally be updated to match engineer's multi-image PHP upload for consistency)
+    // ... (For now, it remains as is, but _buildEntriesList will handle viewing its output)
     if (!mounted) return;
 
     final noteController = TextEditingController();
-    File? pickedImageFile;
+    File? pickedImageFile; // Admin's dialog still uses single File
     bool isUploadingDialog = false;
     final formKeyDialog = GlobalKey<FormState>();
 
@@ -1034,13 +1066,14 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         ? 'إضافة إدخال للمرحلة: $phaseOrSubPhaseName'
         : 'إضافة إدخال للمرحلة الفرعية: $phaseOrSubPhaseName';
 
+    // Path for entries collection
     String collectionPath = subPhaseId == null
         ? 'projects/${widget.projectId}/phases_status/$phaseId/entries'
         : 'projects/${widget.projectId}/subphases_status/$subPhaseId/entries';
 
     await showDialog(
       context: context,
-      barrierDismissible: !isUploadingDialog,
+      barrierDismissible: !isUploadingDialog, // Prevent dismissal during upload
       builder: (dialogContext) {
         return StatefulBuilder(builder: (stfContext, setDialogState) {
           return Directionality(
@@ -1080,9 +1113,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         label: Text(pickedImageFile == null ? 'إضافة صورة (اختياري)' : 'تغيير الصورة', style: const TextStyle(color: AppConstants.primaryColor)),
                         onPressed: () async {
                           final picker = ImagePicker();
-                          final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                          final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 70); // Can be gallery too
                           if (picked != null) {
-                            setDialogState(() {
+                            setDialogState(() { // Use the dialog's state setter
                               pickedImageFile = File(picked.path);
                             });
                           }
@@ -1102,32 +1135,34 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     if (!formKeyDialog.currentState!.validate()) return;
 
                     setDialogState(() => isUploadingDialog = true);
-                    String? imageUrl;
+                    String? imageUrl; // For single image from admin
                     final currentUser = FirebaseAuth.instance.currentUser;
-                    String actorName = "غير معروف";
+                    String actorName = "غير معروف"; // Default
 
                     if (currentUser != null) {
                       final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
                       if (userDoc.exists) {
                         actorName = userDoc.data()?['name'] ?? (_currentUserRole == 'admin' ? 'المسؤول' : 'مهندس');
                       } else {
+                        // Fallback if user doc not found but role is known
                         actorName = _currentUserRole == 'admin' ? 'المسؤول' : 'مهندس';
                       }
                     }
 
                     if (pickedImageFile != null) {
                       try {
+                        // Admin uploads to Firebase Storage (current logic)
                         final timestampForPath = DateTime.now().millisecondsSinceEpoch;
                         final imageName = '${currentUser?.uid ?? 'unknown_user'}_${timestampForPath}.jpg';
                         final refPath = subPhaseId == null
-                            ? 'project_entries/${widget.projectId}/$phaseId/$imageName'
-                            : 'project_entries/${widget.projectId}/$subPhaseId/$imageName';
+                            ? 'project_entries/${widget.projectId}/$phaseId/$imageName' // Path for main phase entry image
+                            : 'project_entries/${widget.projectId}/$subPhaseId/$imageName'; // Path for sub-phase entry image
 
                         final ref = FirebaseStorage.instance.ref().child(refPath);
                         await ref.putFile(pickedImageFile!);
                         imageUrl = await ref.getDownloadURL();
                       } catch (e) {
-                        if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة: $e', isError: true);
+                        if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة: $e', isError: true,);
                         setDialogState(() => isUploadingDialog = false);
                         return;
                       }
@@ -1135,17 +1170,19 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
                     try {
                       await FirebaseFirestore.instance.collection(collectionPath).add({
+                        // Admin adds 'imageUrl', engineers add 'imageUrls'
                         'type': imageUrl != null ? (noteController.text.trim().isEmpty ? 'image_only' : 'image_with_note') : 'note_only',
                         'note': noteController.text.trim(),
-                        'imageUrl': imageUrl,
-                        'engineerUid': currentUser?.uid,
-                        'engineerName': actorName,
+                        'imageUrl': imageUrl, // Admin saves single imageUrl
+                        // 'imageUrls': null, // Explicitly null for admin entries if using this dialog
+                        'engineerUid': currentUser?.uid, // Could be admin's UID
+                        'engineerName': actorName, // Could be "المسؤول"
                         'timestamp': FieldValue.serverTimestamp(),
                       });
                       Navigator.pop(dialogContext);
                       _showFeedbackSnackBar(context, 'تمت إضافة الإدخال بنجاح.', isError: false);
                     } catch (e) {
-                      if (mounted) _showFeedbackSnackBar(stfContext, 'فشل إضافة الإدخال: $e', isError: true);
+                      if (mounted) _showFeedbackSnackBar(stfContext, 'فشل إضافة الإدخال: $e', isError: true,);
                     } finally {
                       if(mounted) setDialogState(() => isUploadingDialog = false);
                     }
@@ -1162,6 +1199,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 
   Future<void> _updatePhaseCompletionStatus(String phaseId, String phaseName, bool newStatus) async {
+    // ... (same as provided)
     if (!mounted) return;
     try {
       final phaseDocRef = FirebaseFirestore.instance
@@ -1183,12 +1221,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
       await phaseDocRef.set({
         'completed': newStatus,
-        'name': phaseName,
+        'name': phaseName, // Ensure the name is also set/updated
         'lastUpdatedByUid': currentUser?.uid,
         'lastUpdatedByName': actorName,
         'lastUpdatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      }, SetOptions(merge: true)); // Use merge to avoid overwriting other fields if any
 
+      // --- Notification Logic ---
       final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
       final projectData = projectDoc.data();
       final projectNameVal = projectData?['name'] ?? 'المشروع';
@@ -1196,7 +1235,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       final List<dynamic> assignedEngineersRaw = projectData?['assignedEngineers'] as List<dynamic>? ?? [];
       final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => e['uid'].toString()).toList();
 
-      if (newStatus) {
+      if (newStatus) { // Send notifications only on completion
+        // Notify Client
         if (clientUid != null) {
           _sendNotificationToMultipleEngineers(
               projectId: widget.projectId,
@@ -1208,6 +1248,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
               phaseDocId: phaseId
           );
         }
+        // Notify other engineers if an engineer completed it, or all engineers if admin completed it
         if (_currentUserRole == 'engineer') {
           final otherEngineers = assignedEngineerUids.where((uid) => uid != currentUser?.uid).toList();
           if (otherEngineers.isNotEmpty) {
@@ -1221,6 +1262,16 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 phaseDocId: phaseId
             );
           }
+        } else if (_currentUserRole == 'admin' && assignedEngineerUids.isNotEmpty) {
+          _sendNotificationToMultipleEngineers(
+              projectId: widget.projectId,
+              projectName: projectNameVal,
+              title: 'تحديث مشروع: مرحلة مكتملة',
+              body: 'المرحلة "$phaseName" في مشروع "$projectNameVal" أصبحت مكتملة بواسطة المسؤول.',
+              recipientUids: assignedEngineerUids, // Notify all assigned engineers
+              notificationType: 'phase_completed_admin_to_engineers',
+              phaseDocId: phaseId
+          );
         }
       }
       _showFeedbackSnackBar(context, 'تم تحديث حالة المرحلة "$phaseName".', isError: false);
@@ -1230,6 +1281,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 
   Future<void> _updateSubPhaseCompletionStatus(String mainPhaseId, String subPhaseId, String subPhaseName, bool newStatus) async {
+    // ... (same as provided)
     if (!mounted) return;
     try {
       final subPhaseDocRef = FirebaseFirestore.instance
@@ -1251,13 +1303,14 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
       await subPhaseDocRef.set({
         'completed': newStatus,
-        'mainPhaseId': mainPhaseId,
-        'name': subPhaseName,
+        'mainPhaseId': mainPhaseId, // Good to keep track of parent
+        'name': subPhaseName, // Ensure the name is also set/updated
         'lastUpdatedByUid': currentUser?.uid,
         'lastUpdatedByName': actorName,
         'lastUpdatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      // --- Notification Logic for Sub-Phases ---
       final projectDoc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
       final projectData = projectDoc.data();
       final projectNameVal = projectData?['name'] ?? 'المشروع';
@@ -1265,7 +1318,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       final List<dynamic> assignedEngineersRaw = projectData?['assignedEngineers'] as List<dynamic>? ?? [];
       final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => e['uid'].toString()).toList();
 
-      if (newStatus) {
+      if (newStatus) { // Send notifications only on completion
         if (clientUid != null) {
           _sendNotificationToMultipleEngineers(
               projectId: widget.projectId,
@@ -1274,7 +1327,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
               body: 'المرحلة الفرعية "$subPhaseName" في مشروع "$projectNameVal" أصبحت مكتملة.',
               recipientUids: [clientUid],
               notificationType: 'subphase_completed_client',
-              phaseDocId: mainPhaseId
+              phaseDocId: mainPhaseId // Can refer to the main phase
           );
         }
         if (_currentUserRole == 'engineer') {
@@ -1290,6 +1343,16 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 phaseDocId: mainPhaseId
             );
           }
+        } else if (_currentUserRole == 'admin' && assignedEngineerUids.isNotEmpty) {
+          _sendNotificationToMultipleEngineers(
+              projectId: widget.projectId,
+              projectName: projectNameVal,
+              title: 'تحديث مشروع: مرحلة فرعية مكتملة',
+              body: 'المرحلة الفرعية "$subPhaseName" في مشروع "$projectNameVal" أصبحت مكتملة بواسطة المسؤول.',
+              recipientUids: assignedEngineerUids,
+              notificationType: 'subphase_completed_admin_to_engineers',
+              phaseDocId: mainPhaseId
+          );
         }
       }
       _showFeedbackSnackBar(context, 'تم تحديث حالة المرحلة الفرعية "$subPhaseName".', isError: false);
@@ -1299,11 +1362,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 
   Future<void> _updateTestStatus(String testId, String testName, bool newStatus, {String? currentNote, String? currentImageUrl}) async {
+    // ... (same as provided - this dialog uses single image and Firebase Storage)
     if (!mounted) return;
 
     final noteController = TextEditingController(text: currentNote ?? "");
     String? tempImageUrl = currentImageUrl;
-    File? pickedImageFile;
+    File? pickedImageFile; // For single image in test status
     bool isUploadingDialog = false;
 
     final currentUser = FirebaseAuth.instance.currentUser;
@@ -1317,10 +1381,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       }
     }
 
+    // Show confirmation dialog with editing options
     bool? confirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: !isUploadingDialog,
         builder: (dialogContext) {
+          // Use a local state for newStatus inside the dialog to allow changes before saving
+          bool dialogNewStatus = newStatus;
           return StatefulBuilder(builder: (stfContext, setDialogState) {
             return Directionality(
               textDirection: ui.TextDirection.rtl,
@@ -1332,8 +1399,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     children: [
                       CheckboxListTile(
                         title: const Text('الاختبار مكتمل وناجح'),
-                        value: newStatus,
-                        onChanged: (val) => setDialogState(() => newStatus = val ?? false),
+                        value: dialogNewStatus, // Use local dialog state
+                        onChanged: (val) => setDialogState(() => dialogNewStatus = val ?? false),
                         activeColor: AppConstants.successColor,
                         controlAffinity: ListTileControlAffinity.leading,
                       ),
@@ -1343,6 +1410,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         maxLines: 2,
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
+                      // Image handling logic (single image for tests)
                       if (tempImageUrl != null && pickedImageFile == null)
                         Column(
                           children: [
@@ -1381,6 +1449,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                       String? finalImageUrl = tempImageUrl;
                       if (pickedImageFile != null) {
                         try {
+                          // Tests use Firebase Storage (as per existing admin code)
                           final refPath = 'project_tests/${widget.projectId}/$testId/${DateTime.now().millisecondsSinceEpoch}.jpg';
                           final ref = FirebaseStorage.instance.ref().child(refPath);
                           await ref.putFile(pickedImageFile!);
@@ -1388,9 +1457,10 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         } catch (e) {
                           if(mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع صورة الاختبار: $e', isError: true);
                           setDialogState(() => isUploadingDialog = false);
-                          return;
+                          return; // Stop if image upload fails
                         }
                       }
+                      // Update Firestore
                       try {
                         final testDocRef = FirebaseFirestore.instance
                             .collection('projects')
@@ -1399,15 +1469,16 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                             .doc(testId);
 
                         await testDocRef.set({
-                          'completed': newStatus,
+                          'completed': dialogNewStatus, // Use status from dialog
                           'name': testName,
                           'note': noteController.text.trim(),
-                          'imageUrl': finalImageUrl,
+                          'imageUrl': finalImageUrl, // Single image URL for tests
                           'lastUpdatedByUid': currentUser?.uid,
                           'lastUpdatedByName': actorName,
                           'lastUpdatedAt': FieldValue.serverTimestamp(),
                         }, SetOptions(merge: true));
-                        if(mounted) Navigator.pop(dialogContext, true);
+
+                        if(mounted) Navigator.pop(dialogContext, true); // Close dialog and indicate success
                         if(mounted) _showFeedbackSnackBar(context, 'تم تحديث حالة الاختبار "$testName".', isError: false);
 
                       } catch (e) {
@@ -1425,6 +1496,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           });
         }
     );
+    // 'confirmed' will be true if saved, false if cancelled. Can be used if needed.
   }
 
 
@@ -1442,6 +1514,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
+        key: _projectFutureBuilderKey, // Use the key here
         backgroundColor: AppConstants.backgroundColor,
         appBar: _buildAppBar(),
         body: Column(
@@ -1463,6 +1536,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 }
 
+// ... (ExpandableText Widget remains the same) ...
 class ExpandableText extends StatefulWidget {
   final String text;
   final int trimLines;
@@ -1491,34 +1565,45 @@ class ExpandableTextState extends State<ExpandableText> {
       builder: (BuildContext context, BoxConstraints constraints) {
         assert(constraints.hasBoundedWidth);
         final double maxWidth = constraints.maxWidth;
-        final text = TextSpan(text: widget.text, style: TextStyle(fontSize: 14.5, color: widget.valueColor ?? AppConstants.textSecondary, height: 1.5));
+        // Text object defining text
+        final text = TextSpan(
+            text: widget.text,
+            style: TextStyle(fontSize: 14.5, color: widget.valueColor ?? AppConstants.textSecondary, height: 1.5)
+        );
+        // Create a TextPainter to measure the text
         TextPainter textPainter = TextPainter(
           text: link,
-          textAlign: TextAlign.start,
-          textDirection: ui.TextDirection.rtl,
+          textAlign: TextAlign.start, // Useful for LTR or RTL
+          textDirection: ui.TextDirection.rtl, // Set text direction
           maxLines: widget.trimLines,
           ellipsis: '...',
         );
         textPainter.layout(minWidth: constraints.minWidth, maxWidth: maxWidth);
         final linkSize = textPainter.size;
+        // Layout and measure link
         textPainter.text = text;
         textPainter.layout(minWidth: constraints.minWidth, maxWidth: maxWidth);
         final textSize = textPainter.size;
+        // Get the endIndex of data
+        int endIndex;
 
+        // Check if text has overflown
         if (!textPainter.didExceedMaxLines) {
           return RichText(
-            softWrap: true,
-            overflow: TextOverflow.clip,
-            textAlign: TextAlign.start,
-            textDirection: ui.TextDirection.rtl,
-            text: text,
-          );
+              softWrap: true,
+              overflow: TextOverflow.clip,
+              textAlign: TextAlign.start, // Useful for LTR or RTL
+              textDirection: ui.TextDirection.rtl, // Set text direction
+              text: text);
         }
+        // چلے
+        var pos = textPainter.getPositionForOffset(Offset(
+          textSize.width - linkSize.width,
+          textSize.height,
+        ));
+        endIndex = textPainter.getOffsetBefore(pos.offset) ?? 0;
 
-        int endIndex = textPainter.getPositionForOffset(Offset(textSize.width - linkSize.width, textSize.height)).offset;
-        endIndex = (endIndex < 0 || endIndex > widget.text.length) ? widget.text.length : endIndex;
-
-        TextSpan textSpan;
+        var textSpan;
         if (_readMore) {
           textSpan = TextSpan(
             text: widget.text.substring(0, endIndex),
@@ -1535,8 +1620,8 @@ class ExpandableTextState extends State<ExpandableText> {
         return RichText(
           softWrap: true,
           overflow: TextOverflow.clip,
-          textAlign: TextAlign.start,
-          textDirection: ui.TextDirection.rtl,
+          textAlign: TextAlign.start, // Useful for LTR or RTL
+          textDirection: ui.TextDirection.rtl, // Set text direction
           text: textSpan,
         );
       },

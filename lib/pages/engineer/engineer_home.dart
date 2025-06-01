@@ -46,17 +46,17 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+  late TabController _tabController;
 
-  // --- MODIFICATION START ---
   final Map<String, String> _clientTypeDisplayMap = {
     'individual': 'فردي',
     'company': 'شركة',
   };
-  // --- MODIFICATION END ---
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this); // Length is 3
     _fadeController = AnimationController(duration: const Duration(milliseconds: 700), vsync: this);
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut));
 
@@ -311,7 +311,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         'type': type,
         'timestamp': FieldValue.serverTimestamp(),
         'location': {'latitude': position.latitude, 'longitude': position.longitude, 'accuracy': position.accuracy},
-        'signatureData': signatureData, // Storing as Blob (Uint8List gets converted)
+        'signatureData': signatureData,
         'deviceInfo': {'platform': 'mobile', 'timestamp': DateTime.now().millisecondsSinceEpoch}
       };
 
@@ -349,7 +349,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
 
   void _showFeedbackSnackBar(BuildContext scaffoldOrDialogContext, String message, {required bool isError, bool useDialogContext = false}) {
     if (!mounted && !useDialogContext) return;
-    if (useDialogContext && !Navigator.of(scaffoldOrDialogContext).canPop() && !mounted) return;
+    if (useDialogContext && !Navigator.of(scaffoldOrDialogContext).canPop() && !mounted) return; // Check if dialog context can pop
 
     final SnackBar snackBar = SnackBar(
       content: Text(message, style: const TextStyle(color: Colors.white)),
@@ -370,6 +370,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
   @override
   void dispose() {
     _fadeController.dispose();
+    _tabController.dispose(); // Dispose the TabController
     super.dispose();
   }
 
@@ -399,23 +400,127 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
-      child: DefaultTabController(
-        length: 2,
-        child: Scaffold(
-          backgroundColor: AppConstants.backgroundColor,
-          appBar: _buildAppBar(),
-          body: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor))
-              : FadeTransition(
-            opacity: _fadeAnimation,
-            child: TabBarView(
-              children: [
-                _buildMyProjectsTab(),
-                _buildAttendanceTab(),
-              ],
-            ),
+      // Removed DefaultTabController
+      child: Scaffold(
+        backgroundColor: AppConstants.backgroundColor,
+        appBar: _buildAppBar(),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor))
+            : FadeTransition(
+          opacity: _fadeAnimation,
+          child: TabBarView( // Pass the controller here
+            controller: _tabController,
+            children: [
+              _buildMyProjectsTab(),
+              _buildAttendanceTab(),
+              _buildPartRequestsTab(),
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPartRequestsTab() {
+    if (_currentEngineerUid == null) {
+      return _buildErrorState('لا يمكن تحميل طلبات القطع بدون معرّف مهندس.');
+    }
+    return Scaffold(
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('partRequests')
+            .where('engineerId', isEqualTo: _currentEngineerUid)
+            .orderBy('requestedAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+          }
+          if (snapshot.hasError) {
+            return _buildErrorState('حدث خطأ في تحميل طلبات القطع: ${snapshot.error}');
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return _buildEmptyState('لا توجد طلبات قطع حالياً.', icon: Icons.list_alt_outlined);
+          }
+
+          final requests = snapshot.data!.docs;
+          return ListView.builder(
+            padding: const EdgeInsets.all(AppConstants.paddingMedium),
+            itemCount: requests.length,
+            itemBuilder: (context, index) {
+              final requestDoc = requests[index];
+              final data = requestDoc.data() as Map<String, dynamic>;
+              final partName = data['partName'] ?? 'قطعة غير مسماة';
+              final quantity = data['quantity']?.toString() ?? 'N/A';
+              final projectName = data['projectName'] ?? 'مشروع غير محدد';
+              final status = data['status'] ?? 'غير معروف';
+              final requestedAt = (data['requestedAt'] as Timestamp?)?.toDate();
+              final formattedDate = requestedAt != null
+                  ? DateFormat('yyyy/MM/dd hh:mm a', 'ar').format(requestedAt)
+                  : 'غير معروف';
+
+              Color statusColor;
+              switch (status) {
+                case 'معلق':
+                  statusColor = AppConstants.warningColor;
+                  break;
+                case 'تمت الموافقة':
+                  statusColor = AppConstants.successColor;
+                  break;
+                case 'مرفوض':
+                  statusColor = AppConstants.errorColor;
+                  break;
+                case 'تم الطلب':
+                  statusColor = AppConstants.infoColor;
+                  break;
+                case 'تم الاستلام':
+                  statusColor = AppConstants.primaryColor;
+                  break;
+                default:
+                  statusColor = AppConstants.textSecondary;
+              }
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
+                elevation: 1.5,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppConstants.paddingMedium / 1.5),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('اسم القطعة: $partName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                      const SizedBox(height: AppConstants.paddingSmall / 2),
+                      Text('الكمية: $quantity', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                      Text('المشروع: $projectName', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                      // Text('الحالة: $status', style: TextStyle(fontSize: 14, color: statusColor, fontWeight: FontWeight.w500)),
+                      Text('تاريخ الطلب: $formattedDate', style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          if (_currentEngineerUid != null && _engineerName != null) {
+            Navigator.pushNamed(
+              context,
+              '/engineer/request_part',
+              arguments: {
+                'engineerId': _currentEngineerUid,
+                'engineerName': _engineerName,
+              },
+            );
+          } else {
+            _showFeedbackSnackBar(context, 'بيانات المهندس غير متوفرة.', isError: true);
+          }
+        },
+        label: const Text('طلب قطعة جديدة', style: TextStyle(color: Colors.white)),
+        icon: const Icon(Icons.add_shopping_cart_rounded, color: Colors.white),
+        backgroundColor: AppConstants.primaryColor,
       ),
     );
   }
@@ -447,6 +552,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         ),
       ],
       bottom: TabBar(
+        controller: _tabController, // Ensure this is using your state's _tabController
         indicatorColor: Colors.white,
         indicatorWeight: 3.0,
         labelColor: Colors.white,
@@ -456,6 +562,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         tabs: const [
           Tab(text: 'مشاريعي', icon: Icon(Icons.business_center_outlined)),
           Tab(text: 'الحضور والانصراف', icon: Icon(Icons.timer_outlined)),
+          Tab(text: 'طلبات القطع', icon: Icon(Icons.build_circle_outlined)),
         ],
       ),
     );
@@ -493,10 +600,8 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             final currentStage = data['currentStage'] ?? 0;
             final currentPhaseName = data['currentPhaseName'] ?? 'لا توجد مراحل بعد';
             final clientName = data['clientName'] ?? 'غير معروف';
-            // --- MODIFICATION START ---
             final String clientTypeKey = data['clientType'] ?? 'individual';
             final String clientTypeDisplay = _clientTypeDisplayMap[clientTypeKey] ?? clientTypeKey;
-            // --- MODIFICATION END ---
             final status = data['status'] ?? 'غير محدد';
 
             final List<dynamic> assignedEngineersRaw = data['assignedEngineers'] as List<dynamic>? ?? [];
@@ -539,12 +644,10 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
                         ],
                       ),
                       const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
-                      _buildProjectInfoRow(Icons.stairs_outlined, 'المرحلة الحالية:', '$currentStage - $currentPhaseName'),
+                      // _buildProjectInfoRow(Icons.stairs_outlined, 'المرحلة الحالية:', '$currentStage - $currentPhaseName'),
                       _buildProjectInfoRow(Icons.engineering_outlined, 'المهندسون:', engineersDisplay),
                       _buildProjectInfoRow(Icons.person_outline_rounded, 'العميل:', clientName),
-                      // --- MODIFICATION START ---
                       _buildProjectInfoRow(Icons.business_center_outlined, 'نوع العميل:', clientTypeDisplay),
-                      // --- MODIFICATION END ---
                       _buildProjectInfoRow(statusIcon, 'الحالة:', status, valueColor: statusColor),
                     ],
                   ),
@@ -680,7 +783,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             ),
           ),
           SizedBox(
-            height: 250, // Adjust height as needed or use Flexible/Expanded if in a Column
+            height: 250,
             child: _buildTodayAttendanceList(),
           ),
         ],

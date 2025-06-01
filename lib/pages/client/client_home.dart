@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // For date formatting
 import 'dart:ui' as ui; // For TextDirection
 
 // Constants for consistent styling, aligned with the admin dashboard's style.
@@ -35,24 +36,295 @@ class ClientHome extends StatefulWidget {
   State<ClientHome> createState() => _ClientHomeState();
 }
 
-class _ClientHomeState extends State<ClientHome> {
-  final String? _currentClientUid = FirebaseAuth.instance.currentUser?.uid; //
+class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin { // Added TickerProviderStateMixin
+  final String? _currentClientUid = FirebaseAuth.instance.currentUser?.uid;
   String? _clientName;
   bool _isLoading = true;
+  late TabController _tabController; // For tabs
+
+  // Copied from engineer_project_details_page.dart for phase/test structure
+  static const List<Map<String, dynamic>> predefinedPhasesStructure = [
+    // ... (Paste the full predefinedPhasesStructure list here from your project_details_page.dart)
+    // Example (ensure you have the full list):
+
+    // ... more main phases
+    {
+      'id': 'phase_01', // معرّف فريد لكل مرحلة
+      'name': 'تأسيس الميدة',
+      'subPhases': [
+        {'id': 'sub_01_01', 'name': 'أعمال السباكة: تركيب سليفات لأنظمة الصرف الصحي'},
+        {'id': 'sub_01_02', 'name': 'أعمال السباكة: تثبيت وتوازن أنابيب الصرف والتهوية الرأسية'},
+        {'id': 'sub_01_03', 'name': 'أعمال السباكة: تمديد مواسير تغذية المياه'},
+        {'id': 'sub_01_04', 'name': 'أعمال السباكة: تأمين وتسكير الفتحات باستخدام الشريط الأسود'},
+        {'id': 'sub_01_05', 'name': 'أعمال الكهرباء: تأسيس مواسير لمسارات الكوابل (كيبل واحد لكل ماسورة)'},
+        {'id': 'sub_01_06', 'name': 'أعمال الكهرباء: تمديد مواسير التيار الخفيف وتحديد مكان لوحة المفاتيح'},
+        {'id': 'sub_01_07', 'name': 'أعمال الكهرباء: تأسيس سليف للطاقة الشمسية'},
+        {'id': 'sub_01_08', 'name': 'أعمال الكهرباء: تأمين وتسكير المواسير والسليفات بالشريط الأسود'},
+        {'id': 'sub_01_09', 'name': 'أعمال الكهرباء: تأريض الأعمدة'},
+      ]
+    },
+    {
+      'id': 'phase_02',
+      'name': 'أعمال الصرف الصحي ٦ إنش',
+      'subPhases': [
+        {'id': 'sub_02_01', 'name': 'تحديد مواقع كراسي الحمامات وأنواعها'},
+        {'id': 'sub_02_02', 'name': 'التأكد من ميول المواسير'},
+        {'id': 'sub_02_03', 'name': 'فحص مواقع الصفايات'},
+        {'id': 'sub_02_04', 'name': 'تأكيد مواقع الكلين آوت وأبعادها'},
+        {'id': 'sub_02_05', 'name': 'إغلاق الفتحات بالكاب أو الشريط الأسود'},
+        {'id': 'sub_02_06', 'name': 'تثبيت المواسير أرضياً'},
+        {'id': 'sub_02_07', 'name': 'استخدام المنظف قبل الغراء'},
+        {'id': 'sub_02_08', 'name': 'ضمان تطبيق الغراء بشكل صحيح'},
+        {'id': 'sub_02_09', 'name': 'تركيب رداد عند نهاية الماسورة المرتبطة بشركة المياه'},
+        {'id': 'sub_02_10', 'name': 'إجراء اختبار التسرب بالماء'},
+      ]
+    },
+    {
+      'id': 'phase_03',
+      'name': 'تمديد مواسير السباكة في الحوائط',
+      'subPhases': [
+        {'id': 'sub_03_01', 'name': 'التأكد من التثبيت الجيد وتوازن المواسير'},
+        {'id': 'sub_03_02', 'name': 'فحص الطول المناسب لكل خط'},
+        {'id': 'sub_03_03', 'name': 'تأمين وتسكير الفتحات بالشريط الأسود أو القطن'},
+      ]
+    },
+    {
+      'id': 'phase_04',
+      'name': 'كهرباء الدرج والعتبات',
+      'subPhases': [
+        {'id': 'sub_04_01', 'name': 'تحديد مواقع الإنارة حسب المخططات'},
+        {'id': 'sub_04_02', 'name': 'تثبيت وتربيط المواسير بإحكام'},
+        {'id': 'sub_04_03', 'name': 'إنارة أسفل الدرج'},
+        {'id': 'sub_04_04', 'name': 'تمديد ماسورة لمفتاح مزدوج الاتجاه'},
+      ]
+    },
+    {
+      'id': 'phase_05',
+      'name': 'أعمدة سور الفيلا الخارجي',
+      'subPhases': [
+        {'id': 'sub_05_01', 'name': 'تحديد موقع الإنتركم وإنارات السور'},
+        {'id': 'sub_05_02', 'name': 'تثبيت المواسير جيداً'},
+        {'id': 'sub_05_03', 'name': 'تركيب علب الكهرباء وتحديد المنسوب وتثبيتها'},
+      ]
+    },
+    {
+      'id': 'phase_06',
+      'name': 'أعمال الأسقف',
+      'subPhases': [
+        {'id': 'sub_06_01', 'name': 'أعمال الكهرباء: تمديد المواسير وتثبيت العلب بشكل جيد'},
+        {'id': 'sub_06_02', 'name': 'أعمال الكهرباء: تعليق المواسير في الجسور والحديد'},
+        {'id': 'sub_06_03', 'name': 'أعمال الكهرباء: تنظيم المسافات بين المواسير'},
+        {'id': 'sub_06_04', 'name': 'أعمال الكهرباء: حماية العلب بالشريط اللاصق وتثبيتها جيداً'},
+        {'id': 'sub_06_05', 'name': 'أعمال الكهرباء: تسكير الفتحات المعتمدة بالفوم والتأكد من الإحكام'},
+        {'id': 'sub_06_06', 'name': 'أعمال الكهرباء: تمديد شبكة التيار الخفيف'},
+        {'id': 'sub_06_07', 'name': 'أعمال الكهرباء: تمديد سليفات بين الجسور للكهرباء المعلقة'},
+        {'id': 'sub_06_08', 'name': 'أعمال السباكة: فحص مواقع سليفات الجسور للسباكة المعلقة'},
+        {'id': 'sub_06_09', 'name': 'أعمال السباكة: فحص مواقع سليفات الصرف الصحي ومياه الأمطار'},
+        {'id': 'sub_06_10', 'name': 'أعمال السباكة: تركيب سليفات مراوح الشفط بدون تعارض مع الديكور'},
+        {'id': 'sub_06_11', 'name': 'أعمال السباكة: تركيب وتوازن مواسير وسليفات تغذية الحمامات والمطابخ'},
+        {'id': 'sub_06_12', 'name': 'أعمال السباكة: تركيب صحيح لقطع T للصرف والتهوية وحمايتها بالشريط الأسود'},
+        {'id': 'sub_06_13', 'name': 'أعمال السباكة: تأمين وتسكير فتحات المواسير كاملة بالشريط الأسود'},
+        {'id': 'sub_06_14', 'name': 'أعمال السباكة: تأسيس منفذ هواء لمجفف الغسيل حسب رغبة العميل'},
+        {'id': 'sub_06_15', 'name': 'أعمال السباكة: مناسيب الكراسي والصفايات موضحة حسب المواصفات'},
+      ]
+    },
+    {
+      'id': 'phase_07',
+      'name': 'تمديد الإنارة في الجدران',
+      'subPhases': [
+        {'id': 'sub_07_01', 'name': 'أعمال الكهرباء: تمديد المواسير حسب توزيع الإنارة في المخطط'},
+        {'id': 'sub_07_02', 'name': 'أعمال الكهرباء: الحد الأدنى ٢ متر لكل نقطة إنارة'},
+      ]
+    },
+    {
+      'id': 'phase_08',
+      'name': 'مرحلة التمديدات',
+      'subPhases': [
+        {'id': 'sub_08_01', 'name': 'أعمال الكهرباء: تحديد نقاط مخارج الكهرباء حسب المخطط أو العميل'},
+        {'id': 'sub_08_02', 'name': 'أعمال الكهرباء: تحديد المناسيب بالليزر'},
+        {'id': 'sub_08_03', 'name': 'أعمال الكهرباء: القص بالصاروخ'},
+        {'id': 'sub_08_04', 'name': 'أعمال الكهرباء: تنظيف الربش والكسارات يومياً'},
+        {'id': 'sub_08_05', 'name': 'أعمال الكهرباء: تثبيت العلب من الخلف والجوانب، ومراعاة البروز'},
+        {'id': 'sub_08_06', 'name': 'أعمال الكهرباء: ستاندر المطابخ: مخرج كهرباء لكل ١ متر'},
+        {'id': 'sub_08_07', 'name': 'أعمال الكهرباء: تركيب علب ٠.٣٠×٠.٣٠ سم للأفران والشوايات'},
+        {'id': 'sub_08_08', 'name': 'أعمال الكهرباء: تركيب الطبلونات حسب المواقع'},
+        {'id': 'sub_08_09', 'name': 'أعمال الكهرباء: تحديد ألوان الأسلاك وسحبها حسب الاستاندر'},
+        {'id': 'sub_08_10', 'name': 'أعمال الكهرباء: خط رئيسي للإنارة، ومخارج الكهرباء، والتكييف'},
+        {'id': 'sub_08_11', 'name': 'أعمال الكهرباء: ربط الخزانات الأرضية والعلوية للعوامة'},
+        {'id': 'sub_08_12', 'name': 'أعمال الكهرباء: تأريض لجميع العلب'},
+        {'id': 'sub_08_13', 'name': 'أعمال الكهرباء: تأريض علب المطابخ والغسيل'},
+        {'id': 'sub_08_14', 'name': 'أعمال الكهرباء: تمديد مواسير مرنة مخصصة للإنارة المعلقة داخل الأسقف الجبسية'},
+        {'id': 'sub_08_15', 'name': 'أعمال الكهرباء: تثبيت علب الإنارة خلف فتحات السبوت لايت حسب التصميم'},
+        {'id': 'sub_08_16', 'name': 'أعمال الكهرباء: توصيل جميع نقاط الإنارة المعلقة بخط مستقل من الطبلون'},
+        {'id': 'sub_08_17', 'name': 'أعمال الكهرباء: استخدام كيابل مقاومة للحرارة حسب المواصفات الفنية'},
+        {'id': 'sub_08_18', 'name': 'أعمال الكهرباء: تحديد مواقع الإنارة المعلقة بدقة وتجنب التعارض مع فتحات التكييف أو الستائر'},
+        {'id': 'sub_08_19', 'name': 'أعمال الكهرباء: عدم تمرير كيابل الكهرباء بجانب كيابل الصوت أو البيانات لتفادي التداخل'},
+        {'id': 'sub_08_20', 'name': 'أعمال الكهرباء: استخدام أربطة تثبيت وعدم الاعتماد على الشريط اللاصق فقط'},
+        {'id': 'sub_08_21', 'name': 'أعمال الكهرباء: تمرير السليفات بين الجسور لتسهيل تمديد الأسلاك بشكل خفي'},
+        {'id': 'sub_08_22', 'name': 'أعمال الكهرباء: تسمية كل نقطة لسهولة الصيانة لاحقاً'},
+        {'id': 'sub_08_23', 'name': 'أعمال الكهرباء: الابتعاد عن الشبابيك والأبواب ٠.٢٥ سم على الأقل'},
+        {'id': 'sub_08_24', 'name': 'أعمال الكهرباء: تحديد منطقة كنترول للتيار الخفيف'},
+        {'id': 'sub_08_25', 'name': 'أعمال الكهرباء: فصل شبكة التيار الخفيف عن الكهرباء'},
+        {'id': 'sub_08_26', 'name': 'أعمال الكهرباء: تمديد شبكات التلفزيون، الإنترنت، الصوتيات، والواي فاي'},
+        {'id': 'sub_08_27', 'name': 'أعمال الكهرباء: لكل نقطة تلفزيون: ٣ مخارج كهرباء + نقطة إنترنت'},
+        {'id': 'sub_08_28', 'name': 'أعمال الكهرباء: تمديد الكابلات الرئيسية لكل لوحة مفاتيح'},
+        {'id': 'sub_08_29', 'name': 'أعمال الكهرباء: تركيب باس بار رئيسي داخل سور المبنى'},
+        {'id': 'sub_08_30', 'name': 'أعمال الكهرباء: قاطع خاص للمصعد'},
+        {'id': 'sub_08_31', 'name': 'أعمال الكهرباء: لوحة مفاتيح مستقلة لكل دور وللحوش'},
+        {'id': 'sub_08_32', 'name': 'أعمال الكهرباء: لوحات وقواطع خاصة بالتكييف حسب الطلب'},
+        {'id': 'sub_08_33', 'name': 'أعمال السباكة: تمديد مواسير التغذية بين الخزانات'},
+        {'id': 'sub_08_34', 'name': 'أعمال السباكة: تمديد ماسورة الماء الحلو من الشارع إلى الخزان ثم الفيلا'},
+        {'id': 'sub_08_35', 'name': 'أعمال السباكة: تمديد ٢ إنش للوايت و١ إنش لعداد المياه'},
+        {'id': 'sub_08_36', 'name': 'أعمال السباكة: خط تغذية بارد ٢ إنش وحار ١ إنش لكل دور'},
+        {'id': 'sub_08_37', 'name': 'أعمال السباكة: تمديد خط راجع ٣/٤ للماء الحار حسب الاتفاق'},
+        {'id': 'sub_08_38', 'name': 'أعمال السباكة: تباعد التعليقات حسب الاستاندر باستخدام الشنل والرود'},
+        {'id': 'sub_08_39', 'name': 'أعمال السباكة: استخدام أكواع حرارية بزاوية ٤٥ درجة وتجنب استخدام كوع ٩٠'},
+        {'id': 'sub_08_40', 'name': 'أعمال السباكة: توزيع الحمامات والمطابخ حسب المخطط أو اتفاق العميل'},
+        {'id': 'sub_08_41', 'name': 'أعمال السباكة: تركيب فاصل بين الحار والبارد داخل الجدار'},
+        {'id': 'sub_08_42', 'name': 'أعمال السباكة: تركيب خلاطات مدفونة حسب الاتفاق'},
+        {'id': 'sub_08_43', 'name': 'أعمال السباكة: الدش المطري بارتفاع ٢.٢٠ م'},
+        {'id': 'sub_08_44', 'name': 'أعمال السباكة: سيفون مخفي للمرحاض العربي'},
+        {'id': 'sub_08_45', 'name': 'أعمال السباكة: تأكيد تمديد ماسورة ماء حلو ٣/٤ للمطبخ'},
+        {'id': 'sub_08_46', 'name': 'أعمال السباكة: تثبيت مواسير تصريف ٢ إنش تحت المغاسل'},
+        {'id': 'sub_08_47', 'name': 'أعمال السباكة: تركيب بكس ٠.٤٠×٠.٤٠ سم لغرف الغسيل'},
+        {'id': 'sub_08_48', 'name': 'أعمال السباكة: اختبار الضغط وتثبيت ساعة الضغط لكل دور'},
+        {'id': 'sub_08_49', 'name': 'أعمال السباكة: تثبيت نقاط إسمنتية بعد الاختبارات'},
+      ]
+    },
+    {
+      'id': 'phase_09',
+      'name': 'الصرف الصحي وتصريف الأمطار الداخلي',
+      'subPhases': [
+        {'id': 'sub_09_01', 'name': 'تعليق وتثبيت المواسير والقطع الصغيرة حسب الاستاندر'},
+        {'id': 'sub_09_02', 'name': 'فحص الميول بشكل دقيق'},
+        {'id': 'sub_09_03', 'name': 'تسكير الفتحات بإحكام'},
+        {'id': 'sub_09_04', 'name': 'تركيب رداد للمرحاض العربي حسب الرغبة'},
+        {'id': 'sub_09_05', 'name': 'اختبار شبكة الصرف بالماء'},
+        {'id': 'sub_09_06', 'name': 'تركيب المرحاض العربي: قاعدة رملية'},
+        {'id': 'sub_09_07', 'name': 'تركيب المرحاض العربي: إسمنت جانبي'},
+        {'id': 'sub_09_08', 'name': 'تركيب المرحاض العربي: توصيل المرحاض بماسورة السيفون'},
+        {'id': 'sub_09_09', 'name': 'تركيب المرحاض العربي: تركيب رداد ٤ إنش'},
+      ]
+    },
+    {
+      'id': 'phase_10',
+      'name': 'أعمال الحوش',
+      'subPhases': [
+        {'id': 'sub_10_01', 'name': 'أعمال الكهرباء: توصيل تأريض الأعمدة'},
+        {'id': 'sub_10_02', 'name': 'أعمال الكهرباء: تركيب بوكس التأريض وربط النحاس بالحوش'},
+        {'id': 'sub_10_03', 'name': 'أعمال الكهرباء: توصيل الباس بار للتأريض'},
+        {'id': 'sub_10_04', 'name': 'أعمال الكهرباء: إكمال إنارة الحوش والحديقة'},
+        {'id': 'sub_10_05', 'name': 'أعمال الكهرباء: تمديد نقاط الكهرباء للكراج'},
+        {'id': 'sub_10_06', 'name': 'أعمال الكهرباء: تركيب شاحن سيارة'},
+        {'id': 'sub_10_07', 'name': 'أعمال الكهرباء: تثبيت طبلون الحوش'},
+        {'id': 'sub_10_08', 'name': 'أعمال السباكة: تمديد نقاط الغسيل بالحوش بعد الصب'},
+      ]
+    },
+    {
+      'id': 'phase_11',
+      'name': 'الأعمال بعد اللياسة',
+      'subPhases': [
+        {'id': 'sub_11_01', 'name': 'أعمال السباكة: تركيب سيفون الكرسي المعلق بمنسوب ٠.٣٣ سم'},
+        {'id': 'sub_11_02', 'name': 'أعمال السباكة: شبكه بنقطة الصرف والتغذية'},
+        {'id': 'sub_11_03', 'name': 'أعمال السباكة: تثبيت الشطاف المدفون'},
+      ]
+    },
+    {
+      'id': 'phase_12',
+      'name': 'أعمال السطح بعد العزل',
+      'subPhases': [
+        {'id': 'sub_12_01', 'name': 'ربط تغذية الخزان العلوي من الأرضي فوق العزل'},
+        {'id': 'sub_12_02', 'name': 'نقاط غسيل السطح'},
+        {'id': 'sub_12_03', 'name': 'تصريف التكييف والغليونات: تمديد ماسورة تصريف ١ إنش لكل مكيف'},
+        {'id': 'sub_12_04', 'name': 'تصريف التكييف والغليونات: استخدام كوع ٤٥ بارتفاع ٥ سم عن الأرض'},
+        {'id': 'sub_12_05', 'name': 'تصريف التكييف والغليونات: فحص الميول'},
+        {'id': 'sub_12_06', 'name': 'تصريف التكييف والغليونات: تمديد ٢ إنش من المغاسل إلى الغليون'},
+        {'id': 'sub_12_07', 'name': 'تصريف التكييف والغليونات: توصيل الصفايات الفرعية بالغليون'},
+        {'id': 'sub_12_08', 'name': 'تصريف التكييف والغليونات: تثبيت الاتصالات في الغليون جيداً'},
+        {'id': 'sub_12_09', 'name': 'أعمال الكهرباء: استلام نقاط الإنارة من فني الجبسوم'},
+        {'id': 'sub_12_10', 'name': 'أعمال الكهرباء: توزيع الأسلاك فوق الجبس'},
+      ]
+    },
+    {
+      'id': 'phase_13',
+      'name': 'التفنيش والتشغيل',
+      'subPhases': [
+        {'id': 'sub_13_01', 'name': 'أعمال الكهرباء: تنظيف العلب جيداً'},
+        {'id': 'sub_13_02', 'name': 'أعمال الكهرباء: تركيب كونكترات للأسلاك'},
+        {'id': 'sub_13_03', 'name': 'أعمال الكهرباء: توصيل التأريض لكل علبة'},
+        {'id': 'sub_13_04', 'name': 'أعمال الكهرباء: ربط الأسلاك بإحكام'},
+        {'id': 'sub_13_05', 'name': 'أعمال الكهرباء: تشغيل تجريبي بعد كل منطقة'},
+        {'id': 'sub_13_06', 'name': 'أعمال الكهرباء: تأمين الإنارة الخارجية بالسيليكون'},
+        {'id': 'sub_13_07', 'name': 'أعمال الكهرباء: عزل مواسير الحديقة جيداً'},
+        {'id': 'sub_13_08', 'name': 'أعمال الكهرباء: تركيب محول ٢٤ فولت للحديقة'},
+        {'id': 'sub_13_09', 'name': 'أعمال الكهرباء: التشغيل الفعلي للمبنى'},
+        {'id': 'sub_13_10', 'name': 'أعمال الكهرباء: اختبار الأحمال وتوزيعها'},
+        {'id': 'sub_13_11', 'name': 'أعمال الكهرباء: طباعة تعريف الخطوط بالطبلون'},
+        {'id': 'sub_13_12', 'name': 'أعمال السباكة: تركيب الكراسي والمغاسل مع اختبار التثبيت'},
+        {'id': 'sub_13_13', 'name': 'أعمال السباكة: استخدام السيليكون للعزل'},
+        {'id': 'sub_13_14', 'name': 'أعمال السباكة: تركيب مضخة أو غطاس بالخزان الأرضي'},
+        {'id': 'sub_13_15', 'name': 'أعمال السباكة: تركيب مضخة ضغط للخزان العلوي'},
+        {'id': 'sub_13_16', 'name': 'أعمال السباكة: تركيب السخانات واختبار التشغيل'},
+        {'id': 'sub_13_17', 'name': 'أعمال السباكة: تشغيل شبكة المياه وربط الخزانات'},
+        {'id': 'sub_13_18', 'name': 'أعمال السباكة: تشغيل الشطافات والمغاسل مع الفحص'},
+      ]
+    },
+  ];
+  static const List<Map<String, dynamic>> finalCommissioningTests = [
+
+    // ... more test sections
+    {
+      'section_id': 'tests_electricity',
+      'section_name': 'أولاً: اختبارات الكهرباء (وفق كود IEC / NFPA / NEC)',
+      'tests': [
+        {'id': 'test_elec_01', 'name': 'اختبار مقاومة العزل: باستخدام جهاز الميجر بجهد 500/1000 فولت، والقيمة المقبولة ≥ 1 ميجا أوم.'},
+        {'id': 'test_elec_02', 'name': 'اختبار الاستمرارية: فحص التوصيلات المغلقة والتأكد من سلامة الأسلاك.'},
+        {'id': 'test_elec_03', 'name': 'اختبار مقاومة التأريض: باستخدام جهاز Earth Tester، والمقاومة المقبولة أقل من 5 أوم (يفضل < 1 أوم).'},
+        {'id': 'test_elec_04', 'name': 'اختبار فرق الجهد: قياس الجهد بين المصدر والحمل والتأكد من ثباته.'},
+        {'id': 'test_elec_05', 'name': 'اختبار قواطع الحماية (MCB/RCD): الضغط على زر الاختبار والتأكد من قطع التيار خلال المدة المسموحة.'},
+        {'id': 'test_elec_06', 'name': 'اختبار تحميل الأحمال: تشغيل جميع الأحمال والتحقق من عدم وجود سخونة أو هبوط في الجهد.'},
+        {'id': 'test_elec_07', 'name': 'اختبار الجهد والتيار: بقياس الفولت والأمبير عند نقاط متعددة.'},
+        {'id': 'test_elec_08', 'name': 'اختبار أنظمة التيار الخفيف: فحص شبكات الإنترنت والتلفزيون والإنتركم.'},
+        {'id': 'test_elec_09', 'name': 'فحص لوحات الكهرباء: التأكد من إحكام التوصيلات وتسميات الخطوط.'},
+        {'id': 'test_elec_10', 'name': 'توثيق النتائج: تسجيل القراءات وتعريف الخطوط بلوحات الطبلون.'},
+      ]
+    },
+    {
+      'section_id': 'tests_water',
+      'section_name': 'ثانياً: اختبارات تغذية المياه (وفق كود UPC / IPC)',
+      'tests': [
+        {'id': 'test_water_01', 'name': 'اختبار الضغط: باستخدام ساعة ضغط، ويُثبت الضغط لمدة 24 ساعة دون تسريب.'},
+        {'id': 'test_water_02', 'name': 'اختبار التوصيلات: فحص التوصيلات النهائية للمغاسل والخلاطات والسخانات.'},
+        {'id': 'test_water_03', 'name': 'اختبار عمل السخانات: التأكد من توفر ماء ساخن في جميع النقاط.'},
+        {'id': 'test_water_04', 'name': 'اختبار تشغيل المضخة: للتحقق من توازن توزيع الماء.'},
+        {'id': 'test_water_05', 'name': 'فحص سريان الماء: عند كافة المخارج النهائية (مغاسل، مطابخ، حمامات).'},
+        {'id': 'test_water_06', 'name': 'اختبار الربط بين الخزانات: وتشغيل عوامة الخزان للتأكد من وظيفتها.'},
+        {'id': 'test_water_07', 'name': 'توثيق النتائج: تسجيل بيانات الضغط والزمن لكل اختبار.'},
+      ]
+    },
+  ];
+
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this); // 3 tabs: Phases, Tests, Part Requests
     if (_currentClientUid == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _logout();
       });
     } else {
-      _fetchClientData(); //
+      _fetchClientData();
     }
   }
 
-  Future<void> _fetchClientData() async { //
+  @override
+  void dispose() {
+    _tabController.dispose(); // Dispose TabController
+    super.dispose();
+  }
+
+  Future<void> _fetchClientData() async {
     setState(() => _isLoading = true);
     try {
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(_currentClientUid).get();
@@ -69,7 +341,7 @@ class _ClientHomeState extends State<ClientHome> {
     }
   }
 
-  Future<void> _logout() async { //
+  Future<void> _logout() async {
     try {
       await FirebaseAuth.instance.signOut();
       if (mounted) {
@@ -105,12 +377,12 @@ class _ClientHomeState extends State<ClientHome> {
           Text('$label ', style: const TextStyle(fontSize: 15, color: AppConstants.textSecondary, fontWeight: FontWeight.w500)),
           Expanded(
             child: isExpandable
-                ? ExpandableText(value, valueColor: valueColor) // Assuming ExpandableText is defined
+                ? ExpandableText(value, valueColor: valueColor)
                 : Text(
               value,
               style: TextStyle(fontSize: 15, color: valueColor ?? AppConstants.textPrimary, fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
-              maxLines: isExpandable ? null : 3, // Allow more lines for notes
+              maxLines: isExpandable ? null : 3,
             ),
           ),
         ],
@@ -118,25 +390,62 @@ class _ClientHomeState extends State<ClientHome> {
     );
   }
 
-  Widget _buildImageSection(String title, String? imageUrl) { //
+  Widget _buildImageSection(String title, String? imageUrl) {
     if (imageUrl == null || imageUrl.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
-        const SizedBox(height: AppConstants.paddingSmall),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
-          child: Image.network(
-            imageUrl, height: 180, width: double.infinity, fit: BoxFit.cover,
-            loadingBuilder: (ctx, child, progress) => progress == null ? child : Container(height: 180, alignment: Alignment.center, child: const CircularProgressIndicator(color: AppConstants.primaryColor)),
-            errorBuilder: (ctx, err, st) => Container(height: 180, width: double.infinity, color: AppConstants.backgroundColor, child: const Icon(Icons.broken_image_outlined, color: AppConstants.textSecondary, size: 50)),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppConstants.textSecondary)),
+          const SizedBox(height: AppConstants.paddingSmall / 2),
+          InkWell(
+            onTap: () => _viewImageDialog(imageUrl),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+              child: Image.network(
+                imageUrl, height: 150, width: double.infinity, fit: BoxFit.cover,
+                loadingBuilder: (ctx, child, progress) => progress == null ? child : Container(height: 150, alignment: Alignment.center, child: const CircularProgressIndicator(color: AppConstants.primaryColor)),
+                errorBuilder: (ctx, err, st) => Container(height: 150, width: double.infinity, color: AppConstants.backgroundColor, child: const Icon(Icons.broken_image_outlined, color: AppConstants.textSecondary, size: 40)),
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: AppConstants.itemSpacing),
-      ],
+        ],
+      ),
     );
   }
+  Future<void> _viewImageDialog(String imageUrl) async {
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.transparent,
+        contentPadding: EdgeInsets.zero,
+        insetPadding: const EdgeInsets.all(10),
+        content: InteractiveViewer(
+          panEnabled: true,
+          boundaryMargin: const EdgeInsets.all(20),
+          minScale: 0.5,
+          maxScale: 4,
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.contain,
+            loadingBuilder: (ctx, child, progress) =>
+            progress == null ? child : const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor)),
+            errorBuilder: (ctx, err, st) => const Center(child: Icon(Icons.error_outline, color: AppConstants.errorColor, size: 50)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(backgroundColor: Colors.black.withOpacity(0.5)),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("إغلاق", style: TextStyle(color: Colors.white)),
+          )
+        ],
+        actionsAlignment: MainAxisAlignment.center,
+      ),
+    );
+  }
+
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -152,7 +461,7 @@ class _ClientHomeState extends State<ClientHome> {
         IconButton(
           icon: const Icon(Icons.notifications_outlined, color: Colors.white),
           tooltip: 'الإشعارات',
-          onPressed: () => Navigator.pushNamed(context, '/notifications'), //
+          onPressed: () => Navigator.pushNamed(context, '/notifications'),
         ),
         IconButton(
           icon: const Icon(Icons.logout_rounded, color: Colors.white),
@@ -160,6 +469,17 @@ class _ClientHomeState extends State<ClientHome> {
           onPressed: _logout,
         ),
       ],
+      bottom: TabBar( // Add TabBar here
+        controller: _tabController,
+        indicatorColor: Colors.white,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white70,
+        tabs: const [
+          Tab(text: 'مراحل المشروع', icon: Icon(Icons.stairs_outlined)),
+          Tab(text: 'الاختبارات النهائية', icon: Icon(Icons.checklist_rtl_rounded)),
+          Tab(text: 'طلبات القطع', icon: Icon(Icons.build_circle_outlined)),
+        ],
+      ),
     );
   }
 
@@ -199,7 +519,7 @@ class _ClientHomeState extends State<ClientHome> {
             const SizedBox(height: AppConstants.itemSpacing),
             Text(message, style: const TextStyle(fontSize: 17, color: AppConstants.textSecondary, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
             const SizedBox(height: AppConstants.paddingSmall),
-            Text('الرجاء التواصل مع إدارة المشروع لمزيد من المعلومات.', style: TextStyle(fontSize: 14, color: AppConstants.textSecondary.withOpacity(0.7)), textAlign: TextAlign.center), //
+            Text('الرجاء التواصل مع إدارة المشروع لمزيد من المعلومات.', style: TextStyle(fontSize: 14, color: AppConstants.textSecondary.withOpacity(0.7)), textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -223,8 +543,8 @@ class _ClientHomeState extends State<ClientHome> {
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppConstants.backgroundColor,
-        appBar: _buildAppBar(),
-        body: FutureBuilder<QuerySnapshot>( //
+        appBar: _buildAppBar(), // AppBar now includes TabBar
+        body: FutureBuilder<QuerySnapshot>(
           future: FirebaseFirestore.instance.collection('projects').where('clientId', isEqualTo: _currentClientUid).limit(1).get(),
           builder: (context, projectSnapshot) {
             if (projectSnapshot.connectionState == ConnectionState.waiting) {
@@ -234,37 +554,30 @@ class _ClientHomeState extends State<ClientHome> {
               return _buildErrorState('حدث خطأ في تحميل بيانات المشروع: ${projectSnapshot.error}');
             }
             if (!projectSnapshot.hasData || projectSnapshot.data!.docs.isEmpty) {
-              return _buildEmptyState('لم يتم ربط حسابك بأي مشروع حتى الآن.'); //
+              return _buildEmptyState('لم يتم ربط حسابك بأي مشروع حتى الآن.');
             }
 
             final projectDoc = projectSnapshot.data!.docs.first;
             final projectId = projectDoc.id;
             final projectData = projectDoc.data() as Map<String, dynamic>;
 
-            return RefreshIndicator(
-              onRefresh: () async {
-                if(mounted) {
-                  setState(() {
-                    // This will trigger the FutureBuilder to re-fetch project data
-                    // and subsequently the StreamBuilder for phases will also update.
-                  });
-                }
-              },
-              color: AppConstants.primaryColor,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildProjectSummaryCard(projectData), // New helper for summary
-                    const SizedBox(height: AppConstants.paddingLarge),
-                    const Text('المراحل المكتملة:', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
-                    const SizedBox(height: AppConstants.itemSpacing),
-                    _buildCompletedPhasesList(projectId), // New helper for phases list
-                  ],
+            return Column( // Wrap content in Column to place TabBarView below summary
+              children: [
+                Padding( // Add padding for the summary card
+                  padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                  child: _buildProjectSummaryCard(projectData),
                 ),
-              ),
+                Expanded( // TabBarView should take remaining space
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildClientPhasesTab(projectId),
+                      _buildClientTestsTab(projectId),
+                      _buildClientPartRequestsTab(projectId),
+                    ],
+                  ),
+                ),
+              ],
             );
           },
         ),
@@ -274,11 +587,17 @@ class _ClientHomeState extends State<ClientHome> {
 
   Widget _buildProjectSummaryCard(Map<String, dynamic> projectData) {
     final projectName = projectData['name'] ?? 'مشروع غير مسمى';
-    final engineerName = projectData['engineerName'] ?? 'غير محدد'; //
+    // Assuming 'assignedEngineers' is a list of maps like [{'name': 'Eng A'}, {'name': 'Eng B'}]
+    final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
+    String engineerName = "غير محدد";
+    if (assignedEngineersRaw.isNotEmpty) {
+      engineerName = assignedEngineersRaw.map((eng) => eng['name'] ?? 'م.غير معروف').join('، ');
+    }
+
     final projectStatus = projectData['status'] ?? 'غير محدد';
-    final generalNotes = projectData['generalNotes'] ?? ''; //
-    final currentStageNumber = projectData['currentStage'] ?? 0; //
-    final currentPhaseName = projectData['currentPhaseName'] ?? 'غير محددة'; //
+    final generalNotes = projectData['generalNotes'] ?? '';
+    final currentStageNumber = projectData['currentStage'] ?? 0;
+    final currentPhaseName = projectData['currentPhaseName'] ?? 'غير محددة';
 
     IconData statusIcon;
     Color statusColor;
@@ -302,10 +621,10 @@ class _ClientHomeState extends State<ClientHome> {
             const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
             _buildDetailRow(Icons.engineering_rounded, 'المهندس المسؤول:', engineerName),
             _buildDetailRow(statusIcon, 'حالة المشروع:', projectStatus, valueColor: statusColor),
-            _buildDetailRow(Icons.stairs_rounded, 'المرحلة الحالية:', '$currentStageNumber - $currentPhaseName'),
+            // _buildDetailRow(Icons.stairs_rounded, 'المرحلة الحالية:', '$currentStageNumber - $currentPhaseName'),
             if (generalNotes.isNotEmpty) ...[
               const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
-              _buildDetailRow(Icons.speaker_notes_rounded, 'ملاحظات عامة من المهندس:', generalNotes, isExpandable: true), //
+              _buildDetailRow(Icons.speaker_notes_rounded, 'ملاحظات عامة من المهندس:', generalNotes, isExpandable: true),
             ],
           ],
         ),
@@ -313,8 +632,407 @@ class _ClientHomeState extends State<ClientHome> {
     );
   }
 
+  // Placeholder - Implement this based on AdminProjectDetailsPage logic (read-only)
+  Widget _buildClientPhasesTab(String projectId) {
+    return ListView.builder(
+      key: const PageStorageKey<String>('clientPhasesTab'),
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      itemCount: predefinedPhasesStructure.length,
+      itemBuilder: (context, index) {
+        final phaseStructure = predefinedPhasesStructure[index];
+        final phaseId = phaseStructure['id'] as String;
+        final phaseName = phaseStructure['name'] as String;
+        final subPhasesStructure = phaseStructure['subPhases'] as List<Map<String, dynamic>>;
+
+        return StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('projects')
+              .doc(projectId)
+              .collection('phases_status')
+              .doc(phaseId)
+              .snapshots(),
+          builder: (context, phaseStatusSnapshot) {
+            bool isCompleted = false;
+            String lastUpdatedBy = "";
+            String phaseActualName = phaseName; // Default to predefined name
+
+            if (phaseStatusSnapshot.hasData && phaseStatusSnapshot.data!.exists) {
+              final statusData = phaseStatusSnapshot.data!.data() as Map<String, dynamic>;
+              isCompleted = statusData['completed'] ?? false;
+              lastUpdatedBy = statusData['lastUpdatedByName'] ?? "غير معروف";
+              phaseActualName = statusData['name'] ?? phaseName; // Use stored name if available
+            }
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
+              elevation: 1.5,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
+              child: ExpansionTile(
+                key: PageStorageKey<String>(phaseId), // For scroll position preservation
+                leading: CircleAvatar(
+                  backgroundColor: isCompleted ? AppConstants.successColor : AppConstants.warningColor.withOpacity(0.7),
+                  child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+                title: Text(phaseActualName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                subtitle: Text(
+                  isCompleted ? 'مكتملة بواسطة: $lastUpdatedBy ✅' : 'قيد التنفيذ ⏳',
+                  style: TextStyle(color: isCompleted ? AppConstants.successColor : AppConstants.warningColor, fontWeight: FontWeight.w500),
+                ),
+                children: [
+                  Padding(
+                      padding: const EdgeInsets.all(AppConstants.paddingSmall).copyWith(right: AppConstants.paddingMedium + 8, left: AppConstants.paddingSmall),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildEntriesListForClient(projectId, phaseId, isSubEntry: false),
+                          if (subPhasesStructure.isNotEmpty)
+                            const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
+                        ],
+                      )
+                  ),
+                  if (subPhasesStructure.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(right: AppConstants.paddingLarge, left: AppConstants.paddingSmall, bottom: AppConstants.paddingSmall),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: AppConstants.paddingSmall / 2),
+                            child: Text("المراحل الفرعية:", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                          ),
+                          ...subPhasesStructure.map((subPhaseMap) {
+                            final subPhaseId = subPhaseMap['id'] as String;
+                            final subPhaseName = subPhaseMap['name'] as String;
+                            return StreamBuilder<DocumentSnapshot>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('projects')
+                                  .doc(projectId)
+                                  .collection('subphases_status')
+                                  .doc(subPhaseId)
+                                  .snapshots(),
+                              builder: (context, subPhaseStatusSnapshot) {
+                                bool isSubCompleted = false;
+                                String subLastUpdatedBy = "";
+                                String subPhaseActualName = subPhaseName;
+
+
+                                if (subPhaseStatusSnapshot.hasData && subPhaseStatusSnapshot.data!.exists) {
+                                  final subStatusData = subPhaseStatusSnapshot.data!.data() as Map<String, dynamic>;
+                                  isSubCompleted = subStatusData['completed'] ?? false;
+                                  subLastUpdatedBy = subStatusData['lastUpdatedByName'] ?? "غير معروف";
+                                  subPhaseActualName = subStatusData['name'] ?? subPhaseName;
+                                }
+                                return Card(
+                                  elevation: 0.2,
+                                  color: AppConstants.backgroundColor,
+                                  margin: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall / 2),
+                                  child: ExpansionTile(
+                                    key: PageStorageKey<String>('sub_$subPhaseId'),
+                                    leading: Icon(
+                                      isSubCompleted ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                                      color: isSubCompleted ? AppConstants.successColor : AppConstants.textSecondary, size: 20,
+                                    ),
+                                    title: Text(subPhaseActualName, style: TextStyle(fontSize: 13.5, color: AppConstants.textSecondary, decoration: isSubCompleted ? TextDecoration.lineThrough : null)),
+                                    subtitle: isSubCompleted ? Text('مكتملة بواسطة: $subLastUpdatedBy', style: const TextStyle(fontSize: 11, color: AppConstants.successColor)) : null,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: AppConstants.paddingSmall, right: AppConstants.paddingMedium + 8, bottom: AppConstants.paddingSmall, top: 0),
+                                        child: _buildEntriesListForClient(projectId, phaseId, subPhaseId: subPhaseId, isSubEntry: true),
+                                      )
+                                    ],
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+  
+
+  Widget _buildEntriesListForClient(String projectId, String mainPhaseId, {String? subPhaseId, bool isSubEntry = false}) {
+    String entriesCollectionPath = subPhaseId == null
+        ? 'projects/$projectId/phases_status/$mainPhaseId/entries'
+        : 'projects/$projectId/subphases_status/$subPhaseId/entries';
+
+    // إضافة ScrollController هنا
+    final ScrollController listViewController = ScrollController(keepScrollOffset: false);
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection(entriesCollectionPath).orderBy('timestamp', descending: true).snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)));
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall /2),
+            child: Text(isSubEntry ? 'لا توجد ملاحظات أو صور لهذه المرحلة الفرعية.' : 'لا توجد ملاحظات أو صور لهذه المرحلة.', style: const TextStyle(color: AppConstants.textSecondary, fontStyle: FontStyle.italic, fontSize: 12)),
+          );
+        }
+        final entries = snapshot.data!.docs;
+        return ListView.builder(
+          // --- بداية التعديل ---
+          controller: listViewController, // استخدام الـ ScrollController المُعرف
+          // --- نهاية التعديل ---
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: entries.length,
+          itemBuilder: (context, index) {
+            final entryData = entries[index].data() as Map<String, dynamic>;
+            final String note = entryData['note'] ?? '';
+            // التعامل مع كلا الحقلين imageUrl (مفرد) و imageUrls (قائمة) كما في صفحة المسؤول
+            final List<String> imageUrlsToDisplay = [];
+            final dynamic imagesField = entryData['imageUrls'];
+            final dynamic singleImageField = entryData['imageUrl'];
+
+            if (imagesField is List) {
+              imageUrlsToDisplay.addAll(imagesField.map((e) => e.toString()).toList());
+            } else if (singleImageField is String && singleImageField.isNotEmpty) {
+              imageUrlsToDisplay.add(singleImageField);
+            }
+
+            final String engineerName = entryData['engineerName'] ?? 'مهندس';
+            final Timestamp? timestamp = entryData['timestamp'] as Timestamp?;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall / 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // عرض الصور المتعددة إذا وجدت
+                  if (imageUrlsToDisplay.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: note.isNotEmpty ? AppConstants.paddingSmall / 2 : 0),
+                      child: Wrap(
+                        spacing: AppConstants.paddingSmall / 1.5,
+                        runSpacing: AppConstants.paddingSmall / 1.5,
+                        children: imageUrlsToDisplay.map((url) {
+                          return InkWell(
+                            onTap: () => _viewImageDialog(url),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
+                              child: Image.network(
+                                url,
+                                height: 80, // حجم أصغر للمعاينة في قائمة العميل
+                                width: 80,
+                                fit: BoxFit.cover,
+                                loadingBuilder: (ctx, child, progress) => progress == null
+                                    ? child
+                                    : Container(height: 80, width: 80, alignment: Alignment.center, child: const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppConstants.primaryLight))),
+                                errorBuilder: (c, e, s) => Container(height: 80, width: 80, color: AppConstants.backgroundColor.withOpacity(0.5), child: Center(child: Icon(Icons.broken_image_outlined, color: AppConstants.textSecondary.withOpacity(0.7), size: 25))),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  if (note.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.only(top: imageUrlsToDisplay.isNotEmpty ? AppConstants.paddingSmall/2 : 0),
+                      child: ExpandableText("ملاحظة المهندس: $note", valueColor: AppConstants.textPrimary, trimLines: 2),
+                    ),
+                  if (imageUrlsToDisplay.isNotEmpty || note.isNotEmpty)
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: Text(
+                        'بواسطة: $engineerName ${timestamp != null ? "- " + DateFormat('dd/MM/yy', 'ar').format(timestamp.toDate()) : ''}',
+                        style: const TextStyle(fontSize: 10, color: AppConstants.textSecondary, fontStyle: FontStyle.italic),
+                      ),
+                    ),
+                  if (index < entries.length -1) const Divider(height: AppConstants.paddingSmall, thickness: 0.3),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+
+  // Placeholder - Implement this based on AdminProjectDetailsPage logic (read-only)
+  Widget _buildClientTestsTab(String projectId) {
+    return ListView.builder(
+      key: const PageStorageKey<String>('clientTestsTab'),
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      itemCount: finalCommissioningTests.length,
+      itemBuilder: (context, sectionIndex) {
+        final section = finalCommissioningTests[sectionIndex];
+        final sectionId = section['section_id'] as String; // Not used directly in client view for now
+        final sectionName = section['section_name'] as String;
+        final tests = section['tests'] as List<Map<String, dynamic>>;
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
+          elevation: 1.5,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
+          child: ExpansionTile(
+            key: PageStorageKey<String>(sectionId),
+            title: Text(sectionName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+            childrenPadding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingSmall, vertical: AppConstants.paddingSmall / 2),
+            children: tests.map((test) {
+              final testId = test['id'] as String;
+              final testName = test['name'] as String;
+              return StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('projects')
+                    .doc(projectId)
+                    .collection('tests_status')
+                    .doc(testId)
+                    .snapshots(),
+                builder: (context, testStatusSnapshot) {
+                  bool isTestCompleted = false;
+                  String testNote = "";
+                  String? testImageUrl;
+                  String? engineerName;
+
+                  if (testStatusSnapshot.hasData && testStatusSnapshot.data!.exists) {
+                    final statusData = testStatusSnapshot.data!.data() as Map<String, dynamic>;
+                    isTestCompleted = statusData['completed'] ?? false;
+                    testNote = statusData['note'] ?? '';
+                    testImageUrl = statusData['imageUrl'] as String?;
+                    engineerName = statusData['lastUpdatedByName'] as String?;
+                  }
+
+                  return ListTile(
+                    leading: Icon(
+                      isTestCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                      color: isTestCompleted ? AppConstants.successColor : AppConstants.textSecondary,
+                      size: 20,
+                    ),
+                    title: Text(testName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: isTestCompleted ? TextDecoration.lineThrough : null)),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (isTestCompleted && engineerName != null && engineerName.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2.0),
+                            child: Text("بواسطة: $engineerName", style: const TextStyle(fontSize: 10, color: AppConstants.textSecondary, fontStyle: FontStyle.italic)),
+                          ),
+                        if (testNote.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2.0),
+                            child: ExpandableText("ملاحظة: $testNote", valueColor: AppConstants.infoColor, trimLines: 1),
+                          ),
+                        if (testImageUrl != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2.0),
+                            child: InkWell(
+                              onTap: () => _viewImageDialog(testImageUrl??''),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.image_outlined, size: 14, color: AppConstants.primaryLight),
+                                  SizedBox(width: 2),
+                                  Text("عرض الصورة", style: TextStyle(fontSize: 11, color: AppConstants.primaryLight, decoration: TextDecoration.underline)),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  // Placeholder - Implement to show part requests related to the project
+  Widget _buildClientPartRequestsTab(String projectId) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('partRequests')
+          .where('projectId', isEqualTo: projectId) // Filter by project ID
+          .orderBy('requestedAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+        }
+        if (snapshot.hasError) {
+          return _buildErrorState('حدث خطأ في تحميل طلبات القطع: ${snapshot.error}');
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyState('لا توجد طلبات قطع لهذا المشروع حالياً.', icon: Icons.construction_rounded);
+        }
+
+        final requests = snapshot.data!.docs;
+        return ListView.builder(
+          key: const PageStorageKey<String>('clientPartRequestsTab'),
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+          itemCount: requests.length,
+          itemBuilder: (context, index) {
+            final requestDoc = requests[index];
+            final data = requestDoc.data() as Map<String, dynamic>;
+            final partName = data['partName'] ?? 'قطعة غير مسماة';
+            final quantity = data['quantity']?.toString() ?? 'N/A';
+            final engineerName = data['engineerName'] ?? 'مهندس غير معروف';
+            final status = data['status'] ?? 'غير معروف';
+            final requestedAt = (data['requestedAt'] as Timestamp?)?.toDate();
+            final formattedDate = requestedAt != null
+                ? DateFormat('yyyy/MM/dd hh:mm a', 'ar').format(requestedAt)
+                : 'غير معروف';
+
+            Color statusColor;
+            IconData statusIcon;
+            switch (status) {
+              case 'معلق': statusColor = AppConstants.warningColor; statusIcon = Icons.pending_actions_rounded; break;
+              case 'تمت الموافقة': statusColor = AppConstants.successColor; statusIcon = Icons.check_circle_outline_rounded; break;
+              case 'مرفوض': statusColor = AppConstants.errorColor; statusIcon = Icons.cancel_outlined; break;
+              case 'تم الطلب': statusColor = AppConstants.infoColor; statusIcon = Icons.shopping_cart_checkout_rounded; break;
+              case 'تم الاستلام': statusColor = AppConstants.primaryColor; statusIcon = Icons.inventory_2_outlined; break;
+              default: statusColor = AppConstants.textSecondary; statusIcon = Icons.help_outline_rounded;
+            }
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
+              elevation: 1.5,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
+              child: Padding(
+                padding: const EdgeInsets.all(AppConstants.paddingMedium / 1.5),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('اسم القطعة: $partName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                    const SizedBox(height: AppConstants.paddingSmall / 2),
+                    Text('الكمية: $quantity', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                    Text('مقدم الطلب: $engineerName', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                    Row(
+                      children: [
+                        // Text('الحالة: ', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                        Icon(statusIcon, color: statusColor, size: 16),
+                        const SizedBox(width: 4),
+                        Text(status, style: TextStyle(fontSize: 14, color: statusColor, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                    Text('تاريخ الطلب: $formattedDate', style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // This was the old method, no longer directly used for the main body but kept for reference
+  // if you want to re-introduce a specific list of completed phases elsewhere.
   Widget _buildCompletedPhasesList(String projectId) {
-    return StreamBuilder<QuerySnapshot>( //
+    return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('projects').doc(projectId).collection('phases')
           .where('completed', isEqualTo: true).orderBy('number').snapshots(),
       builder: (context, phaseSnapshot) {
@@ -325,7 +1043,7 @@ class _ClientHomeState extends State<ClientHome> {
           return _buildErrorState('حدث خطأ في تحميل المراحل المكتملة.');
         }
         if (!phaseSnapshot.hasData || phaseSnapshot.data!.docs.isEmpty) {
-          return _buildEmptyState('لا توجد مراحل مكتملة لعرضها حالياً.', icon: Icons.checklist_rtl_rounded); //
+          return _buildEmptyState('لا توجد مراحل مكتملة لعرضها حالياً.', icon: Icons.checklist_rtl_rounded);
         }
 
         final completedPhases = phaseSnapshot.data!.docs;
@@ -337,11 +1055,11 @@ class _ClientHomeState extends State<ClientHome> {
             final phase = completedPhases[index];
             final data = phase.data() as Map<String, dynamic>;
             final number = data['number'] ?? (index + 1);
-            final name = data['name'] ?? 'مرحلة غير مسمى'; //
+            final name = data['name'] ?? 'مرحلة غير مسمى';
             final note = data['note'] ?? '';
             final imageUrl = data['imageUrl'] as String?;
             final image360Url = data['image360Url'] as String?;
-            final hasSubPhases = data['hasSubPhases'] ?? false; //
+            final hasSubPhases = data['hasSubPhases'] ?? false;
 
             return Card(
               margin: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall),
@@ -373,7 +1091,7 @@ class _ClientHomeState extends State<ClientHome> {
                         _buildImageSection('صورة 360°:', image360Url),
                         if (note.isEmpty && (imageUrl == null || imageUrl.isEmpty) && (image360Url == null || image360Url.isEmpty) && !hasSubPhases)
                           const Text('لا توجد تفاصيل إضافية لهذه المرحلة.', style: TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
-                        if (hasSubPhases) _buildCompletedSubPhasesList(projectId, phase.id), //
+                        if (hasSubPhases) _buildCompletedSubPhasesList(projectId, phase.id),
                       ],
                     ),
                   ),
@@ -393,13 +1111,13 @@ class _ClientHomeState extends State<ClientHome> {
         const Divider(height: AppConstants.itemSpacing * 1.5, thickness: 0.5),
         const Text('المراحل الفرعية المكتملة:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.primaryColor)),
         const SizedBox(height: AppConstants.paddingSmall),
-        StreamBuilder<QuerySnapshot>( //
+        StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance.collection('projects').doc(projectId).collection('phases').doc(phaseId)
               .collection('subPhases').where('completed', isEqualTo: true).orderBy('timestamp').snapshots(),
           builder: (context, subPhaseSnapshot) {
             if (subPhaseSnapshot.connectionState == ConnectionState.waiting) return const Center(child: SizedBox(height:25, width:25, child: CircularProgressIndicator(strokeWidth: 2, color: AppConstants.primaryColor)));
             if (subPhaseSnapshot.hasError) return Text('خطأ: ${subPhaseSnapshot.error}', style: const TextStyle(color: AppConstants.errorColor));
-            if (!subPhaseSnapshot.hasData || subPhaseSnapshot.data!.docs.isEmpty) return const Text('لا توجد مراحل فرعية مكتملة.', style: TextStyle(color: AppConstants.textSecondary)); //
+            if (!subPhaseSnapshot.hasData || subPhaseSnapshot.data!.docs.isEmpty) return const Text('لا توجد مراحل فرعية مكتملة.', style: TextStyle(color: AppConstants.textSecondary));
 
             final completedSubPhases = subPhaseSnapshot.data!.docs;
             return ListView.builder(
@@ -414,12 +1132,12 @@ class _ClientHomeState extends State<ClientHome> {
                 final String? subImageUrl = subData['imageUrl'];
                 final String? subImage360Url = subData['image360Url'];
 
-                return Card( // Wrap sub-phase in a light card for better separation
+                return Card(
                   elevation: 0.5,
                   color: AppConstants.successColor.withOpacity(0.03),
                   margin: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall / 2),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
-                  child: ExpansionTile( // Allow expanding sub-phases too
+                  child: ExpansionTile(
                     leading: const Icon(Icons.check_circle_outline_rounded, color: AppConstants.successColor, size: 20),
                     title: Text(subName, style: const TextStyle(fontWeight: FontWeight.w500, color: AppConstants.textPrimary, fontSize: 14.5)),
                     subtitle: const Text('مكتملة', style: TextStyle(color: AppConstants.successColor, fontSize: 12)),
@@ -432,10 +1150,10 @@ class _ClientHomeState extends State<ClientHome> {
                         ExpandableText(subNote, valueColor: AppConstants.textSecondary, trimLines: 1),
                         const SizedBox(height: AppConstants.itemSpacing /2),
                       ],
-                      _buildImageSection('صورة فرعية عادية:', subImageUrl), //
-                      _buildImageSection('صورة فرعية 360°:', subImage360Url), //
+                      _buildImageSection('صورة فرعية عادية:', subImageUrl),
+                      _buildImageSection('صورة فرعية 360°:', subImage360Url),
                       if (subNote.isEmpty && (subImageUrl == null || subImageUrl.isEmpty) && (subImage360Url == null || subImage360Url.isEmpty))
-                        const Text('لا توجد تفاصيل إضافية لهذه المرحلة الفرعية.', style: TextStyle(fontSize: 13, color: AppConstants.textSecondary)), //
+                        const Text('لا توجد تفاصيل إضافية لهذه المرحلة الفرعية.', style: TextStyle(fontSize: 13, color: AppConstants.textSecondary)),
                     ],
                   ),
                 );
@@ -448,7 +1166,6 @@ class _ClientHomeState extends State<ClientHome> {
   }
 }
 
-// Helper widget for expandable text (same as in other detail pages)
 class ExpandableText extends StatefulWidget {
   final String text;
   final int trimLines;
@@ -494,7 +1211,7 @@ class ExpandableTextState extends State<ExpandableText> {
         TextSpan textSpan;
         if (textPainter.didExceedMaxLines) {
           textSpan = TextSpan(
-            text: _readMore && widget.text.length > endIndex ? widget.text.substring(0, endIndex) + "..." : widget.text,
+            text: _readMore && widget.text.length > endIndex && endIndex > 0 ? widget.text.substring(0, endIndex) + "..." : widget.text,
             style: TextStyle(fontSize: 14.5, color: widget.valueColor ?? AppConstants.textSecondary, height: 1.5),
             children: <TextSpan>[link],
           );

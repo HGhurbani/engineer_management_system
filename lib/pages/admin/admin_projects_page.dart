@@ -286,7 +286,7 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
                     ],
                   ),
                   const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
-                  _buildProjectInfoRow(Icons.stairs_outlined, 'المرحلة الحالية:', '$currentStage - $currentPhaseName'),
+                  // _buildProjectInfoRow(Icons.stairs_outlined, 'المرحلة الحالية:', '$currentStage - $currentPhaseName'),
                   _buildProjectInfoRow(Icons.engineering_outlined, 'المهندسون:', engineersDisplay),
                   _buildProjectInfoRow(Icons.person_outline_rounded, 'العميل:', clientName),
                   // --- MODIFICATION START ---

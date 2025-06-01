@@ -21,9 +21,8 @@ class AppConstants {
   static const double padding = 24.0;
   static const double borderRadius = 12.0;
   static const double spacing = 20.0;
-  // static const double cardElevation = 8.0; // Will be removed as per request
 
-  static const String appName = 'منصة المهندس';
+  static const String appName = 'منصة الجهد الآمن';
 
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [Color(0xFF2E5BFF), Color(0xFF3B82F6)],
@@ -39,8 +38,11 @@ class AppConstants {
   // Button specific colors for consistency
   static const Color adminButtonColor1 = Color(0xFFFF6B35);
   static const Color adminButtonColor2 = Color(0xFFFF8E53);
-  static const Color engineerButtonColor1 = Color(0xFF4CAF50); // Example: Green for engineer
+  static const Color engineerButtonColor1 = Color(0xFF4CAF50);
   static const Color engineerButtonColor2 = Color(0xFF81C784);
+  // New colors for client button
+  static const Color clientButtonColor1 = Color(0xFF007BFF); // Standard blue
+  static const Color clientButtonColor2 = Color(0xFF3395FF); // Lighter blue
 }
 
 class LoginPage extends StatefulWidget {
@@ -59,13 +61,10 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   String? _error;
 
-  // Animations removed as per request
-
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    // AnimationController removed
     super.dispose();
   }
 
@@ -92,7 +91,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Future<void> _loginUser() async { //
+  Future<void> _loginUser() async {
     if (!_loginFormKey.currentState!.validate()) return;
     if (!mounted) return;
     setState(() { _isLoading = true; _error = null; });
@@ -114,6 +113,12 @@ class _LoginPageState extends State<LoginPage> {
       final userData = userDoc.data() as Map<String, dynamic>;
       String role = userData['role'];
       String userName = userData['name'] ?? 'المستخدم';
+      // Determine clientType for clients, default if not present
+      String clientType = "individual"; // Default
+      if (role == 'client' && userData.containsKey('clientType')) {
+        clientType = userData['clientType'];
+      }
+
 
       _showSnackBar('مرحباً $userName! تم تسجيل الدخول بنجاح', isSuccess: true);
       await Future.delayed(const Duration(milliseconds: 1200));
@@ -134,13 +139,14 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> _loginOrRegisterRoleBased({ // New generic function
+  Future<void> _loginOrRegisterRoleBased({
     required String email,
     required String password,
     required String defaultName,
     required String role,
     required String successRoute,
     required String buttonLabelForError,
+    String clientType = "individual", // Added clientType with a default
   }) async {
     if (!mounted) return;
     setState(() { _isLoading = true; _error = null; });
@@ -152,9 +158,9 @@ class _LoginPageState extends State<LoginPage> {
         userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
       } on FirebaseAuthException catch (e) {
         if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
-          userExisted = false; // User does not exist or wrong pass, try creating
+          userExisted = false;
         } else {
-          throw e; // Re-throw other Firebase errors
+          throw e;
         }
       }
 
@@ -162,16 +168,20 @@ class _LoginPageState extends State<LoginPage> {
         try {
           userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email, password: password);
           if (userCredential.user != null) {
-            await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+            Map<String, dynamic> userDataToSet = {
               'uid': userCredential.user!.uid, 'email': email, 'name': defaultName, 'role': role, 'createdAt': FieldValue.serverTimestamp(),
-            });
+            };
+            if (role == 'client') {
+              userDataToSet['clientType'] = clientType; // Add clientType for client role
+            }
+            await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set(userDataToSet);
           }
         } on FirebaseAuthException catch (e) {
-          if (e.code == 'email-already-in-use') { // Should not happen if signIn failed with user-not-found
+          if (e.code == 'email-already-in-use') {
             if (mounted) setState(() => _error = 'فشل تسجيل الدخول كـ $buttonLabelForError: الحساب موجود ببيانات أخرى.');
             return;
           }
-          throw e; // Re-throw other creation errors
+          throw e;
         }
       }
 
@@ -180,14 +190,22 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      // Verify role from Firestore, even if we just created it
       DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(userCredential!.user!.uid).get();
       if (!userDoc.exists || (userDoc.data() as Map<String,dynamic>)['role'] != role) {
         if (mounted) setState(() => _error = 'فشل تسجيل الدخول كـ $buttonLabelForError: الدور غير متطابق أو المستخدم غير مهيأ بشكل صحيح.');
-        // Optionally sign out if role mismatch after creation for safety
-        // await FirebaseAuth.instance.signOut();
         return;
       }
+      // Verify clientType if the role is client
+      if (role == 'client') {
+        String firestoreClientType = (userDoc.data() as Map<String, dynamic>)['clientType'] ?? "individual";
+        if (firestoreClientType != clientType) {
+          // If clientType mismatch, update it in Firestore for consistency during quick login
+          await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).update({
+            'clientType': clientType,
+          });
+        }
+      }
+
 
       String userName = (userDoc.data() as Map<String,dynamic>)['name'] ?? defaultName;
       _showSnackBar('مرحباً $userName! تم تسجيل الدخول كـ $buttonLabelForError بنجاح', isSuccess: true);
@@ -204,7 +222,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
 
-  Future<void> _loginAsAdmin() async { // Uses the generic function
+  Future<void> _loginAsAdmin() async {
     await _loginOrRegisterRoleBased(
         email: 'z@z.com',
         password: '12345678',
@@ -215,7 +233,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Future<void> _loginAsEngineer() async { // Uses the generic function
+  Future<void> _loginAsEngineer() async {
     await _loginOrRegisterRoleBased(
         email: 'eng@eng.com',
         password: '12345678',
@@ -226,8 +244,21 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  // New function for client quick login
+  Future<void> _loginAsClient() async {
+    await _loginOrRegisterRoleBased(
+        email: 'cus@cus.com',
+        password: '12345678',
+        defaultName: 'عميل النظام', // System Client
+        role: 'client',
+        successRoute: '/client',
+        buttonLabelForError: 'عميل',
+        clientType: 'individual' // Assuming default type for quick login, can be changed if needed
+    );
+  }
 
-  String _getFirebaseErrorMessage(String errorCode) { //
+
+  String _getFirebaseErrorMessage(String errorCode) {
     switch (errorCode) {
       case 'user-not-found': return 'المستخدم غير موجود. يرجى التحقق من البريد الإلكتروني.';
       case 'wrong-password': return 'كلمة المرور خاطئة. يرجى المحاولة مرة أخرى.';
@@ -240,11 +271,13 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> _showRegisterDialog() async { //
+  Future<void> _showRegisterDialog() async {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
-    String selectedRole = 'client';
+    String selectedRole = 'client'; // Default role
+    String selectedClientType = 'individual'; // Default client type, only relevant if role is client
+
     final GlobalKey<FormState> registerFormKey = GlobalKey<FormState>();
     bool isRegistering = false;
     bool obscureRegisterPassword = true;
@@ -259,7 +292,7 @@ class _LoginPageState extends State<LoginPage> {
               textDirection: ui.TextDirection.rtl,
               child: Dialog(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius * 1.5)),
-                elevation: 5, // cardElevation removed, so using a fixed value for dialog
+                elevation: 5,
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 400),
                   padding: const EdgeInsets.all(AppConstants.padding),
@@ -295,11 +328,28 @@ class _LoginPageState extends State<LoginPage> {
                                   items: const [
                                     DropdownMenuItem(value: 'client', child: Text('عميل', style: TextStyle(color: AppConstants.textPrimary))),
                                     DropdownMenuItem(value: 'engineer', child: Text('مهندس', style: TextStyle(color: AppConstants.textPrimary))),
+                                    // Add other roles if needed, e.g., 'employee'
                                   ],
                                   onChanged: (val) { if (val != null) setDialogState(() => selectedRole = val); },
                                   validator: (value) => (value == null || value.isEmpty) ? 'الرجاء اختيار نوع المستخدم' : null,
                                 ),
                               ),
+                              if (selectedRole == 'client') ...[ // Show clientType dropdown only if role is client
+                                const SizedBox(height: AppConstants.spacing),
+                                Container(
+                                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppConstants.borderRadius), border: Border.all(color: AppConstants.borderColor), color: AppConstants.cardColor),
+                                  child: DropdownButtonFormField<String>(
+                                    value: selectedClientType,
+                                    decoration: InputDecoration(labelText: 'نوع العميل', prefixIcon: const Icon(Icons.business_center_outlined, color: AppConstants.primaryColor), border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
+                                    items: const [
+                                      DropdownMenuItem(value: 'individual', child: Text('فردي', style: TextStyle(color: AppConstants.textPrimary))),
+                                      DropdownMenuItem(value: 'company', child: Text('شركة', style: TextStyle(color: AppConstants.textPrimary))),
+                                    ],
+                                    onChanged: (val) { if (val != null) setDialogState(() => selectedClientType = val); },
+                                    validator: (value) => (value == null || value.isEmpty) ? 'الرجاء اختيار نوع العميل' : null,
+                                  ),
+                                ),
+                              ]
                             ],
                           ),
                         ),
@@ -318,7 +368,13 @@ class _LoginPageState extends State<LoginPage> {
                                     setDialogState(() => isRegistering = true);
                                     try {
                                       final userCred = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: emailController.text.trim(), password: passwordController.text.trim());
-                                      await FirebaseFirestore.instance.collection('users').doc(userCred.user!.uid).set({'uid': userCred.user!.uid, 'email': emailController.text.trim(), 'name': nameController.text.trim(), 'role': selectedRole, 'createdAt': FieldValue.serverTimestamp()});
+                                      Map<String, dynamic> userDataToSet = {
+                                        'uid': userCred.user!.uid, 'email': emailController.text.trim(), 'name': nameController.text.trim(), 'role': selectedRole, 'createdAt': FieldValue.serverTimestamp()
+                                      };
+                                      if (selectedRole == 'client') {
+                                        userDataToSet['clientType'] = selectedClientType;
+                                      }
+                                      await FirebaseFirestore.instance.collection('users').doc(userCred.user!.uid).set(userDataToSet);
                                       Navigator.pop(context);
                                       _showSnackBar('تم إنشاء الحساب بنجاح! يمكنك الآن تسجيل الدخول.', isSuccess: true);
                                     } on FirebaseAuthException catch (e) {
@@ -348,7 +404,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildEnhancedTextField({ //
+  Widget _buildEnhancedTextField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
@@ -357,7 +413,7 @@ class _LoginPageState extends State<LoginPage> {
     Widget? suffixIcon,
     String? Function(String?)? validator,
   }) {
-    return Container( // Container for shadow is kept as it's per field, not for the whole form
+    return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppConstants.borderRadius),
         boxShadow: [BoxShadow(color: AppConstants.primaryColor.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 1))],
@@ -379,7 +435,7 @@ class _LoginPageState extends State<LoginPage> {
           errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius), borderSide: const BorderSide(color: AppConstants.errorColor, width: 1)),
           focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius), borderSide: const BorderSide(color: AppConstants.errorColor, width: 1.5)),
           filled: true,
-          fillColor: AppConstants.cardColor, // Kept fill color for fields
+          fillColor: AppConstants.cardColor,
           contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
         ),
       ),
@@ -408,9 +464,9 @@ class _LoginPageState extends State<LoginPage> {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
-          padding: const EdgeInsets.symmetric(vertical: 16), // Increased padding for better touch target
+          padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
-          minimumSize: const Size(double.infinity, 50), // Ensure buttons take full width available in their part of Row/Column
+          minimumSize: const Size(double.infinity, 50),
         ),
       ),
     );
@@ -428,8 +484,6 @@ class _LoginPageState extends State<LoginPage> {
             child: Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(AppConstants.padding),
-                // Removed FadeTransition and SlideTransition
-                // Removed outer Card/Container that grouped form elements
                 child: Form(
                   key: _loginFormKey,
                   child: Column(
@@ -445,20 +499,19 @@ class _LoginPageState extends State<LoginPage> {
                       const Text(AppConstants.appName, textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
                       const SizedBox(height: 8),
                       const Text('مرحباً بك مرة أخرى', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: AppConstants.textSecondary)),
-                      const SizedBox(height: AppConstants.spacing * 1.5), // Adjusted spacing
+                      const SizedBox(height: AppConstants.spacing * 1.5),
                       _buildEnhancedTextField(controller: _emailController, label: 'البريد الإلكتروني', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress, validator: (value) => (value == null || value.isEmpty) ? 'الرجاء إدخال البريد الإلكتروني' : (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value) ? 'صيغة البريد الإلكتروني غير صحيحة' : null)),
                       const SizedBox(height: AppConstants.spacing),
                       _buildEnhancedTextField(controller: _passwordController, label: 'كلمة المرور', icon: Icons.lock_outline_rounded, obscureText: _obscurePassword, suffixIcon: IconButton(icon: Icon(_obscurePassword ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: AppConstants.textSecondary), onPressed: () => setState(() => _obscurePassword = !_obscurePassword)), validator: (value) => (value == null || value.isEmpty) ? 'الرجاء إدخال كلمة المرور' : (value.length < 6 ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' : null)),
                       const SizedBox(height: AppConstants.spacing),
                       if (_error != null)
                         Container(
-                          margin: const EdgeInsets.only(bottom: AppConstants.spacing / 2), // Reduced bottom margin
-                          padding: const EdgeInsets.all(AppConstants.padding / 1.5), // Reduced padding
+                          margin: const EdgeInsets.only(bottom: AppConstants.spacing / 2),
+                          padding: const EdgeInsets.all(AppConstants.padding / 1.5),
                           decoration: BoxDecoration(color: AppConstants.errorColor.withOpacity(0.1), borderRadius: BorderRadius.circular(AppConstants.borderRadius), border: Border.all(color: AppConstants.errorColor.withOpacity(0.3), width: 1)),
                           child: Row(children: [const Icon(Icons.error_outline_rounded, color: AppConstants.errorColor, size: 20), const SizedBox(width: 12), Expanded(child: Text(_error!, style: const TextStyle(color: AppConstants.errorColor, fontSize: 14, fontWeight: FontWeight.w500)))]),
                         ),
 
-                      // Main Login Button
                       Container(
                         decoration: BoxDecoration(gradient: AppConstants.primaryGradient, borderRadius: BorderRadius.circular(AppConstants.borderRadius), boxShadow: [BoxShadow(color: AppConstants.primaryColor.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 6))]),
                         child: ElevatedButton.icon(
@@ -468,34 +521,54 @@ class _LoginPageState extends State<LoginPage> {
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent, padding: const EdgeInsets.symmetric(vertical: 17), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)), minimumSize: const Size(double.infinity, 50)),
                         ),
                       ),
-                      const SizedBox(height: AppConstants.spacing * 0.75), // Spacing before role login buttons
-
-                      // Role-based login buttons in a Row
+                      const SizedBox(height: AppConstants.spacing * 0.75),
                       Row(
                         children: [
                           Expanded(
                             child: _buildRoleLoginButton(
-                              label: 'دخول كمسؤول', // Updated label
+                              label: 'دخول كمسؤول',
                               icon: Icons.admin_panel_settings_rounded,
-                              onPressed: _loginAsAdmin, // Updated function call
-                              color1: AppConstants.adminButtonColor1, // Using specific colors from AppConstants
+                              onPressed: _loginAsAdmin,
+                              color1: AppConstants.adminButtonColor1,
                               color2: AppConstants.adminButtonColor2,
                             ),
                           ),
-                          const SizedBox(width: AppConstants.spacing / 2), // Spacing between buttons
+                          const SizedBox(width: AppConstants.spacing / 2),
                           Expanded(
                             child: _buildRoleLoginButton(
                               label: 'دخول كمهندس',
                               icon: Icons.engineering_rounded,
                               onPressed: _loginAsEngineer,
-                              color1: AppConstants.engineerButtonColor1, // Using specific colors
+                              color1: AppConstants.engineerButtonColor1,
                               color2: AppConstants.engineerButtonColor2,
                             ),
                           ),
                         ],
                       ),
-
-                      const SizedBox(height: AppConstants.spacing * 1.5),
+                      const SizedBox(height: AppConstants.spacing / 2), // Added spacing before the new button
+                      // New Client Login Button
+                      _buildRoleLoginButton(
+                        label: 'دخول كعميل',
+                        icon: Icons.person_rounded, // Example icon for client
+                        onPressed: _loginAsClient,
+                        color1: AppConstants.clientButtonColor1, // Using new client button colors
+                        color2: AppConstants.clientButtonColor2,
+                      ),
+                      // const SizedBox(height: AppConstants.spacing * 0.75), // Adjusted spacing for register button
+                      // // Register Button
+                      // TextButton.icon(
+                      //   onPressed: _isLoading ? null : _showRegisterDialog,
+                      //   icon: const Icon(Icons.person_add_alt_1_outlined, color: AppConstants.primaryColor, size: 20),
+                      //   label: const Text(
+                      //     'ليس لديك حساب؟ إنشاء حساب جديد',
+                      //     style: TextStyle(color: AppConstants.primaryColor, fontSize: 14, fontWeight: FontWeight.w600),
+                      //   ),
+                      //   style: TextButton.styleFrom(
+                      //     padding: const EdgeInsets.symmetric(vertical: 12),
+                      //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+                      //   ),
+                      // ),
+                      const SizedBox(height: AppConstants.spacing),
                       Text('© ${DateTime.now().year} ${AppConstants.appName}', textAlign: TextAlign.center, style: TextStyle(color: AppConstants.textSecondary.withOpacity(0.7), fontSize: 12)),
                     ],
                   ),
