@@ -1,24 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A Engineer Management System.">
+  <meta name="description" content="An Engineer Management System.">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -28,28 +15,41 @@
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyALwjTWZOafa0RhBLcOgrgHHuzQWk5_fwQ"></script>
-  <title>engineer_management_system</title>
-  <link rel="manifest" href="manifest.json">
-  <script src="https://www.gstatic.com/firebasejs/11.8.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.8.0/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.8.0/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.8.0/firebase-storage.js"></script>
+
+  <!-- Google Maps JavaScript API (async for performance) -->
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyALwjTWZOafa0RhBLcOgrgHHuzQWk5_fwQ&callback=initMap"></script>
+
+  <!-- Firebase JS SDKs using compat (non-module) for browser compatibility -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+
+  <!-- Firebase Configuration -->
   <script>
-  // تكوينات Firebase الخاصة بك من firebase_options.dart
-  const firebaseConfig = {
-    apiKey: "AIzaSyDX_fhBTQmwm-KP8Qu2gfwFQylGuaEm4VA", // من firebase_options.dart
-    authDomain: "eng-system.firebaseapp.com",      // من firebase_options.dart
-    projectId: "eng-system",                       // من firebase_options.dart
-    storageBucket: "eng-system.firebasestorage.app", // من firebase_options.dart
-    messagingSenderId: "526461382833",             // من firebase_options.dart
-    appId: "1:526461382833:web:46090faa13de2d4b30f290", // من firebase_options.dart
-    measurementId: "G-NMMTY5PN4Y"                  // من firebase_options.dart
-  };
-  firebase.initializeApp(firebaseConfig);
-</script>
+    window.onload = function () {
+      const firebaseConfig = {
+        apiKey: "AIzaSyDX_fhBTQmwm-KP8Qu2gfwFQylGuaEm4VA",
+        authDomain: "eng-system.firebaseapp.com",
+        projectId: "eng-system",
+        storageBucket: "eng-system.firebasestorage.app",
+        messagingSenderId: "526461382833",
+        appId: "1:526461382833:web:46090faa13de2d4b30f290",
+        measurementId: "G-NMMTY5PN4Y"
+      };
+      firebase.initializeApp(firebaseConfig);
+    };
+
+    // Placeholder for the Google Maps init callback
+    function initMap() {
+      console.log("Google Maps API loaded.");
+    }
+  </script>
+
+  <link rel="manifest" href="manifest.json">
+  <title>engineer_management_system</title>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+<script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

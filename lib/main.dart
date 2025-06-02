@@ -34,6 +34,16 @@ void main() async {
     print('Firebase app [DEFAULT] already initialized.'); //
   }
 
+  // options: const FirebaseOptions(
+  //   apiKey: "AIzaSyDX_fhBTQmwm-KP8Qu2gfwFQylGuaEm4VA",
+  //   authDomain: "eng-system.firebaseapp.com",
+  //   projectId: "eng-system",
+  //   storageBucket: "eng-system.firebasestorage.app",
+  //   messagingSenderId: "526461382833",
+  //   appId: "1:526461382833:web:46090faa13de2d4b30f290",
+  //   measurementId: "G-NMMTY5PN4Y",
+  // ),
+
   await initializeDateFormatting('ar', null);
   runApp(const MyApp());
 }
@@ -85,19 +95,11 @@ class MyApp extends StatelessWidget {
         '/admin/employees': (context) => const AdminEmployeesPage(), //
         '/admin/projects': (context) => const AdminProjectsPage(), //
         '/admin/projectDetails': (context) { //
-          final route = ModalRoute.of(context);
-          if (route == null || route.settings.arguments == null) {
-            return const LoginPage(); // أو صفحة خطأ
-          }
-          final projectId = route.settings.arguments as String;
+          final projectId = ModalRoute.of(context)!.settings.arguments as String;
           return AdminProjectDetailsPage(projectId: projectId);
         },
         '/projectDetails': (context) { //
-          final route = ModalRoute.of(context);
-          if (route == null || route.settings.arguments == null) {
-            return const LoginPage(); // أو صفحة خطأ
-          }
-          final projectId = route.settings.arguments as String;
+          final projectId = ModalRoute.of(context)!.settings.arguments as String;
           return ProjectDetailsPage(projectId: projectId);
         },
         '/admin/settings': (context) => const AdminSettingsPage(), //
@@ -136,9 +138,7 @@ class AuthWrapper extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         } else if (snapshot.hasData) {
           return FutureBuilder<DocumentSnapshot>(
-            future: snapshot.data != null
-                ? FirebaseFirestore.instance.collection('users').doc(snapshot.data!.uid).get()
-                : Future.error('User data is null'),
+            future: FirebaseFirestore.instance.collection('users').doc(snapshot.data!.uid).get(),
             builder: (context, userDocSnapshot) {
               if (userDocSnapshot.connectionState == ConnectionState.waiting) {
                 return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -147,10 +147,6 @@ class AuthWrapper extends StatelessWidget {
               } else if (userDocSnapshot.hasData && userDocSnapshot.data!.exists) {
                 final data = userDocSnapshot.data!.data() as Map<String, dynamic>;
                 final role = data['role'];
-                if (role == null) {
-                  print('User document missing "role" field');
-                  return const LoginPage();
-                }
                 if (role == 'admin') return const AdminDashboard(); //
                 if (role == 'engineer') return const EngineerHome(); //
                 if (role == 'client') return const ClientHome(); //
