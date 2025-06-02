@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // For date formatting
 import 'dart:ui' as ui; // For TextDirection
 
+import 'dart:async'; // تم إضافة هذا الاستيراد للـ StreamSubscription
+
 // Constants for consistent styling, aligned with the admin dashboard's style.
 class AppConstants {
   static const Color primaryColor = Color(0xFF2563EB);
@@ -36,18 +38,17 @@ class ClientHome extends StatefulWidget {
   State<ClientHome> createState() => _ClientHomeState();
 }
 
-class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin { // Added TickerProviderStateMixin
+class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
   final String? _currentClientUid = FirebaseAuth.instance.currentUser?.uid;
   String? _clientName;
   bool _isLoading = true;
-  late TabController _tabController; // For tabs
+  late TabController _tabController;
 
-  // Copied from engineer_project_details_page.dart for phase/test structure
+  int _unreadNotificationsCount = 0;
+  StreamSubscription? _notificationsSubscription; // تم إضافة هذا الاستيراد
+
   static const List<Map<String, dynamic>> predefinedPhasesStructure = [
-    // ... (Paste the full predefinedPhasesStructure list here from your project_details_page.dart)
-    // Example (ensure you have the full list):
-
-    // ... more main phases
+    // ... (قائمة المراحل كما هي في الكود الأصلي)
     {
       'id': 'phase_01', // معرّف فريد لكل مرحلة
       'name': 'تأسيس الميدة',
@@ -203,7 +204,7 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
         {'id': 'sub_09_06', 'name': 'تركيب المرحاض العربي: قاعدة رملية'},
         {'id': 'sub_09_07', 'name': 'تركيب المرحاض العربي: إسمنت جانبي'},
         {'id': 'sub_09_08', 'name': 'تركيب المرحاض العربي: توصيل المرحاض بماسورة السيفون'},
-        {'id': 'sub_09_09', 'name': 'تركيب المرحاض العربي: تركيب رداد ٤ إنش'},
+        {'id': 'sub_09_09', 'name': 'تركيب رداد ٤ إنش'},
       ]
     },
     {
@@ -308,20 +309,39 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this); // 3 tabs: Phases, Tests, Part Requests
+    _tabController = TabController(length: 3, vsync: this);
     if (_currentClientUid == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _logout();
       });
     } else {
       _fetchClientData();
+      _listenForUnreadNotifications(); // ابدأ الاستماع للإشعارات
     }
   }
 
   @override
   void dispose() {
-    _tabController.dispose(); // Dispose TabController
+    _tabController.dispose();
+    _notificationsSubscription?.cancel(); // إلغاء الاشتراك عند التخلص من الويدجت
     super.dispose();
+  }
+
+  // دالة جديدة للاستماع لعدد الإشعارات غير المقروءة
+  void _listenForUnreadNotifications() {
+    if (_currentClientUid == null) return;
+    _notificationsSubscription = FirebaseFirestore.instance
+        .collection('notifications')
+        .where('userId', isEqualTo: _currentClientUid)
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          _unreadNotificationsCount = snapshot.docs.length;
+        });
+      }
+    });
   }
 
   Future<void> _fetchClientData() async {
@@ -458,10 +478,40 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
       elevation: 3,
       centerTitle: true,
       actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-          tooltip: 'الإشعارات',
-          onPressed: () => Navigator.pushNamed(context, '/notifications'),
+        Stack( // استخدام Stack لوضع العداد فوق الأيقونة
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+              tooltip: 'الإشعارات',
+              onPressed: () => Navigator.pushNamed(context, '/notifications'),
+            ),
+            if (_unreadNotificationsCount > 0) // عرض العداد فقط إذا كان هناك إشعارات غير مقروءة
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: AppConstants.errorColor, // لون أحمر مميز
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white, width: 1), // حدود بيضاء
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 18,
+                    minHeight: 18,
+                  ),
+                  child: Text(
+                    _unreadNotificationsCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+          ],
         ),
         IconButton(
           icon: const Icon(Icons.logout_rounded, color: Colors.white),
@@ -469,7 +519,7 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
           onPressed: _logout,
         ),
       ],
-      bottom: TabBar( // Add TabBar here
+      bottom: TabBar(
         controller: _tabController,
         indicatorColor: Colors.white,
         labelColor: Colors.white,
@@ -526,6 +576,7 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
     );
   }
 
+  // === إضافة دالة build هنا ===
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -584,6 +635,7 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
       ),
     );
   }
+  // === نهاية دالة build ===
 
   Widget _buildProjectSummaryCard(Map<String, dynamic> projectData) {
     final projectName = projectData['name'] ?? 'مشروع غير مسمى';

@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'firebase_options.dart'; //
+import 'firebase_options.dart';
 import 'package:engineer_management_system/pages/auth/login_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_dashboard.dart';
 import 'package:engineer_management_system/pages/engineer/engineer_home.dart';
@@ -18,31 +18,35 @@ import 'package:engineer_management_system/pages/admin/admin_projects_page.dart'
 import 'package:engineer_management_system/pages/admin/admin_project_details_page.dart';
 import 'package:engineer_management_system/pages/engineer/project_details_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_settings_page.dart';
-// Import for the new Part Request page
 import 'package:engineer_management_system/pages/engineer/request_part_page.dart';
+
+// --- ADDITION START ---
+import 'package:engineer_management_system/pages/admin/admin_evaluations_page.dart'; // استيراد صفحة التقييم الجديدة
+// --- ADDITION END ---
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (Firebase.apps.isEmpty) { // تحقق مما إذا كانت قائمة تطبيقات Firebase فارغة
+  if (Firebase.apps.isEmpty) {
     await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform, //
+      options: DefaultFirebaseOptions.currentPlatform,
     );
   } else {
-    // إذا لم تكن فارغة، افترض أن التطبيق الافتراضي موجود بالفعل
-    // يمكنك إضافة تسجيل (log) هنا إذا أردت للتأكد
-    print('Firebase app [DEFAULT] already initialized.'); //
+    print('Firebase app [DEFAULT] already initialized.');
   }
+  // await Firebase.initializeApp(
+  //   options: const FirebaseOptions(
+  //     apiKey: "AIzaSyDX_fhBTQmwm-KP8Qu2gfwFQylGuaEm4VA",
+  //     authDomain: "eng-system.firebaseapp.com",
+  //     projectId: "eng-system",
+  //     storageBucket: "eng-system.firebasestorage.app",
+  //     messagingSenderId: "526461382833",
+  //     appId: "1:526461382833:web:46090faa13de2d4b30f290",
+  //     measurementId: "G-NMMTY5PN4Y",
+  //   ),
+  // );
 
-  // options: const FirebaseOptions(
-  //   apiKey: "AIzaSyDX_fhBTQmwm-KP8Qu2gfwFQylGuaEm4VA",
-  //   authDomain: "eng-system.firebaseapp.com",
-  //   projectId: "eng-system",
-  //   storageBucket: "eng-system.firebasestorage.app",
-  //   messagingSenderId: "526461382833",
-  //   appId: "1:526461382833:web:46090faa13de2d4b30f290",
-  //   measurementId: "G-NMMTY5PN4Y",
-  // ),
 
   await initializeDateFormatting('ar', null);
   runApp(const MyApp());
@@ -57,19 +61,18 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Engineer Management System',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2563EB)), // استخدمنا لون مشابه للـ primaryColor الجديد
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2563EB)),
         useMaterial3: true,
-        fontFamily: 'Tajawal', // <--- هنا يتم تعيين الخط الافتراضي للتطبيق
+        fontFamily: 'Tajawal',
         appBarTheme: const AppBarTheme(
-          color: Color(0xFF2563EB), // يمكنك استخدام AppConstants.primaryColor هنا إذا كانت معرفة
+          color: Color(0xFF2563EB),
           iconTheme: IconThemeData(color: Colors.white),
-          titleTextStyle: TextStyle(fontFamily: 'Tajawal', fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white), // تطبيق الخط على عناوين AppBar أيضاً
+          titleTextStyle: TextStyle(fontFamily: 'Tajawal', fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
         ),
-        textTheme: const TextTheme( // يمكنك تخصيص أنماط النصوص المختلفة هنا إذا أردت
+        textTheme: const TextTheme(
           bodyLarge: TextStyle(fontFamily: 'Tajawal', fontSize: 16.0),
           bodyMedium: TextStyle(fontFamily: 'Tajawal', fontSize: 14.0),
           displayLarge: TextStyle(fontFamily: 'Tajawal', fontSize: 32.0, fontWeight: FontWeight.bold),
-          // ... أضف المزيد من الأنماط حسب الحاجة
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
@@ -81,44 +84,44 @@ class MyApp extends StatelessWidget {
                 textStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w500)
             )
         ),
-        // يمكنك أيضاً تخصيص الخط للـ FloatingActionButtonTheme, CardTheme, etc.
       ),
       initialRoute: '/',
       routes: {
         '/': (context) => const AuthWrapper(),
-        '/login': (context) => const LoginPage(), //
-        '/admin': (context) => const AdminDashboard(), //
-        '/engineer': (context) => const EngineerHome(), //
-        '/client': (context) => const ClientHome(), //
-        '/admin/engineers': (context) => const AdminEngineersPage(), //
-        '/admin/clients': (context) => const AdminClientsPage(), //
-        '/admin/employees': (context) => const AdminEmployeesPage(), //
-        '/admin/projects': (context) => const AdminProjectsPage(), //
-        '/admin/projectDetails': (context) { //
+        '/login': (context) => const LoginPage(),
+        '/admin': (context) => const AdminDashboard(),
+        '/engineer': (context) => const EngineerHome(),
+        '/client': (context) => const ClientHome(),
+        '/admin/engineers': (context) => const AdminEngineersPage(),
+        '/admin/clients': (context) => const AdminClientsPage(),
+        '/admin/employees': (context) => const AdminEmployeesPage(),
+        '/admin/projects': (context) => const AdminProjectsPage(),
+        '/admin/projectDetails': (context) {
           final projectId = ModalRoute.of(context)!.settings.arguments as String;
           return AdminProjectDetailsPage(projectId: projectId);
         },
-        '/projectDetails': (context) { //
+        '/projectDetails': (context) {
           final projectId = ModalRoute.of(context)!.settings.arguments as String;
           return ProjectDetailsPage(projectId: projectId);
         },
-        '/admin/settings': (context) => const AdminSettingsPage(), //
-        '/admin/attendance': (context) => const AdminAttendancePage(), //
-        '/notifications': (context) => const NotificationsPage(), //
+        '/admin/settings': (context) => const AdminSettingsPage(),
+        '/admin/attendance': (context) => const AdminAttendancePage(),
+        '/notifications': (context) => const NotificationsPage(),
         // New route for requesting parts
-        '/engineer/request_part': (context) { //
+        '/engineer/request_part': (context) {
           final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
           if (args != null && args.containsKey('engineerId') && args.containsKey('engineerName')) {
-            return RequestPartPage( //
+            return RequestPartPage(
               engineerId: args['engineerId'] as String,
               engineerName: args['engineerName'] as String,
             );
           }
-          // Fallback or error handling if arguments are missing
-          // You might want to redirect to login or show an error page
-          print('Error: Missing arguments for /engineer/request_part route.'); //
-          return const LoginPage(); // Or a dedicated error screen
+          print('Error: Missing arguments for /engineer/request_part route.');
+          return const LoginPage();
         },
+        // --- ADDITION START ---
+        '/admin/evaluations': (context) => const AdminEvaluationsPage(), // مسار جديد لصفحة التقييم
+        // --- ADDITION END ---
       },
 
       debugShowCheckedModeBanner: false,
@@ -147,41 +150,31 @@ class AuthWrapper extends StatelessWidget {
               } else if (userDocSnapshot.hasData && userDocSnapshot.data!.exists) {
                 final data = userDocSnapshot.data!.data() as Map<String, dynamic>;
                 final role = data['role'];
-                if (role == 'admin') return const AdminDashboard(); //
-                if (role == 'engineer') return const EngineerHome(); //
-                if (role == 'client') return const ClientHome(); //
-                return const LoginPage(); // Fallback for unknown role
+                if (role == 'admin') return const AdminDashboard();
+                if (role == 'engineer') return const EngineerHome();
+                if (role == 'client') return const ClientHome();
+                return const LoginPage();
               } else {
-                // If user is authenticated but no document in 'users' collection,
-                // might indicate an issue or a new user whose document creation failed.
-                // For now, redirect to login. Consider more robust handling.
-                print('User authenticated but no user document found in Firestore. UID: ${snapshot.data!.uid}'); //
-                // Optionally sign out the user if their Firestore record is missing
-                // FirebaseAuth.instance.signOut();
-                return const LoginPage(); //
+                print('User authenticated but no user document found in Firestore. UID: ${snapshot.data!.uid}');
+                return const LoginPage();
               }
             },
           );
         } else {
-          return const LoginPage(); // No user logged in
+          return const LoginPage();
         }
       },
     );
   }
 }
 
-// --- MODIFICATION START: Notification Helper Functions ---
-// It's generally better to put these in a separate service/utility file,
-// but for simplicity, we'll add them here as requested.
-
-/// Sends a single notification to a specific user.
 Future<void> sendNotification({
   required String recipientUserId,
   required String title,
   required String body,
   required String type,
   String? projectId,
-  String? itemId, // Generic ID for phase, test, part request, etc.
+  String? itemId,
   String? senderName,
 }) async {
   try {
@@ -194,15 +187,13 @@ Future<void> sendNotification({
       'itemId': itemId,
       'isRead': false,
       'timestamp': FieldValue.serverTimestamp(),
-      'senderName': senderName ?? 'النظام', // Default sender name
+      'senderName': senderName ?? 'النظام',
     });
   } catch (e) {
     print('Error sending notification to $recipientUserId: $e');
-    // Consider more robust error handling or logging
   }
 }
 
-/// Sends the same notification to multiple users.
 Future<void> sendNotificationsToMultiple({
   required List<String> recipientUserIds,
   required String title,
@@ -213,9 +204,6 @@ Future<void> sendNotificationsToMultiple({
   String? senderName,
 }) async {
   for (String userId in recipientUserIds) {
-    // Consider adding a small delay or batching if sending to a very large number of users
-    // to avoid hitting Firestore write limits too quickly, though for typical admin/engineer lists
-    // this direct loop should be fine.
     await sendNotification(
       recipientUserId: userId,
       title: title,
@@ -228,7 +216,6 @@ Future<void> sendNotificationsToMultiple({
   }
 }
 
-/// Fetches a list of UIDs for all users with the 'admin' role.
 Future<List<String>> getAdminUids() async {
   try {
     final adminSnapshot = await FirebaseFirestore.instance
@@ -238,7 +225,6 @@ Future<List<String>> getAdminUids() async {
     return adminSnapshot.docs.map((doc) => doc.id).toList();
   } catch (e) {
     print('Error fetching admin UIDs: $e');
-    return []; // Return empty list on error
+    return [];
   }
 }
-// --- MODIFICATION END: Notification Helper Functions ---

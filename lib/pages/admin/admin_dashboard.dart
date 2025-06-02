@@ -1,3 +1,7 @@
+// lib/pages/admin/admin_dashboard.dart
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -79,6 +83,12 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   String _currentGreeting = '';
   String _userName = 'مسؤول النظام';
 
+  // --- ADDITION START ---
+  int _unreadNotificationsCount = 0;
+  User? _currentUser;
+  StreamSubscription? _notificationsSubscription;
+  // --- ADDITION END ---
+
   @override
   void initState() {
     super.initState();
@@ -86,7 +96,29 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
     _setGreeting();
     _fetchDashboardStats();
     _getCurrentUserName();
+    // --- ADDITION START ---
+    _currentUser = FirebaseAuth.instance.currentUser;
+    _listenForUnreadNotifications();
+    // --- ADDITION END ---
   }
+
+  // --- ADDITION START ---
+  void _listenForUnreadNotifications() {
+    if (_currentUser == null) return;
+    _notificationsSubscription = FirebaseFirestore.instance
+        .collection('notifications')
+        .where('userId', isEqualTo: _currentUser!.uid)
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          _unreadNotificationsCount = snapshot.docs.length;
+        });
+      }
+    });
+  }
+  // --- ADDITION END ---
 
   void _initializeAnimations() {
     _fadeController = AnimationController(
@@ -203,27 +235,27 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
 
   Future<bool?> _showLogoutConfirmation() async {
     return await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-            ),
-            title: const Text('تأكيد تسجيل الخروج'),
-            content: const Text('هل أنت متأكد من رغبتك في تسجيل الخروج؟'),
-            actions: [
-            TextButton(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+        ),
+        title: const Text('تأكيد تسجيل الخروج'),
+        content: const Text('هل أنت متأكد من رغبتك في تسجيل الخروج؟'),
+        actions: [
+          TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-    child: const Text('إلغاء'),
-    ),
-    ElevatedButton(
-    onPressed: () => Navigator.of(context).pop(true),
-    style: ElevatedButton.styleFrom(
-    backgroundColor: AppConstants.errorColor,
-    foregroundColor: Colors.white,
-    ),
-    child: const Text('تسجيل الخروج'),
-    ),],
-        ),);
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppConstants.errorColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('تسجيل الخروج'),
+          ),],
+      ),);
 
   }
 
@@ -257,6 +289,9 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
+    // --- ADDITION START ---
+    _notificationsSubscription?.cancel();
+    // --- ADDITION END ---
     super.dispose();
   }
 
@@ -320,11 +355,43 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         ),
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-          tooltip: 'الإشعارات',
-          onPressed: () => Navigator.pushNamed(context, '/notifications'),
+        // --- ADDITION START ---
+        Stack(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+              tooltip: 'الإشعارات',
+              onPressed: () => Navigator.pushNamed(context, '/notifications'),
+            ),
+            if (_unreadNotificationsCount > 0)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: AppConstants.errorColor, // لون أحمر مميز
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white, width: 1),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 18,
+                    minHeight: 18,
+                  ),
+                  child: Text(
+                    _unreadNotificationsCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+          ],
         ),
+        // --- ADDITION END ---
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert, color: Colors.white),
           onSelected: (value) {
@@ -657,13 +724,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         color: AppConstants.infoColor,
         route: '/admin/clients',
       ),
-      _ManagementItem(
-        title: 'إدارة الموظفين',
-        subtitle: 'عرض وإدارة الموظفين',
-        icon: Icons.badge_rounded,
-        color: AppConstants.primaryColor,
-        route: '/admin/employees',
-      ),
+      // _ManagementItem(
+      //   title: 'إدارة الموظفين',
+      //   subtitle: 'عرض وإدارة الموظفين',
+      //   icon: Icons.badge_rounded,
+      //   color: AppConstants.primaryColor,
+      //   route: '/admin/employees',
+      // ),
       _ManagementItem(
         title: 'عرض المشاريع',
         subtitle: 'متابعة جميع المشاريع',
@@ -673,10 +740,17 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       ),
       _ManagementItem(
         title: 'كشف حضور',
-        subtitle: 'متابعة حضور الموظفين',
+        subtitle: 'متابعة حضور الفنيين',
         icon: Icons.access_time_filled_rounded,
         color: const Color(0xFF8B5CF6),
         route: '/admin/attendance',
+      ),
+      _ManagementItem(
+        title: 'تقييم الفنيين',
+        subtitle: 'متابعة أداء المهندسين',
+        icon: Icons.star_half_rounded,
+        color: const Color(0xFFEC4899),
+        route: '/admin/evaluations',
       ),
       _ManagementItem(
         title: 'الإعدادات العامة',

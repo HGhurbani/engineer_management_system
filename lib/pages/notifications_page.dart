@@ -126,10 +126,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   // --- MODIFICATION START: _handleNotificationTap ---
+  // lib/pages/notifications_page.dart
+// ... (الكود السابق للدالة)
+
   void _handleNotificationTap(String? projectId, String? itemId, String notificationType) {
     if (!mounted) return;
     String route = '';
-    // dynamic arguments; // To pass arguments like projectId or itemId
 
     // Determine base route by role
     if (_currentUserRole == 'admin') {
@@ -165,6 +167,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
       case 'project_assignment':
         if (_currentUserRole == 'engineer' && projectId != null && projectId.isNotEmpty) {
           Navigator.pushNamed(context, '/projectDetails', arguments: projectId);
+        } else if (_currentUserRole == 'client') {
+          // Client does not get project assignment notifications directly
+          // or they are handled by a general client home page, no deep link for client
+          Navigator.pushNamed(context, route); // Go to client home
         }
         break;
 
@@ -173,10 +179,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
       case 'subphase_update_by_admin':
       case 'test_update_by_admin':
       case 'project_entry_admin':
-      case 'phase_completed_by_engineer':
-      case 'subphase_completed_by_engineer':
-      case 'test_completed_by_engineer':
-      case 'project_entry_engineer':
+      // حالات التراجع عن الاكتمال بواسطة المسؤول
+      case 'phase_reverted_by_admin':
+      case 'subphase_reverted_by_admin':
+      case 'test_reverted_by_admin':
+      case 'project_entry_engineer': // المهندس أضاف إدخال
         if ((_currentUserRole == 'admin' || _currentUserRole == 'engineer') && projectId != null && projectId.isNotEmpty) {
           String detailRoute = _currentUserRole == 'admin' ? '/admin/projectDetails' : '/projectDetails';
           Navigator.pushNamed(context, detailRoute, arguments: projectId);
@@ -184,45 +191,55 @@ class _NotificationsPageState extends State<NotificationsPage> {
         }
         break;
 
-    // Client notifications for completions
+    // Client notifications for completions and Admin entries
       case 'phase_completed_for_client':
       case 'subphase_completed_for_client':
       case 'test_completed_for_client':
+      case 'project_entry_admin_to_client': // المسؤول أضاف إدخال للعميل
+      case 'project_entry_engineer_to_client': // المهندس أضاف إدخال للعميل
+      // حالات التراجع عن الاكتمال التي تظهر للعميل
+      case 'phase_reverted_for_client':
+      case 'subphase_reverted_for_client':
+      case 'test_reverted_for_client':
         if (_currentUserRole == 'client' && projectId != null && projectId.isNotEmpty) {
           // ClientHome is already the destination, it will show the project.
+          // No specific deep link needed beyond the main client page.
+          Navigator.pushNamed(context, route);
         }
         break;
 
       case 'part_request_new':
         if (_currentUserRole == 'admin') {
-          // Admin might navigate to a specific part request management page or project.
-          // For now, let's assume project details, then admin can find requests.
-          // A dedicated '/admin/partRequests' or '/admin/projectDetails/partRequests?id=itemId' would be better.
-          if (projectId != null && projectId.isNotEmpty) {
-            Navigator.pushNamed(context, '/admin/projects'); // Or a more specific page if available
-            _showFeedbackSnackBar(context, 'يرجى مراجعة طلبات القطع للمشروع ذو الصلة.', isError: false, isInfo: true);
-          } else {
-            Navigator.pushNamed(context, '/admin/projects'); // Fallback
-          }
+          // Admin navigates to projects page, where they can see part requests.
+          Navigator.pushNamed(context, '/admin/projects'); // أو /admin/partRequests إذا كان هناك صفحة مخصصة
+          _showFeedbackSnackBar(context, 'يرجى مراجعة طلبات القطع للمشروع ذو الصلة.', isError: false, isInfo: true);
         }
         break;
 
-      case 'part_request_status_update':
+      case 'part_request_status_update': // (إذا كان لديك منطق لتحديث حالة طلب القطعة)
         if (_currentUserRole == 'engineer') {
-          // Engineer navigates to their list of part requests.
-          // This might be a new tab in EngineerHome or a dedicated page.
-          // For now, navigate to engineer home, they can check the tab.
-          Navigator.pushNamed(context, '/engineer');
+          Navigator.pushNamed(context, '/engineer'); // المهندس يعود لصفحته الرئيسية حيث يمكنه رؤية طلبات القطع
           _showFeedbackSnackBar(context, 'تم تحديث حالة طلب قطعة. يرجى مراجعة طلباتك.', isError: false, isInfo: true);
         }
         break;
 
+      case 'engineer_evaluation': // تقييم المهندس
+        if (_currentUserRole == 'engineer') {
+          Navigator.pushNamed(context, '/engineer'); // المهندس لا يمتلك صفحة تقييم مفصلة (حسب الكود الحالي)
+        } else if (_currentUserRole == 'admin') {
+          // المسؤول يذهب لصفحة التقييم
+          Navigator.pushNamed(context, '/admin/evaluations');
+        }
+        break;
+
       default:
-        if (projectId != null && projectId.isNotEmpty && (_currentUserRole == 'admin' || _currentUserRole == 'engineer')) {
-          String detailRoute = _currentUserRole == 'admin' ? '/admin/projectDetails' : '/projectDetails';
-          Navigator.pushNamed(context, detailRoute, arguments: projectId);
+      // إذا لم يكن هناك مسار محدد، قم بتوجيه المستخدم إلى صفحته الرئيسية
+        if (_currentUserRole == 'admin') {
+          Navigator.pushNamed(context, '/admin');
+        } else if (_currentUserRole == 'engineer'){
+          Navigator.pushNamed(context, '/engineer');
         } else if (_currentUserRole == 'client'){
-          Navigator.pushNamed(context, '/client'); // Default for client
+          Navigator.pushNamed(context, '/client');
         } else {
           _showFeedbackSnackBar(context, 'نوع الإشعار غير معروف أو لا يمكن الانتقال إليه.', isError: true);
         }

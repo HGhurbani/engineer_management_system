@@ -1,4 +1,6 @@
 // lib/pages/engineer/engineer_home.dart
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -54,10 +56,15 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     'company': 'شركة',
   };
 
+  // --- ADDITION START ---
+  int _unreadNotificationsCount = 0;
+  StreamSubscription? _notificationsSubscription;
+  // --- ADDITION END ---
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this); // Length is 3
+    _tabController = TabController(length: 3, vsync: this);
     _fadeController = AnimationController(duration: const Duration(milliseconds: 700), vsync: this);
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut));
 
@@ -67,8 +74,29 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
       });
     } else {
       _loadInitialData();
+      // --- ADDITION START ---
+      _listenForUnreadNotifications();
+      // --- ADDITION END ---
     }
   }
+
+  // --- ADDITION START ---
+  void _listenForUnreadNotifications() {
+    if (_currentEngineerUid == null) return;
+    _notificationsSubscription = FirebaseFirestore.instance
+        .collection('notifications')
+        .where('userId', isEqualTo: _currentEngineerUid)
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          _unreadNotificationsCount = snapshot.docs.length;
+        });
+      }
+    });
+  }
+  // --- ADDITION END ---
 
   Future<void> _loadInitialData() async {
     if(!mounted) return;
@@ -409,7 +437,10 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
   @override
   void dispose() {
     _fadeController.dispose();
-    _tabController.dispose(); // Dispose the TabController
+    _tabController.dispose();
+    // --- ADDITION START ---
+    _notificationsSubscription?.cancel();
+    // --- ADDITION END ---
     super.dispose();
   }
 
@@ -579,11 +610,43 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
       elevation: 3,
       centerTitle: true,
       actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-          tooltip: 'الإشعارات',
-          onPressed: () => Navigator.pushNamed(context, '/notifications'),
+        // --- ADDITION START ---
+        Stack(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+              tooltip: 'الإشعارات',
+              onPressed: () => Navigator.pushNamed(context, '/notifications'),
+            ),
+            if (_unreadNotificationsCount > 0)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: AppConstants.errorColor, // لون أحمر مميز
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white, width: 1),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 18,
+                    minHeight: 18,
+                  ),
+                  child: Text(
+                    _unreadNotificationsCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+          ],
         ),
+        // --- ADDITION END ---
         IconButton(
           icon: const Icon(Icons.logout_rounded, color: Colors.white),
           tooltip: 'تسجيل الخروج',

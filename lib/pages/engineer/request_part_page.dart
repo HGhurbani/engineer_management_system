@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
 
+import '../../main.dart';
+
 class RequestPartPage extends StatefulWidget {
   final String engineerId;
   final String engineerName;
@@ -82,6 +84,19 @@ class _RequestPartPageState extends State<RequestPartPage> {
         'status': 'معلق', // Pending
         'requestedAt': FieldValue.serverTimestamp(),
       });
+      final List<String> adminUids = await getAdminUids(); // جلب جميع الـ UIDs للمسؤولين
+
+      if (adminUids.isNotEmpty) {
+        await sendNotificationsToMultiple(
+          recipientUserIds: adminUids,
+          title: 'طلب قطعة جديد',
+          body: 'المهندس ${widget.engineerName} طلب قطعة "${_partNameController.text.trim()}" (الكمية: ${_quantityController.text.trim()}) لمشروع "${_selectedProjectName ?? 'غير محدد'}".',
+          type: 'part_request_new',
+          projectId: _selectedProjectId,
+          itemId: null, // لا يوجد itemId محدد لطلب القطعة بعد، يمكن تحديثه لاحقاً
+          senderName: widget.engineerName,
+        );
+      }
       if (mounted) {
         _showFeedbackSnackBar('تم إرسال طلب القطعة بنجاح.', isError: false);
         Navigator.pop(context);

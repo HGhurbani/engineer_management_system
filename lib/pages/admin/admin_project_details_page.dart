@@ -1189,6 +1189,42 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         'engineerName': actorName,
                         'timestamp': FieldValue.serverTimestamp(),
                       });
+                      if (_projectDataSnapshot != null && _projectDataSnapshot!.exists) {
+                        final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>?;
+                        if (projectData == null) return;
+
+                        final projectNameVal = projectData['name'] ?? 'المشروع';
+                        final clientUid = projectData['clientId'] as String?;
+                        final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
+                        final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
+
+                        String notificationBody = "قام المسؤول '$actorName' بإضافة ${imageUrl != null ? 'صورة وملاحظة' : 'ملاحظة'} جديدة في ${subPhaseId != null ? 'المرحلة الفرعية' : 'المرحلة'}: '$phaseOrSubPhaseName'.";
+
+                        // Notify Assigned Engineers
+                        if(assignedEngineerUids.isNotEmpty) {
+                          await sendNotificationsToMultiple(
+                            recipientUserIds: assignedEngineerUids,
+                            title: "إضافة جديدة في مشروع: $projectNameVal",
+                            body: notificationBody,
+                            type: "project_entry_admin",
+                            projectId: widget.projectId,
+                            itemId: subPhaseId ?? phaseId,
+                            senderName: actorName,
+                          );
+                        }
+                        // Notify Client
+                        if (clientUid != null && clientUid.isNotEmpty) {
+                          await sendNotification(
+                            recipientUserId: clientUid,
+                            title: "ℹ️ تحديث جديد في مشروعك: $projectNameVal",
+                            body: notificationBody,
+                            type: "project_entry_admin_to_client",
+                            projectId: widget.projectId,
+                            itemId: subPhaseId ?? phaseId,
+                            senderName: actorName,
+                          );
+                        }
+                      }
 
                       // --- Notification Logic for Admin Adding Entry ---
                       if (_projectDataSnapshot != null && _projectDataSnapshot!.exists) {
@@ -1248,6 +1284,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   // --- MODIFICATION END ---
 
   // --- MODIFICATION START: _updatePhaseCompletionStatus - Send notifications ---
+  // lib/pages/admin/admin_project_details_page.dart
+// ... (الكود السابق للدالة)
+
   Future<void> _updatePhaseCompletionStatus(String phaseId, String phaseName, bool newStatus) async {
     if (!mounted) return;
     try {
@@ -1258,7 +1297,6 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           .doc(phaseId);
 
       final currentUser = FirebaseAuth.instance.currentUser;
-      // _currentAdminName should be fetched in initState or similar
       String actorName = _currentAdminName ?? "المسؤول";
 
 
@@ -1270,38 +1308,75 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         'lastUpdatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      if (newStatus && _projectDataSnapshot != null && _projectDataSnapshot!.exists) {
-        final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>;
+      // --- ADDITION START: Send notifications for phase completion (Admin) ---
+      if (newStatus && _projectDataSnapshot != null && _projectDataSnapshot!.exists) { // الإشعار فقط عند اكتمال المرحلة
+        final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>?;
+        if (projectData == null) return;
+
         final projectNameVal = projectData['name'] ?? 'المشروع';
         final clientUid = projectData['clientId'] as String?;
         final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
         final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
 
-        // Notify Assigned Engineers
+        // إشعار للمهندسين المعينين
         if (assignedEngineerUids.isNotEmpty) {
           await sendNotificationsToMultiple(
               recipientUserIds: assignedEngineerUids,
               title: 'تحديث مرحلة مشروع: $projectNameVal',
-              body: 'المرحلة "$phaseName" في مشروع "$projectNameVal" أصبحت مكتملة (بواسطة المسؤول).',
+              body: 'المرحلة "$phaseName" في مشروع "$projectNameVal" أصبحت مكتملة (بواسطة المسؤول $actorName).',
               type: 'phase_update_by_admin',
               projectId: widget.projectId,
               itemId: phaseId,
               senderName: actorName
           );
         }
-        // Notify Client
+        // إشعار للعميل
         if (clientUid != null && clientUid.isNotEmpty) {
           await sendNotification(
               recipientUserId: clientUid,
-              title: 'تحديث مشروعك: $projectNameVal',
-              body: 'المرحلة "$phaseName" في مشروعك "$projectNameVal" أصبحت مكتملة.',
+              title: '🎉 تحديث رئيسي في مشروعك: $projectNameVal',
+              body: 'لقد تم إكمال المرحلة الرئيسية "$phaseName" في مشروعك "$projectNameVal". تهانينا على هذا التقدم الكبير!',
               type: 'phase_completed_for_client',
               projectId: widget.projectId,
               itemId: phaseId,
               senderName: actorName
           );
         }
+      } else if (!newStatus && _projectDataSnapshot != null && _projectDataSnapshot!.exists) { // إشعار عند إلغاء اكتمال المرحلة
+        final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>?;
+        if (projectData == null) return;
+
+        final projectNameVal = projectData['name'] ?? 'المشروع';
+        final clientUid = projectData['clientId'] as String?;
+        final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
+        final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
+
+        // إشعار للمهندسين المعينين
+        if (assignedEngineerUids.isNotEmpty) {
+          await sendNotificationsToMultiple(
+              recipientUserIds: assignedEngineerUids,
+              title: 'تراجع عن اكتمال مرحلة: $projectNameVal',
+              body: 'قام المسؤول $actorName بتغيير حالة المرحلة "$phaseName" في مشروع "$projectNameVal" إلى "قيد التنفيذ".',
+              type: 'phase_reverted_by_admin',
+              projectId: widget.projectId,
+              itemId: phaseId,
+              senderName: actorName
+          );
+        }
+        // إشعار للعميل
+        if (clientUid != null && clientUid.isNotEmpty) {
+          await sendNotification(
+              recipientUserId: clientUid,
+              title: '⚠ تحديث في مشروعك: $projectNameVal',
+              body: 'تم إعادة فتح المرحلة "$phaseName" في مشروعك "$projectNameVal" للمراجعة أو التعديل. سيتم تزويدك بالتفاصيل قريباً.',
+              type: 'phase_reverted_for_client',
+              projectId: widget.projectId,
+              itemId: phaseId,
+              senderName: actorName
+          );
+        }
       }
+      // --- ADDITION END ---
       _showFeedbackSnackBar(context, 'تم تحديث حالة المرحلة "$phaseName".', isError: false);
     } catch (e) {
       _showFeedbackSnackBar(context, 'فشل تحديث حالة المرحلة: $e', isError: true);
@@ -1310,6 +1385,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   // --- MODIFICATION END ---
 
   // --- MODIFICATION START: _updateSubPhaseCompletionStatus - Send notifications ---
+  // lib/pages/admin/admin_project_details_page.dart
+// ... (الكود السابق للدالة)
+
   Future<void> _updateSubPhaseCompletionStatus(String mainPhaseId, String subPhaseId, String subPhaseName, bool newStatus) async {
     if (!mounted) return;
     try {
@@ -1331,38 +1409,75 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         'lastUpdatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      // --- ADDITION START: Send notifications for sub-phase completion (Admin) ---
       if (newStatus && _projectDataSnapshot != null && _projectDataSnapshot!.exists) {
-        final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>;
+        final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>?;
+        if (projectData == null) return;
+
         final projectNameVal = projectData['name'] ?? 'المشروع';
         final clientUid = projectData['clientId'] as String?;
         final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
         final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
 
-        // Notify Assigned Engineers
+        // إشعار للمهندسين المعينين
         if (assignedEngineerUids.isNotEmpty) {
           await sendNotificationsToMultiple(
               recipientUserIds: assignedEngineerUids,
               title: 'تحديث مرحلة مشروع: $projectNameVal',
-              body: 'المرحلة الفرعية "$subPhaseName" في مشروع "$projectNameVal" أصبحت مكتملة (بواسطة المسؤول).',
+              body: 'المرحلة الفرعية "$subPhaseName" في مشروع "$projectNameVal" أصبحت مكتملة (بواسطة المسؤول $actorName).',
               type: 'subphase_update_by_admin',
               projectId: widget.projectId,
               itemId: subPhaseId, // Use subPhaseId as itemId
               senderName: actorName
           );
         }
-        // Notify Client
+        // إشعار للعميل
         if (clientUid != null && clientUid.isNotEmpty) {
           await sendNotification(
               recipientUserId: clientUid,
-              title: 'تحديث مشروعك: $projectNameVal',
-              body: 'المرحلة الفرعية "$subPhaseName" في مشروعك "$projectNameVal" أصبحت مكتملة.',
+              title: '✅ تحديث جديد في مشروعك: $projectNameVal',
+              body: 'العمل يتقدم! تم إكمال المرحلة الفرعية "$subPhaseName" في مشروعك "$projectNameVal".',
               type: 'subphase_completed_for_client',
               projectId: widget.projectId,
               itemId: subPhaseId, // Use subPhaseId as itemId
               senderName: actorName
           );
         }
+      } else if (!newStatus && _projectDataSnapshot != null && _projectDataSnapshot!.exists) { // إشعار عند إلغاء اكتمال المرحلة
+        final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>?;
+        if (projectData == null) return;
+
+        final projectNameVal = projectData['name'] ?? 'المشروع';
+        final clientUid = projectData['clientId'] as String?;
+        final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
+        final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
+
+        // إشعار للمهندسين المعينين
+        if (assignedEngineerUids.isNotEmpty) {
+          await sendNotificationsToMultiple(
+              recipientUserIds: assignedEngineerUids,
+              title: 'تراجع عن اكتمال مرحلة: $projectNameVal',
+              body: 'قام المسؤول $actorName بتغيير حالة المرحلة الفرعية "$subPhaseName" في مشروع "$projectNameVal" إلى "قيد التنفيذ".',
+              type: 'subphase_reverted_by_admin',
+              projectId: widget.projectId,
+              itemId: subPhaseId,
+              senderName: actorName
+          );
+        }
+        // إشعار للعميل
+        if (clientUid != null && clientUid.isNotEmpty) {
+          await sendNotification(
+              recipientUserId: clientUid,
+              title: '⚠ تحديث في مشروعك: $projectNameVal',
+              body: 'تم إعادة فتح المرحلة الفرعية "$subPhaseName" في مشروعك "$projectNameVal" للمراجعة أو التعديل.',
+              type: 'subphase_reverted_for_client',
+              projectId: widget.projectId,
+              itemId: subPhaseId,
+              senderName: actorName
+          );
+        }
       }
+      // --- ADDITION END ---
       _showFeedbackSnackBar(context, 'تم تحديث حالة المرحلة الفرعية "$subPhaseName".', isError: false);
     } catch (e) {
       _showFeedbackSnackBar(context, 'فشل تحديث حالة المرحلة الفرعية: $e', isError: true);
@@ -1474,6 +1589,73 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                           'lastUpdatedByName': actorName,
                           'lastUpdatedAt': FieldValue.serverTimestamp(),
                         }, SetOptions(merge: true));
+                        if (dialogNewStatus && _projectDataSnapshot != null && _projectDataSnapshot!.exists) { // الإشعار فقط عند اكتمال الاختبار
+                          final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>?;
+                          if (projectData == null) return;
+
+                          final projectNameVal = projectData['name'] ?? 'المشروع';
+                          final clientUid = projectData['clientId'] as String?;
+                          final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
+                          final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
+
+                          // إشعار للمهندسين المعينين
+                          if (assignedEngineerUids.isNotEmpty) {
+                            await sendNotificationsToMultiple(
+                                recipientUserIds: assignedEngineerUids,
+                                title: 'تحديث اختبار مشروع: $projectNameVal',
+                                body: 'قام المسؤول $actorName بإكمال الاختبار "$testName" في مشروع "$projectNameVal".',
+                                type: 'test_update_by_admin',
+                                projectId: widget.projectId,
+                                itemId: testId,
+                                senderName: actorName
+                            );
+                          }
+                          // إشعار للعميل
+                          if (clientUid != null && clientUid.isNotEmpty) {
+                            await sendNotification(
+                                recipientUserId: clientUid,
+                                title: '🚀 تقدم رائع في مشروعك: $projectNameVal',
+                                body: 'لقد اجتاز مشروعك اختبار "$testName" بنجاح! نواصل العمل بجد لتحقيق أفضل النتائج.',
+                                type: 'test_completed_for_client',
+                                projectId: widget.projectId,
+                                itemId: testId,
+                                senderName: actorName
+                            );
+                          }
+                        } else if (!dialogNewStatus && _projectDataSnapshot != null && _projectDataSnapshot!.exists) { // إشعار عند إلغاء اكتمال الاختبار
+                          final projectData = _projectDataSnapshot!.data() as Map<String, dynamic>?;
+                          if (projectData == null) return;
+
+                          final projectNameVal = projectData['name'] ?? 'المشروع';
+                          final clientUid = projectData['clientId'] as String?;
+                          final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
+                          final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
+
+                          // إشعار للمهندسين المعينين
+                          if (assignedEngineerUids.isNotEmpty) {
+                            await sendNotificationsToMultiple(
+                                recipientUserIds: assignedEngineerUids,
+                                title: 'تراجع عن اكتمال اختبار: $projectNameVal',
+                                body: 'قام المسؤول $actorName بتغيير حالة الاختبار "$testName" في مشروع "$projectNameVal" إلى "قيد التنفيذ".',
+                                type: 'test_reverted_by_admin',
+                                projectId: widget.projectId,
+                                itemId: testId,
+                                senderName: actorName
+                            );
+                          }
+                          // إشعار للعميل
+                          if (clientUid != null && clientUid.isNotEmpty) {
+                            await sendNotification(
+                                recipientUserId: clientUid,
+                                title: '⚠ تحديث في مشروعك: $projectNameVal',
+                                body: 'تم إعادة فتح اختبار "$testName" في مشروعك "$projectNameVal" للمراجعة أو التعديل.',
+                                type: 'test_reverted_for_client',
+                                projectId: widget.projectId,
+                                itemId: testId,
+                                senderName: actorName
+                            );
+                          }
+                        }
 
                         // --- Notification Logic for Admin Updating Test ---
                         if (dialogNewStatus && _projectDataSnapshot != null && _projectDataSnapshot!.exists) { // Only notify on completion
