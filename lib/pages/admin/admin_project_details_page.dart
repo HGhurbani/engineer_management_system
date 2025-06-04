@@ -65,6 +65,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   late TabController _tabController;
   List<QueryDocumentSnapshot> _allAvailableEngineers = [];
   List<QueryDocumentSnapshot> _projectEmployees = [];
+  List<QueryDocumentSnapshot> _projectAssignedEmployees = [];
   List<QueryDocumentSnapshot> _projectPartRequests = [];
 
   String? _clientTypeKeyFromFirestore;
@@ -440,6 +441,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             .get();
         if (mounted) setState(() => _projectPartRequests = partSnap.docs);
 
+        final assignedEmpSnap = await FirebaseFirestore.instance
+            .collection('projects')
+            .doc(widget.projectId)
+            .collection('employeeAssignments')
+            .get();
+        if (mounted) setState(() => _projectAssignedEmployees = assignedEmpSnap.docs);
+
         final String? clientId = projectData?['clientId'] as String?;
         if (clientId != null && clientId.isNotEmpty) {
           try {
@@ -639,7 +647,15 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             Text(projectName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppConstants.primaryColor)),
             const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
             _buildDetailRow(Icons.engineering_rounded, 'المهندسون:', engineersDisplay),
-            _buildDetailRow(Icons.badge_rounded, 'الموظفون:', _projectEmployees.isNotEmpty ? _projectEmployees.map((e) => (e.data() as Map<String, dynamic>)['name'] ?? '').join('، ') : 'لا يوجد'),
+            _buildDetailRow(
+                Icons.badge_rounded,
+                'الموظفون:',
+                _projectAssignedEmployees.isNotEmpty
+                    ? _projectAssignedEmployees
+                        .map((e) => (e.data() as Map<String, dynamic>)['employeeName'] ?? '')
+                        .toSet()
+                        .join('، ')
+                    : 'لا يوجد'),
             _buildDetailRow(Icons.person_rounded, 'العميل:', clientName),
             // Conditionally display client type
             if (_clientTypeDisplayString != null &&
@@ -1041,7 +1057,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     Text('تاريخ الطلب: $formattedDate', style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
                   ],
                 ),
-                trailing: (_currentUserRole == 'admin' || _currentUserRole == 'engineer')
+                trailing: (_currentUserRole == 'admin')
                     ? PopupMenuButton<String>(
                         onSelected: (val) {
                           if (val == 'edit') {

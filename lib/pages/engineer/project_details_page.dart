@@ -375,6 +375,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                   final employeeId = data['employeeId'] as String? ?? '';
                   final employeeName = data['employeeName'] as String? ?? 'موظف';
                   final phaseName = data['phaseName'] as String? ?? '';
+                  final subPhaseName = data['subPhaseName'] as String?;
                   return StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('attendance')
@@ -393,7 +394,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       }
                       return ListTile(
                         title: Text(employeeName),
-                        subtitle: Text('المرحلة: $phaseName\n$attendanceInfo'),
+                        subtitle: Text(
+                            'المرحلة: $phaseName${subPhaseName != null ? ' > $subPhaseName' : ''}\n$attendanceInfo'),
                         trailing: PopupMenuButton<String>(
                           onSelected: (value) {
                             if (value == 'check_in') {
@@ -449,6 +451,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
     String? selectedEmployeeId;
     String? selectedPhaseId;
+    String? selectedSubPhaseId;
+    List<Map<String, dynamic>> subPhases = [];
     await showDialog(
       context: context,
       builder: (dialogContext) {
@@ -480,8 +484,29 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                         child: Text(phase['name'] as String),
                       );
                     }).toList(),
-                    onChanged: (val) => setState(() => selectedPhaseId = val),
+                    onChanged: (val) {
+                      setState(() {
+                        selectedPhaseId = val;
+                        selectedSubPhaseId = null;
+                        subPhases = predefinedPhasesStructure
+                            .firstWhere((p) => p['id'] == val)['subPhases']
+                            .cast<Map<String, dynamic>>();
+                      });
+                    },
                   ),
+                  if (subPhases.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(labelText: 'المرحلة الفرعية'),
+                      items: subPhases.map((sp) {
+                        return DropdownMenuItem(
+                          value: sp['id'] as String,
+                          child: Text(sp['name'] as String),
+                        );
+                      }).toList(),
+                      onChanged: (val) => setState(() => selectedSubPhaseId = val),
+                    ),
+                  ],
                 ],
               ),
               actions: [
@@ -494,6 +519,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       ? null
                       : () async {
                           final phaseMap = predefinedPhasesStructure.firstWhere((p) => p['id'] == selectedPhaseId);
+                          Map<String, dynamic>? subPhaseMap;
+                          if (selectedSubPhaseId != null) {
+                            subPhaseMap = phaseMap['subPhases']
+                                .firstWhere((sp) => sp['id'] == selectedSubPhaseId);
+                          }
                           final employeeDoc = employees.firstWhere((e) => e.id == selectedEmployeeId);
                           final empData = employeeDoc.data() as Map<String, dynamic>;
                           await FirebaseFirestore.instance
@@ -505,6 +535,10 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                             'employeeName': empData['name'] ?? 'موظف',
                             'phaseId': selectedPhaseId,
                             'phaseName': phaseMap['name'],
+                            if (selectedSubPhaseId != null) ...{
+                              'subPhaseId': selectedSubPhaseId,
+                              'subPhaseName': subPhaseMap?['name'] ?? '',
+                            },
                             'assignedBy': _currentEngineerUid,
                             'assignedAt': Timestamp.now(),
                           });
