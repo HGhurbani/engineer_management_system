@@ -329,10 +329,195 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _currentEngineerUid = FirebaseAuth.instance.currentUser?.uid;
     _loadArabicFont(); // Load the font
     _fetchInitialData();
+  }
+
+  Widget _buildEmployeesTab() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(AppConstants.paddingSmall),
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.person_add, color: Colors.white, size: 18),
+              label: const Text('إضافة موظف', style: TextStyle(color: Colors.white)),
+              onPressed: _showAddEmployeeDialog,
+              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+            ),
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('projects')
+                .doc(widget.projectId)
+                .collection('employeeAssignments')
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+              }
+              if (snapshot.hasError) {
+                return const Center(child: Text('فشل تحميل الموظفين'));
+              }
+              final assignments = snapshot.data?.docs ?? [];
+              if (assignments.isEmpty) {
+                return const Center(child: Text('لا يوجد موظفون مضافون'));
+              }
+              return ListView.builder(
+                itemCount: assignments.length,
+                itemBuilder: (context, index) {
+                  final data = assignments[index].data() as Map<String, dynamic>;
+                  final employeeId = data['employeeId'] as String? ?? '';
+                  final employeeName = data['employeeName'] as String? ?? 'موظف';
+                  final phaseName = data['phaseName'] as String? ?? '';
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('attendance')
+                        .where('userId', isEqualTo: employeeId)
+                        .where('projectId', isEqualTo: widget.projectId)
+                        .orderBy('timestamp', descending: true)
+                        .limit(1)
+                        .snapshots(),
+                    builder: (context, attSnap) {
+                      String attendanceInfo = 'لا يوجد سجل';
+                      if (attSnap.hasData && attSnap.data!.docs.isNotEmpty) {
+                        final attData = attSnap.data!.docs.first.data() as Map<String, dynamic>;
+                        final Timestamp ts = attData['timestamp'] as Timestamp;
+                        final type = attData['type'] == 'check_in' ? 'حضور' : 'انصراف';
+                        attendanceInfo = '$type - ${DateFormat('dd/MM HH:mm').format(ts.toDate())}';
+                      }
+                      return ListTile(
+                        title: Text(employeeName),
+                        subtitle: Text('المرحلة: $phaseName\n$attendanceInfo'),
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'check_in') {
+                              _recordEmployeeAttendance(employeeId, 'check_in');
+                            } else if (value == 'check_out') {
+                              _recordEmployeeAttendance(employeeId, 'check_out');
+                            }
+                          },
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(value: 'check_in', child: Text('تسجيل حضور')),
+                            PopupMenuItem(value: 'check_out', child: Text('تسجيل انصراف')),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _recordEmployeeAttendance(String employeeId, String type) async {
+    if (!mounted) return;
+    try {
+      await FirebaseFirestore.instance.collection('attendance').add({
+        'userId': employeeId,
+        'type': type,
+        'timestamp': Timestamp.now(),
+        'recordedBy': _currentEngineerUid,
+        'projectId': widget.projectId,
+      });
+      _showFeedbackSnackBar(context, type == 'check_in' ? 'تم تسجيل الحضور' : 'تم تسجيل الانصراف', isError: false);
+    } catch (e) {
+      _showFeedbackSnackBar(context, 'حدث خطأ أثناء التسجيل', isError: true);
+    }
+  }
+
+  Future<void> _showAddEmployeeDialog() async {
+    if (!mounted || _currentEngineerUid == null) return;
+    final employeesSnap = await FirebaseFirestore.instance
+        .collection('users')
+        .where('role', isEqualTo: 'employee')
+        .where('engineerId', isEqualTo: _currentEngineerUid)
+        .get();
+    final employees = employeesSnap.docs;
+    if (employees.isEmpty) {
+      _showFeedbackSnackBar(context, 'لا يوجد موظفون لإضافتهم', isError: true);
+      return;
+    }
+    String? selectedEmployeeId;
+    String? selectedPhaseId;
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(builder: (stfContext, setState) {
+          return Directionality(
+            textDirection: ui.TextDirection.rtl,
+            child: AlertDialog(
+              title: const Text('إضافة موظف للمشروع'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(labelText: 'الموظف'),
+                    items: employees.map((e) {
+                      final data = e.data() as Map<String, dynamic>;
+                      return DropdownMenuItem(
+                        value: e.id,
+                        child: Text(data['name'] ?? 'موظف'),
+                      );
+                    }).toList(),
+                    onChanged: (val) => setState(() => selectedEmployeeId = val),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(labelText: 'المرحلة'),
+                    items: predefinedPhasesStructure.map((phase) {
+                      return DropdownMenuItem(
+                        value: phase['id'] as String,
+                        child: Text(phase['name'] as String),
+                      );
+                    }).toList(),
+                    onChanged: (val) => setState(() => selectedPhaseId = val),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('إلغاء'),
+                ),
+                ElevatedButton(
+                  onPressed: selectedEmployeeId == null || selectedPhaseId == null
+                      ? null
+                      : () async {
+                          final phaseMap = predefinedPhasesStructure.firstWhere((p) => p['id'] == selectedPhaseId);
+                          final employeeDoc = employees.firstWhere((e) => e.id == selectedEmployeeId);
+                          final empData = employeeDoc.data() as Map<String, dynamic>;
+                          await FirebaseFirestore.instance
+                              .collection('projects')
+                              .doc(widget.projectId)
+                              .collection('employeeAssignments')
+                              .add({
+                            'employeeId': selectedEmployeeId,
+                            'employeeName': empData['name'] ?? 'موظف',
+                            'phaseId': selectedPhaseId,
+                            'phaseName': phaseMap['name'],
+                            'assignedBy': _currentEngineerUid,
+                            'assignedAt': Timestamp.now(),
+                          });
+                          Navigator.pop(dialogContext);
+                        },
+                  child: const Text('حفظ'),
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
   }
 
   // --- Function to load Arabic font ---
@@ -462,6 +647,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         tabs: const [
           Tab(text: 'مراحل المشروع', icon: Icon(Icons.list_alt_rounded)),
           Tab(text: 'اختبارات التشغيل', icon: Icon(Icons.checklist_rtl_rounded)),
+          Tab(text: 'موظفو المشروع', icon: Icon(Icons.group)),
         ],
       ),
     );
@@ -840,6 +1026,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 children: [
                   _buildPhasesTab(),
                   _buildTestsTab(),
+                  _buildEmployeesTab(),
                 ],
               ),
             ),

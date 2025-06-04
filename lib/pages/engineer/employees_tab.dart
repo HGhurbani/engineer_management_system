@@ -60,13 +60,14 @@ class EmployeesTab extends StatelessWidget {
     );
   }
 
-  Future<void> _recordAttendance(BuildContext context, String employeeId, String type) async {
+  Future<void> _recordAttendance(BuildContext context, String employeeId, String type, {String? projectId}) async {
     try {
       await FirebaseFirestore.instance.collection('attendance').add({
         'userId': employeeId,
         'type': type,
         'timestamp': Timestamp.now(),
         'recordedBy': engineerId,
+        if (projectId != null) 'projectId': projectId,
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
