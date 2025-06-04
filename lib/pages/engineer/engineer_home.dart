@@ -739,6 +739,18 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
   }
 // --- نهاية دالة تحديث حالة المهمة ---
 
+  Future<void> _updatePartRequestStatus(String requestId, String newStatus) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('partRequests')
+          .doc(requestId)
+          .update({'status': newStatus});
+      _showFeedbackSnackBar(context, 'تم تحديث حالة الطلب.', isError: false);
+    } catch (e) {
+      _showFeedbackSnackBar(context, 'فشل تحديث الطلب: $e', isError: true);
+    }
+  }
+
   Widget _buildPartRequestsTab() {
     if (_currentEngineerUid == null) {
       return _buildErrorState('لا يمكن تحميل طلبات القطع بدون معرّف مهندس.');
@@ -802,17 +814,28 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
                 margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
                 elevation: 1.5,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppConstants.paddingMedium / 1.5),
-                  child: Column(
+                child: ListTile(
+                  title: Text('اسم القطعة: $partName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                  subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('اسم القطعة: $partName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
-                      const SizedBox(height: AppConstants.paddingSmall / 2),
                       Text('الكمية: $quantity', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
                       Text('المشروع: $projectName', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
-                      // Text('الحالة: $status', style: TextStyle(fontSize: 14, color: statusColor, fontWeight: FontWeight.w500)),
+                      Row(
+                        children: [
+                          Icon(Icons.circle, color: statusColor, size: 10),
+                          const SizedBox(width: 4),
+                          Text(status, style: TextStyle(fontSize: 14, color: statusColor, fontWeight: FontWeight.w500)),
+                        ],
+                      ),
                       Text('تاريخ الطلب: $formattedDate', style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
+                    ],
+                  ),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (val) => _updatePartRequestStatus(requestDoc.id, val),
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(value: 'تم الطلب', child: Text('تم الطلب')),
+                      PopupMenuItem(value: 'تم الاستلام', child: Text('تم الاستلام')),
                     ],
                   ),
                 ),
