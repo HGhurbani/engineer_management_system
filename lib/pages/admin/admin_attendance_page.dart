@@ -55,8 +55,10 @@ class AdminAttendancePage extends StatefulWidget {
 
 class _AdminAttendancePageState extends State<AdminAttendancePage> {
   DateTime _selectedDate = DateTime.now();
-  String? _selectedEngineerId;
+  String _selectedRole = 'engineer';
+  String? _selectedUserId;
   List<DocumentSnapshot> _engineers = [];
+  List<DocumentSnapshot> _employees = [];
   double _defaultWorkingHours = 8.0;
   double _engineerHourlyRate = 50.0;
   bool _isLoadingFilters = true;
@@ -71,6 +73,7 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
     setState(() => _isLoadingFilters = true);
     await Future.wait([
       _loadEngineers(),
+      _loadEmployees(),
       _loadSettings(),
     ]);
     if (mounted) {
@@ -93,6 +96,25 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
     } catch (e) {
       if (mounted) {
         _showFeedbackSnackBar(context, 'فشل تحميل قائمة المهندسين: $e', isError: true);
+      }
+    }
+  }
+
+  Future<void> _loadEmployees() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'employee')
+          .orderBy('name')
+          .get();
+      if (mounted) {
+        setState(() {
+          _employees = snapshot.docs;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showFeedbackSnackBar(context, 'فشل تحميل قائمة الموظفين: $e', isError: true);
       }
     }
   }
@@ -272,21 +294,37 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
           child: Column(
             children: [
               _buildStyledDropdown(
-                hint: 'اختر المهندس',
-                value: _selectedEngineerId,
-                items: _engineers.map((doc) {
+                hint: 'اختر النوع',
+                value: _selectedRole,
+                items: const [
+                  DropdownMenuItem(value: 'engineer', child: Text('مهندس')),
+                  DropdownMenuItem(value: 'employee', child: Text('موظف')),
+                ],
+                onChanged: (value) {
+                  if (mounted && value != null) {
+                    setState(() {
+                      _selectedRole = value;
+                      _selectedUserId = null;
+                    });
+                  }
+                },
+                icon: Icons.person_rounded,
+              ),
+              const SizedBox(height: AppConstants.itemSpacing),
+              _buildStyledDropdown(
+                hint: _selectedRole == 'engineer' ? 'اختر المهندس' : 'اختر الموظف',
+                value: _selectedUserId,
+                items: (_selectedRole == 'engineer' ? _engineers : _employees).map((doc) {
                   final user = doc.data() as Map<String, dynamic>;
                   return DropdownMenuItem<String>(
                     value: doc.id,
-                    child: Text(user['name'] ?? 'مهندس غير مسمى'),
+                    child: Text(user['name'] ?? ''),
                   );
                 }).toList(),
                 onChanged: (value) {
-                  if (mounted) {
-                    setState(() => _selectedEngineerId = value);
-                  }
+                  if (mounted) setState(() => _selectedUserId = value);
                 },
-                icon: Icons.engineering_rounded,
+                icon: _selectedRole == 'engineer' ? Icons.engineering_rounded : Icons.badge_rounded,
               ),
               const SizedBox(height: AppConstants.itemSpacing),
               _buildStyledDatePicker(),
@@ -363,13 +401,13 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
   }
 
   Widget _buildAttendanceStream() {
-    if (_selectedEngineerId == null) {
-      return _buildEmptyState('الرجاء اختيار مهندس لعرض سجل الحضور.');
+    if (_selectedUserId == null) {
+      return _buildEmptyState('الرجاء اختيار المستخدم لعرض سجل الحضور.');
     }
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('attendance')
-          .where('userId', isEqualTo: _selectedEngineerId)
+          .where('userId', isEqualTo: _selectedUserId)
           .where('timestamp', isGreaterThanOrEqualTo: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day))
           .where('timestamp', isLessThan: DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day + 1))
           .orderBy('timestamp', descending: false)
@@ -382,7 +420,7 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
           return _buildErrorState('حدث خطأ أثناء تحميل السجلات: ${snapshot.error}');
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState('لا توجد سجلات حضور لهذا المهندس في التاريخ المحدد.');
+          return _buildEmptyState('لا توجد سجلات حضور لهذا المستخدم في التاريخ المحدد.');
         }
 
         final attendanceRecords = snapshot.data!.docs;
