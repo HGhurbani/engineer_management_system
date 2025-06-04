@@ -333,7 +333,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _fetchInitialData();
   }
 
@@ -599,6 +599,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           Tab(text: 'مراحل المشروع', icon: Icon(Icons.list_alt_rounded)),
           Tab(text: 'اختبارات التشغيل', icon: Icon(Icons.checklist_rtl_rounded)),
           Tab(text: 'طلبات القطع', icon: Icon(Icons.build_circle_outlined)),
+          Tab(text: 'موظفو المشروع', icon: Icon(Icons.group)),
         ],
       ),
     );
@@ -1080,6 +1081,61 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     );
   }
 
+  Widget _buildEmployeesTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .collection('employeeAssignments')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+        }
+        if (snapshot.hasError) {
+          return const Center(child: Text('فشل تحميل الموظفين'));
+        }
+        final assignments = snapshot.data?.docs ?? [];
+        if (assignments.isEmpty) {
+          return const Center(child: Text('لا يوجد موظفون مضافون'));
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+          itemCount: assignments.length,
+          itemBuilder: (context, index) {
+            final data = assignments[index].data() as Map<String, dynamic>;
+            final employeeId = data['employeeId'] as String? ?? '';
+            final employeeName = data['employeeName'] as String? ?? 'موظف';
+            final phaseName = data['phaseName'] as String? ?? '';
+            final subPhaseName = data['subPhaseName'] as String?;
+            return StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('attendance')
+                  .where('userId', isEqualTo: employeeId)
+                  .where('projectId', isEqualTo: widget.projectId)
+                  .orderBy('timestamp', descending: true)
+                  .limit(1)
+                  .snapshots(),
+              builder: (context, attSnap) {
+                String attendanceInfo = 'لا يوجد سجل';
+                if (attSnap.hasData && attSnap.data!.docs.isNotEmpty) {
+                  final attData = attSnap.data!.docs.first.data() as Map<String, dynamic>;
+                  final Timestamp ts = attData['timestamp'] as Timestamp;
+                  final type = attData['type'] == 'check_in' ? 'حضور' : 'انصراف';
+                  attendanceInfo = '$type - ${DateFormat('dd/MM HH:mm').format(ts.toDate())}';
+                }
+                return ListTile(
+                  title: Text(employeeName),
+                  subtitle: Text('المرحلة: $phaseName${subPhaseName != null ? ' > $subPhaseName' : ''}\n$attendanceInfo'),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _deletePartRequest(String docId) async {
     try {
       await FirebaseFirestore.instance.collection('partRequests').doc(docId).delete();
@@ -1230,7 +1286,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
               itemBuilder: (context, index) {
                 final entryData = entries[index].data() as Map<String, dynamic>;
                 final String note = entryData['note'] ?? '';
-                final String engineerName = entryData['engineerName'] ?? 'غير معروف';
+                final String engineerName = entryData['employeeName'] ?? entryData['engineerName'] ?? 'غير معروف';
                 final Timestamp? timestamp = entryData['timestamp'] as Timestamp?;
 
                 final List<String> imageUrlsToDisplay = [];
@@ -2003,6 +2059,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                   _buildPhasesTab(),
                   _buildTestsTab(),
                   _buildPartRequestsTab(),
+                  _buildEmployeesTab(),
                 ],
               ),
             ),
