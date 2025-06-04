@@ -20,6 +20,8 @@ import 'package:engineer_management_system/pages/admin/admin_project_details_pag
 import 'package:engineer_management_system/pages/engineer/project_details_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_settings_page.dart';
 import 'package:engineer_management_system/pages/engineer/request_part_page.dart';
+import 'package:engineer_management_system/pages/engineer/meeting_logs_page.dart';
+import 'package:engineer_management_system/pages/admin/admin_meeting_logs_page.dart';
 
 // --- ADDITION START ---
 import 'package:engineer_management_system/pages/admin/admin_evaluations_page.dart'; // استيراد صفحة التقييم الجديدة
@@ -121,8 +123,16 @@ class MyApp extends StatelessWidget {
           print('Error: Missing arguments for /engineer/request_part route.');
           return const LoginPage();
         },
+        '/engineer/meeting_logs': (context) {
+          final engineerId = ModalRoute.of(context)!.settings.arguments as String?;
+          if (engineerId != null) {
+            return MeetingLogsPage(engineerId: engineerId);
+          }
+          return const LoginPage();
+        },
         // --- ADDITION START ---
         '/admin/evaluations': (context) => const AdminEvaluationsPage(), // مسار جديد لصفحة التقييم
+        '/admin/meeting_logs': (context) => const AdminMeetingLogsPage(),
         // --- ADDITION END ---
       },
 

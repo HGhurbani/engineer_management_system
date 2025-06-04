@@ -760,6 +760,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         route: '/admin/evaluations',
       ),
       _ManagementItem(
+        title: 'محاضر الاجتماعات',
+        subtitle: 'عرض محاضر الاجتماعات',
+        icon: Icons.event_note_rounded,
+        color: const Color(0xFF3B82F6),
+        route: '/admin/meeting_logs',
+      ),
+      _ManagementItem(
         title: 'الإعدادات العامة',
         subtitle: 'إعدادات النظام',
         icon: Icons.settings_rounded,

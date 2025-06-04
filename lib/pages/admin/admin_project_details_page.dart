@@ -64,6 +64,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
   late TabController _tabController;
   List<QueryDocumentSnapshot> _allAvailableEngineers = [];
+  List<QueryDocumentSnapshot> _projectEmployees = [];
+  List<QueryDocumentSnapshot> _projectPartRequests = [];
 
   String? _clientTypeKeyFromFirestore;
   String? _clientTypeDisplayString;
@@ -419,6 +421,25 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           _projectDataSnapshot = projectDoc;
         });
 
+        final List<dynamic> assignedEngineersRaw = projectData?['assignedEngineers'] as List<dynamic>? ?? [];
+        final List<String> engineerIds = assignedEngineersRaw.map((e) => Map<String, dynamic>.from(e)['uid'].toString()).toList();
+        if (engineerIds.isNotEmpty) {
+          final empSnap = await FirebaseFirestore.instance
+              .collection('users')
+              .where('role', isEqualTo: 'employee')
+              .where('engineerId', whereIn: engineerIds.length > 10 ? engineerIds.sublist(0,10) : engineerIds)
+              .get();
+          if (mounted) setState(() => _projectEmployees = empSnap.docs);
+        } else {
+          if (mounted) setState(() => _projectEmployees = []);
+        }
+
+        final partSnap = await FirebaseFirestore.instance
+            .collection('partRequests')
+            .where('projectId', isEqualTo: widget.projectId)
+            .get();
+        if (mounted) setState(() => _projectPartRequests = partSnap.docs);
+
         final String? clientId = projectData?['clientId'] as String?;
         if (clientId != null && clientId.isNotEmpty) {
           try {
@@ -617,6 +638,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             Text(projectName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppConstants.primaryColor)),
             const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
             _buildDetailRow(Icons.engineering_rounded, 'المهندسون:', engineersDisplay),
+            _buildDetailRow(Icons.badge_rounded, 'الموظفون:', _projectEmployees.isNotEmpty ? _projectEmployees.map((e) => (e.data() as Map<String, dynamic>)['name'] ?? '').join('، ') : 'لا يوجد'),
             _buildDetailRow(Icons.person_rounded, 'العميل:', clientName),
             // Conditionally display client type
             if (_clientTypeDisplayString != null &&
@@ -631,6 +653,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                   _clientTypeDisplayString!
               ),
             _buildDetailRow(statusIcon, 'حالة المشروع:', projectStatus, valueColor: statusColor),
+            _buildDetailRow(Icons.build_circle_outlined, 'طلبات القطع:', '${_projectPartRequests.length}'),
             const SizedBox(height: AppConstants.itemSpacing),
             if (_currentUserRole == 'admin')
               Center(
