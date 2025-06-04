@@ -718,6 +718,23 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildDetailRow(Icons.engineering_rounded, 'المهندسون:', engineersDisplay),
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('projects')
+                  .doc(widget.projectId)
+                  .collection('employeeAssignments')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                String employeesDisplay = 'لا يوجد';
+                if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                  employeesDisplay = snapshot.data!.docs
+                      .map((e) => (e.data() as Map<String, dynamic>)['employeeName'] ?? '')
+                      .toSet()
+                      .join('، ');
+                }
+                return _buildDetailRow(Icons.badge_rounded, 'الموظفون:', employeesDisplay);
+              },
+            ),
             _buildDetailRow(Icons.person_rounded, 'العميل:', clientName),
             _buildDetailRow(statusIcon, 'حالة المشروع:', projectStatus, valueColor: statusColor),
           ],
@@ -1163,6 +1180,14 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     bool isDialogLoading = false;
 
     String engineerNameForTest = _currentEngineerName ?? "مهندس";
+    final empSnap = await FirebaseFirestore.instance
+        .collection('projects')
+        .doc(widget.projectId)
+        .collection('employeeAssignments')
+        .get();
+    final testEmployees = empSnap.docs;
+    String? selectedTestEmployeeId;
+    String? selectedTestEmployeeName;
 
     await showDialog<bool>(
       context: context,
@@ -1177,6 +1202,32 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (testEmployees.isNotEmpty) ...[
+                      DropdownButtonFormField<String>(
+                        decoration: const InputDecoration(labelText: 'الموظف'),
+                        items: testEmployees.map((e) {
+                          final data = e.data() as Map<String, dynamic>;
+                          return DropdownMenuItem(
+                            value: data['employeeId'] as String? ?? '',
+                            child: Text(data['employeeName'] as String? ?? 'موظف'),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            selectedTestEmployeeId = val;
+                            final match = testEmployees.firstWhere((d) => (d.data() as Map<String,dynamic>)['employeeId'] == val);
+                            selectedTestEmployeeName = (match.data() as Map<String,dynamic>)['employeeName'] as String? ?? 'موظف';
+                          });
+                        },
+                        validator: (val) {
+                          if (val == null || val.isEmpty) {
+                            return 'اختر الموظف';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                    ],
                     CheckboxListTile(
                       title: const Text('الاختبار مكتمل وناجح'),
                       value: newStatus,
@@ -1284,7 +1335,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                         'note': noteController.text.trim(),
                         'imageUrl': finalImageUrl,
                         'lastUpdatedByUid': _currentEngineerUid,
-                        'lastUpdatedByName': engineerNameForTest,
+                        'lastUpdatedByName': selectedTestEmployeeName ?? engineerNameForTest,
                         'lastUpdatedAt': FieldValue.serverTimestamp(),
                       }, SetOptions(merge: true));
 
@@ -1301,21 +1352,21 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                           await sendNotificationsToMultiple(
                             recipientUserIds: adminUids,
                             title: 'تحديث اختبار مشروع: $projectNameVal',
-                            body: 'قام المهندس $engineerNameForTest بإكمال الاختبار "$testName" في مشروع "$projectNameVal".',
+                            body: 'قام الموظف ${selectedTestEmployeeName ?? engineerNameForTest} بإكمال الاختبار "$testName" في مشروع "$projectNameVal".',
                             type: 'test_completed_by_engineer',
                             projectId: widget.projectId,
                             itemId: testId,
-                            senderName: engineerNameForTest,
+                            senderName: selectedTestEmployeeName ?? engineerNameForTest,
                           );
                         } else if (!newStatus && adminUids.isNotEmpty) {
                           await sendNotificationsToMultiple(
                             recipientUserIds: adminUids,
                             title: 'تراجع عن اكتمال اختبار: $projectNameVal',
-                            body: 'قام المهندس $engineerNameForTest بتغيير حالة الاختبار "$testName" في مشروع "$projectNameVal" إلى "قيد التنفيذ".',
+                            body: 'قام الموظف ${selectedTestEmployeeName ?? engineerNameForTest} بتغيير حالة الاختبار "$testName" في مشروع "$projectNameVal" إلى "قيد التنفيذ".',
                             type: 'test_reverted_by_engineer',
                             projectId: widget.projectId,
                             itemId: testId,
-                            senderName: engineerNameForTest,
+                            senderName: selectedTestEmployeeName ?? engineerNameForTest,
                           );
                         }
 
@@ -1325,11 +1376,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                             await sendNotification(
                               recipientUserId: clientUid,
                               title: '🌟 إنجاز جديد في مشروعك: $projectNameVal',
-                              body: 'المهندس $engineerNameForTest قام بإكمال اختبار "$testName" الهام في مشروعك. خطوة أخرى نحو الإنجاز!',
+                              body: 'الموظف ${selectedTestEmployeeName ?? engineerNameForTest} قام بإكمال اختبار "$testName" الهام في مشروعك. خطوة أخرى نحو الإنجاز!',
                               type: 'test_completed_for_client',
                               projectId: widget.projectId,
                               itemId: testId,
-                              senderName: engineerNameForTest,
+                              senderName: selectedTestEmployeeName ?? engineerNameForTest,
                             );
                           } else {
                             await sendNotification(
@@ -1339,7 +1390,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                               type: 'test_reverted_for_client',
                               projectId: widget.projectId,
                               itemId: testId,
-                              senderName: engineerNameForTest,
+                              senderName: selectedTestEmployeeName ?? engineerNameForTest,
                             );
                           }
                         }
@@ -1425,6 +1476,19 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         ? 'projects/${widget.projectId}/phases_status/$phaseId/entries'
         : 'projects/${widget.projectId}/subphases_status/$subPhaseId/entries';
 
+    Query employeeQuery = FirebaseFirestore.instance
+        .collection('projects')
+        .doc(widget.projectId)
+        .collection('employeeAssignments')
+        .where('phaseId', isEqualTo: phaseId);
+    if (subPhaseId != null) {
+      employeeQuery = employeeQuery.where('subPhaseId', isEqualTo: subPhaseId);
+    }
+    final employeesSnap = await employeeQuery.get();
+    final employees = employeesSnap.docs;
+    String? selectedEmployeeId;
+    String? selectedEmployeeName;
+
     List<XFile>? _selectedImagesInDialogStateful;
 
     await showDialog(
@@ -1442,6 +1506,32 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (employees.isNotEmpty) ...[
+                        DropdownButtonFormField<String>(
+                          decoration: const InputDecoration(labelText: 'الموظف'),
+                          items: employees.map((e) {
+                            final data = e.data() as Map<String, dynamic>;
+                            return DropdownMenuItem(
+                              value: data['employeeId'] as String? ?? '',
+                              child: Text(data['employeeName'] as String? ?? 'موظف'),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setDialogContentState(() {
+                              selectedEmployeeId = val;
+                              final match = employees.firstWhere((d) => (d.data() as Map<String,dynamic>)['employeeId'] == val);
+                              selectedEmployeeName = (match.data() as Map<String, dynamic>)['employeeName'] as String? ?? 'موظف';
+                            });
+                          },
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'اختر الموظف المسؤول';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppConstants.itemSpacing),
+                      ],
                       TextFormField(
                         controller: noteController,
                         decoration: const InputDecoration(
@@ -1583,6 +1673,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                         'imageUrls': uploadedImageUrls.isNotEmpty ? uploadedImageUrls : null,
                         'engineerUid': _currentEngineerUid,
                         'engineerName': _currentEngineerName ?? 'مهندس',
+                        if (selectedEmployeeId != null) 'employeeId': selectedEmployeeId,
+                        if (selectedEmployeeName != null) 'employeeName': selectedEmployeeName,
                         'timestamp': FieldValue.serverTimestamp(),
                       });
                       // ... (notifications code)
@@ -1594,7 +1686,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                         final clientUid = projectData['clientId'] as String?;
                         final List<String> adminUids = await getAdminUids();
 
-                        String notificationBody = "قام المهندس ${_currentEngineerName ?? 'غير معروف'} بإضافة ${uploadedImageUrls.isNotEmpty ? 'صورة وملاحظة' : 'ملاحظة'} جديدة في ${subPhaseId != null ? 'المرحلة الفرعية' : 'المرحلة'}: '$phaseOrSubPhaseName'.";
+                        String actor = selectedEmployeeName ?? _currentEngineerName ?? 'غير معروف';
+                        String notificationBody = "قام الموظف $actor بإضافة ${uploadedImageUrls.isNotEmpty ? 'صورة وملاحظة' : 'ملاحظة'} جديدة في ${subPhaseId != null ? 'المرحلة الفرعية' : 'المرحلة'}: '$phaseOrSubPhaseName'.";
 
                         if (adminUids.isNotEmpty) {
                           await sendNotificationsToMultiple(
@@ -1673,7 +1766,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 final List<dynamic>? imageUrlsDynamic = entryData['imageUrls'] as List<dynamic>?;
                 final List<String> imageUrls = imageUrlsDynamic?.map((e) => e.toString()).toList() ?? [];
 
-                final String engineerName = entryData['engineerName'] ?? 'مهندس';
+                final String employeeName = entryData['employeeName'] ?? entryData['engineerName'] ?? 'مهندس';
                 final Timestamp? timestamp = entryData['timestamp'] as Timestamp?;
 
                 return Card(
@@ -1713,7 +1806,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             Text(
-                              'بواسطة: $engineerName - ${timestamp != null ? DateFormat('dd/MM/yy hh:mm a', 'ar').format(timestamp.toDate()) : 'غير معروف'}',
+                              'بواسطة: $employeeName - ${timestamp != null ? DateFormat('dd/MM/yy hh:mm a', 'ar').format(timestamp.toDate()) : 'غير معروف'}',
                               style: const TextStyle(fontSize: 10, color: AppConstants.textSecondary, fontStyle: FontStyle.italic),
                             ),
                           ],
@@ -1962,7 +2055,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             final String note = entry['note'] ?? '';
             final List<dynamic>? imageUrlsDynamic = entry['imageUrls'] as List<dynamic>?;
             final List<String> imageUrls = imageUrlsDynamic?.map((e) => e.toString()).toList() ?? [];
-            final String entryEngineer = entry['engineerName'] ?? 'مهندس';
+            final String entryEngineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
             final Timestamp? ts = entry['timestamp'] as Timestamp?;
             final String entryDate = ts != null ? DateFormat('dd/MM/yy hh:mm a', 'ar').format(ts.toDate()) : 'غير معروف';
 
@@ -2005,7 +2098,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             final String note = entry['note'] ?? '';
             final List<dynamic>? imageUrlsDynamic = entry['imageUrls'] as List<dynamic>?;
             final List<String> imageUrls = imageUrlsDynamic?.map((e) => e.toString()).toList() ?? [];
-            final String entryEngineer = entry['engineerName'] ?? 'مهندس';
+            final String entryEngineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
             final Timestamp? ts = entry['timestamp'] as Timestamp?;
             final String entryDate = ts != null ? DateFormat('dd/MM/yy hh:mm a', 'ar').format(ts.toDate()) : 'غير معروف';
 
@@ -2084,7 +2177,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 final String note = entry['note'] ?? '';
                 final List<dynamic>? imageUrlsDynamic = entry['imageUrls'] as List<dynamic>?;
                 final List<String> imageUrls = imageUrlsDynamic?.map((e) => e.toString()).toList() ?? [];
-                final String entryEngineer = entry['engineerName'] ?? 'مهندس';
+                final String entryEngineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
                 final Timestamp? ts = entry['timestamp'] as Timestamp?;
                 final String entryDate = ts != null ? DateFormat('dd/MM/yy hh:mm a', 'ar').format(ts.toDate()) : 'غير معروف';
 
