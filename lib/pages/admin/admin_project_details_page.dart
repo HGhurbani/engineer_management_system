@@ -332,7 +332,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _fetchInitialData();
   }
 
@@ -590,6 +590,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         tabs: const [
           Tab(text: 'مراحل المشروع', icon: Icon(Icons.list_alt_rounded)),
           Tab(text: 'اختبارات التشغيل', icon: Icon(Icons.checklist_rtl_rounded)),
+          Tab(text: 'طلبات القطع', icon: Icon(Icons.build_circle_outlined)),
         ],
       ),
     );
@@ -953,6 +954,230 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           ),
         );
       },
+    );
+  }
+
+  Widget _buildPartRequestsTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('partRequests')
+          .where('projectId', isEqualTo: widget.projectId)
+          .orderBy('requestedAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+        }
+        if (snapshot.hasError) {
+          return _buildErrorState('حدث خطأ في تحميل طلبات القطع: ${snapshot.error}');
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyState('لا توجد طلبات قطع لهذا المشروع حالياً.', icon: Icons.build_circle_outlined);
+        }
+
+        final requests = snapshot.data!.docs;
+        return ListView.builder(
+          key: const PageStorageKey<String>('adminPartRequestsTab'),
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+          itemCount: requests.length,
+          itemBuilder: (context, index) {
+            final requestDoc = requests[index];
+            final data = requestDoc.data() as Map<String, dynamic>;
+            final partName = data['partName'] ?? 'قطعة غير مسماة';
+            final quantity = data['quantity']?.toString() ?? 'N/A';
+            final engineerName = data['engineerName'] ?? 'مهندس غير معروف';
+            final status = data['status'] ?? 'غير معروف';
+            final requestedAt = (data['requestedAt'] as Timestamp?)?.toDate();
+            final formattedDate = requestedAt != null
+                ? DateFormat('yyyy/MM/dd hh:mm a', 'ar').format(requestedAt)
+                : 'غير معروف';
+
+            Color statusColor;
+            IconData statusIcon;
+            switch (status) {
+              case 'معلق':
+                statusColor = AppConstants.warningColor;
+                statusIcon = Icons.pending_actions_rounded;
+                break;
+              case 'تمت الموافقة':
+                statusColor = AppConstants.successColor;
+                statusIcon = Icons.check_circle_outline_rounded;
+                break;
+              case 'مرفوض':
+                statusColor = AppConstants.errorColor;
+                statusIcon = Icons.cancel_outlined;
+                break;
+              case 'تم الطلب':
+                statusColor = AppConstants.infoColor;
+                statusIcon = Icons.shopping_cart_checkout_rounded;
+                break;
+              case 'تم الاستلام':
+                statusColor = AppConstants.primaryColor;
+                statusIcon = Icons.inventory_2_outlined;
+                break;
+              default:
+                statusColor = AppConstants.textSecondary;
+                statusIcon = Icons.help_outline_rounded;
+            }
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
+              elevation: 1.5,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
+              child: ListTile(
+                title: Text('اسم القطعة: $partName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('الكمية: $quantity', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                    Text('مقدم الطلب: $engineerName', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                    Row(
+                      children: [
+                        Icon(statusIcon, color: statusColor, size: 16),
+                        const SizedBox(width: 4),
+                        Text(status, style: TextStyle(fontSize: 14, color: statusColor, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                    Text('تاريخ الطلب: $formattedDate', style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
+                  ],
+                ),
+                trailing: (_currentUserRole == 'admin' || _currentUserRole == 'engineer')
+                    ? PopupMenuButton<String>(
+                        onSelected: (val) {
+                          if (val == 'edit') {
+                            _showEditPartRequestDialog(requestDoc);
+                          } else if (val == 'delete') {
+                            _deletePartRequest(requestDoc.id);
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(value: 'edit', child: Text('تعديل')),
+                          PopupMenuItem(value: 'delete', child: Text('حذف')),
+                        ],
+                      )
+                    : null,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _deletePartRequest(String docId) async {
+    try {
+      await FirebaseFirestore.instance.collection('partRequests').doc(docId).delete();
+      if (mounted) {
+        _showFeedbackSnackBar(context, 'تم حذف الطلب بنجاح', isError: false);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showFeedbackSnackBar(context, 'فشل حذف الطلب: $e', isError: true);
+      }
+    }
+  }
+
+  Future<void> _showEditPartRequestDialog(DocumentSnapshot requestDoc) async {
+    final data = requestDoc.data() as Map<String, dynamic>?;
+    if (data == null) return;
+    final partController = TextEditingController(text: data['partName'] ?? '');
+    final quantityController = TextEditingController(text: data['quantity']?.toString() ?? '');
+    String status = data['status'] ?? 'معلق';
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return Directionality(
+          textDirection: ui.TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('تعديل طلب القطعة'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: partController,
+                  decoration: const InputDecoration(labelText: 'اسم القطعة'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: quantityController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'الكمية'),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: status,
+                  decoration: const InputDecoration(labelText: 'الحالة'),
+                  items: const [
+                    DropdownMenuItem(value: 'معلق', child: Text('معلق')),
+                    DropdownMenuItem(value: 'تمت الموافقة', child: Text('تمت الموافقة')),
+                    DropdownMenuItem(value: 'مرفوض', child: Text('مرفوض')),
+                    DropdownMenuItem(value: 'تم الطلب', child: Text('تم الطلب')),
+                    DropdownMenuItem(value: 'تم الاستلام', child: Text('تم الاستلام')),
+                  ],
+                  onChanged: (val) => status = val ?? status,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await FirebaseFirestore.instance.collection('partRequests').doc(requestDoc.id).update({
+                      'partName': partController.text.trim(),
+                      'quantity': int.tryParse(quantityController.text.trim()) ?? 0,
+                      'status': status,
+                    });
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      _showFeedbackSnackBar(context, 'تم تحديث الطلب', isError: false);
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      _showFeedbackSnackBar(context, 'فشل تحديث الطلب: $e', isError: true);
+                    }
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, foregroundColor: Colors.white),
+                child: const Text('حفظ'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState(String message, {IconData icon = Icons.info_outline}) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppConstants.paddingLarge),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 80, color: AppConstants.textSecondary.withOpacity(0.4)),
+            const SizedBox(height: AppConstants.itemSpacing),
+            Text(message, style: const TextStyle(fontSize: 17, color: AppConstants.textSecondary, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppConstants.paddingLarge),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off_rounded, size: 80, color: AppConstants.errorColor),
+            const SizedBox(height: AppConstants.itemSpacing),
+            Text(message, style: const TextStyle(fontSize: 17, color: AppConstants.errorColor, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1761,6 +1986,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 children: [
                   _buildPhasesTab(),
                   _buildTestsTab(),
+                  _buildPartRequestsTab(),
                 ],
               ),
             ),

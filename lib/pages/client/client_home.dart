@@ -736,7 +736,10 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildEntriesListForClient(projectId, phaseId, isSubEntry: false),
+                          if (isCompleted)
+                            _buildEntriesListForClient(projectId, phaseId, isSubEntry: false)
+                          else
+                            const Text('تفاصيل المرحلة متاحة بعد الاكتمال.', style: TextStyle(color: AppConstants.textSecondary)),
                           if (subPhasesStructure.isNotEmpty)
                             const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
                         ],
@@ -789,7 +792,9 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
                                     children: [
                                       Padding(
                                         padding: const EdgeInsets.only(left: AppConstants.paddingSmall, right: AppConstants.paddingMedium + 8, bottom: AppConstants.paddingSmall, top: 0),
-                                        child: _buildEntriesListForClient(projectId, phaseId, subPhaseId: subPhaseId, isSubEntry: true),
+                                        child: isSubCompleted
+                                            ? _buildEntriesListForClient(projectId, phaseId, subPhaseId: subPhaseId, isSubEntry: true)
+                                            : const Text('ستظهر التفاصيل بعد اكتمال المرحلة الفرعية.', style: TextStyle(color: AppConstants.textSecondary)),
                                       )
                                     ],
                                   ),
@@ -962,36 +967,38 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
                       size: 20,
                     ),
                     title: Text(testName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: isTestCompleted ? TextDecoration.lineThrough : null)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (isTestCompleted && engineerName != null && engineerName.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2.0),
-                            child: Text("بواسطة: $engineerName", style: const TextStyle(fontSize: 10, color: AppConstants.textSecondary, fontStyle: FontStyle.italic)),
-                          ),
-                        if (testNote.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2.0),
-                            child: ExpandableText("ملاحظة: $testNote", valueColor: AppConstants.infoColor, trimLines: 1),
-                          ),
-                        if (testImageUrl != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2.0),
-                            child: InkWell(
-                              onTap: () => _viewImageDialog(testImageUrl??''),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.image_outlined, size: 14, color: AppConstants.primaryLight),
-                                  SizedBox(width: 2),
-                                  Text("عرض الصورة", style: TextStyle(fontSize: 11, color: AppConstants.primaryLight, decoration: TextDecoration.underline)),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                    subtitle: isTestCompleted
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (engineerName != null && engineerName.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2.0),
+                                  child: Text("بواسطة: $engineerName", style: const TextStyle(fontSize: 10, color: AppConstants.textSecondary, fontStyle: FontStyle.italic)),
+                                ),
+                              if (testNote.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2.0),
+                                  child: ExpandableText("ملاحظة: $testNote", valueColor: AppConstants.infoColor, trimLines: 1),
+                                ),
+                              if (testImageUrl != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2.0),
+                                  child: InkWell(
+                                    onTap: () => _viewImageDialog(testImageUrl ?? ''),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.image_outlined, size: 14, color: AppConstants.primaryLight),
+                                        SizedBox(width: 2),
+                                        Text("عرض الصورة", style: TextStyle(fontSize: 11, color: AppConstants.primaryLight, decoration: TextDecoration.underline)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          )
+                        : const Text('سيتم عرض تفاصيل الاختبار بعد اكتماله.', style: TextStyle(color: AppConstants.textSecondary)),
                   );
                 },
               );
