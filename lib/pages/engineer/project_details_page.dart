@@ -12,6 +12,7 @@ import 'dart:convert';
 import 'dart:ui' as ui; // For TextDirection
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:share_plus/share_plus.dart';
+import 'dart:html' as html;
 
 // --- PDF and Path Provider Imports ---
 import 'package:pdf/pdf.dart';
@@ -44,7 +45,7 @@ class AppConstants {
     BoxShadow(
         color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 4)),
   ];
-  static const String UPLOAD_URL = 'https://creditphoneqatar.com/eng-app/upload_image.php';
+  static const String UPLOAD_URL = 'https://mobileapp.alfatehestates.com/images_upload/upload_image.php';
 }
 
 
@@ -592,8 +593,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                     backgroundColor: isMainPhaseCompletedByAnyEngineer ? AppConstants.successColor : AppConstants.primaryColor,
                     child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
-                  title: Text(phaseName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
-                  subtitle: Text(isMainPhaseCompletedByAnyEngineer ? 'مكتملة ✅' : 'قيد التنفيذ ⏳', style: TextStyle(color: isMainPhaseCompletedByAnyEngineer ? AppConstants.successColor : AppConstants.warningColor, fontWeight: FontWeight.w500)),
+                  title: Text(phaseName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary, decoration: null)),                  subtitle: Text(isMainPhaseCompletedByAnyEngineer ? 'مكتملة ✅' : 'قيد التنفيذ ⏳', style: TextStyle(color: isMainPhaseCompletedByAnyEngineer ? AppConstants.successColor : AppConstants.warningColor, fontWeight: FontWeight.w500)),
                   trailing: trailingWidget,
                   children: [
                     _buildEntriesList(phaseId, isMainPhaseCompletedByAnyEngineer, phaseName),
@@ -653,8 +653,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                       isSubPhaseCompletedByAnyEngineer ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
                                       color: isSubPhaseCompletedByAnyEngineer ? AppConstants.successColor : AppConstants.textSecondary,
                                     ),
-                                    title: Text(subPhaseName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: isSubPhaseCompletedByAnyEngineer ? TextDecoration.lineThrough : null)),
-                                    trailing: subPhaseTrailingWidget,
+                                    title: Text(subPhaseName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: null)),                                    trailing: subPhaseTrailingWidget,
                                     onTap: () {
                                       if (canEngineerEditThisSubPhase) {
                                         _showAddNoteOrImageDialog(phaseId, subPhaseName, subPhaseId: subPhaseId);
@@ -766,7 +765,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                     }
 
                     return ListTile(
-                      title: Text(testName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: isTestCompleted ? TextDecoration.lineThrough : null)),
+                      title: Text(testName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: null)),
                       leading: Icon(
                         isTestCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
                         color: isTestCompleted ? AppConstants.successColor : AppConstants.textSecondary,
@@ -935,7 +934,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   }
 
   Future<void> _showUpdateTestStatusDialog(String testId, String testName, bool initialStatus, {String? currentNote, String? currentImageUrl}) async {
-    // ... (no changes in this function)
     bool newStatus = initialStatus;
     final noteController = TextEditingController(text: currentNote ?? "");
     String? tempImageUrl = currentImageUrl;
@@ -1012,11 +1010,23 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                     if (pickedImageXFile != null) {
                       try {
                         var request = http.MultipartRequest('POST', Uri.parse(AppConstants.UPLOAD_URL));
-                        request.files.add(await http.MultipartFile.fromPath(
-                          'image',
-                          pickedImageXFile!.path,
-                          contentType: MediaType.parse(pickedImageXFile!.mimeType ?? 'image/jpeg'),
-                        ));
+                        if (kIsWeb) {
+                          // Read bytes for web
+                          final bytes = await pickedImageXFile!.readAsBytes();
+                          request.files.add(http.MultipartFile.fromBytes(
+                            'image', // Field name on your PHP server
+                            bytes,
+                            filename: pickedImageXFile!.name,
+                            contentType: MediaType.parse(pickedImageXFile!.mimeType ?? 'image/jpeg'),
+                          ));
+                        } else {
+                          // Use fromPath for mobile (iOS/Android)
+                          request.files.add(await http.MultipartFile.fromPath(
+                            'image', // Field name on your PHP server
+                            pickedImageXFile!.path,
+                            contentType: MediaType.parse(pickedImageXFile!.mimeType ?? 'image/jpeg'),
+                          ));
+                        }
 
                         var streamedResponse = await request.send();
                         var response = await http.Response.fromStream(streamedResponse);
@@ -1038,6 +1048,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       }
                     }
 
+                    // ... (rest of the try-catch block for Firestore update)
                     try {
                       final testDocRef = FirebaseFirestore.instance
                           .collection('projects')
@@ -1174,8 +1185,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     );
   }
 
+  // lib/pages/engineer/project_details_page.dart
+
+// ... (existing code)
+
   Future<void> _showAddNoteOrImageDialog(String phaseId, String phaseOrSubPhaseName, {String? subPhaseId}) async {
-    // ... (no changes in this function)
     if (!mounted || _currentEngineerUid == null) return;
     final noteController = TextEditingController();
     bool isDialogLoading = false;
@@ -1304,11 +1318,21 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                         final XFile imageFile = _selectedImagesInDialogStateful![i];
                         try {
                           var request = http.MultipartRequest('POST', Uri.parse(AppConstants.UPLOAD_URL));
-                          request.files.add(await http.MultipartFile.fromPath(
-                            'image',
-                            imageFile.path,
-                            contentType: MediaType.parse(imageFile.mimeType ?? 'image/jpeg'),
-                          ));
+                          if (kIsWeb) {
+                            final bytes = await imageFile.readAsBytes();
+                            request.files.add(http.MultipartFile.fromBytes(
+                              'image',
+                              bytes,
+                              filename: imageFile.name,
+                              contentType: MediaType.parse(imageFile.mimeType ?? 'image/jpeg'),
+                            ));
+                          } else {
+                            request.files.add(await http.MultipartFile.fromPath(
+                              'image',
+                              imageFile.path,
+                              contentType: MediaType.parse(imageFile.mimeType ?? 'image/jpeg'),
+                            ));
+                          }
 
                           var streamedResponse = await request.send();
                           var response = await http.Response.fromStream(streamedResponse);
@@ -1329,6 +1353,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       }
                     }
 
+                    // ... (rest of the try-catch block for Firestore update)
                     try {
                       await FirebaseFirestore.instance.collection(entriesCollectionPath).add({
                         'type': uploadedImageUrls.isNotEmpty ? 'image_with_note' : 'note',
@@ -1548,7 +1573,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   }
 
 
-  // --- MODIFIED PDF Generation and Sharing Function ---
+  // ... (inside _ProjectDetailsPageState) ...
+
+// --- MODIFIED PDF Generation and Sharing Function ---
   Future<void> _generateAndSharePdf(
       String phaseOrTestId,
       String name, {
@@ -1561,7 +1588,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       }) async {
     if (_arabicFont == null) {
       _showFeedbackSnackBar(context, "خطأ: الخط العربي غير متوفر لإنشاء PDF.", isError: true);
-      // Attempt to load it again if it's null, or guide the user.
       await _loadArabicFont();
       if(_arabicFont == null){
         _showFeedbackSnackBar(context, "فشل تحميل الخط العربي. لا يمكن إنشاء PDF.", isError: true);
@@ -1574,13 +1600,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final pdf = pw.Document();
     final List<pw.Widget> contentWidgets = [];
 
-    // --- PDF Styling and Common Info ---
     final pw.TextStyle regularStyle = pw.TextStyle(font: _arabicFont, fontSize: 11);
     final pw.TextStyle boldStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 12);
     final pw.TextStyle headerStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16, color: PdfColors.blueGrey800);
     final pw.TextStyle subHeaderStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 14, color: PdfColors.blueGrey600);
     final pw.TextStyle smallGreyStyle = pw.TextStyle(font: _arabicFont, fontSize: 9, color: PdfColors.grey600);
-
 
     String projectName = (_projectDataSnapshot?.data() as Map<String, dynamic>)?['name'] ?? 'اسم المشروع غير محدد';
     contentWidgets.add(pw.Header(
@@ -1601,8 +1625,76 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     ));
     contentWidgets.add(pw.Divider(height: 20, thickness: 1, color: PdfColors.grey400));
 
+    // --- NEW: Fetch all images before building the PDF ---
+    final Map<String, pw.MemoryImage> fetchedImages = {};
 
-    // --- Content Specific to Test or Phase ---
+    // Helper to fetch and store images
+    Future<void> _fetchAndStoreImages(List<String> imageUrls) async {
+      for (String url in imageUrls) {
+        if (!fetchedImages.containsKey(url)) {
+          try {
+            final response = await http.get(Uri.parse(url));
+            if (response.statusCode == 200) {
+              fetchedImages[url] = pw.MemoryImage(response.bodyBytes);
+            } else {
+              print("Failed to load image from URL $url: Status code ${response.statusCode}");
+            }
+          } catch (e) {
+            print("Error fetching image from URL $url: $e");
+          }
+        }
+      }
+    }
+
+    // Identify all image URLs that might be needed in the PDF
+    List<String> allImageUrlsToFetch = [];
+
+    if (isTestSection) {
+      if (testImageUrl != null) {
+        allImageUrlsToFetch.add(testImageUrl);
+      }
+    } else { // It's a Phase (Main or specific Sub-Phase)
+      if (isSubPhase) {
+        String entriesPath = 'projects/${widget.projectId}/subphases_status/$phaseOrTestId/entries';
+        List<Map<String, dynamic>> entries = await _fetchEntriesForPdf(entriesPath);
+        for (var entry in entries) {
+          final List<dynamic>? imageUrlsDynamic = entry['imageUrls'] as List<dynamic>?;
+          if (imageUrlsDynamic != null) {
+            allImageUrlsToFetch.addAll(imageUrlsDynamic.map((e) => e.toString()).toList());
+          }
+        }
+      } else { // PDF for a Main Phase and ALL its sub-phases
+        String mainPhaseEntriesPath = 'projects/${widget.projectId}/phases_status/$phaseOrTestId/entries';
+        List<Map<String, dynamic>> mainPhaseEntries = await _fetchEntriesForPdf(mainPhaseEntriesPath);
+        for (var entry in mainPhaseEntries) {
+          final List<dynamic>? imageUrlsDynamic = entry['imageUrls'] as List<dynamic>?;
+          if (imageUrlsDynamic != null) {
+            allImageUrlsToFetch.addAll(imageUrlsDynamic.map((e) => e.toString()).toList());
+          }
+        }
+
+        final mainPhaseStructure = predefinedPhasesStructure.firstWhere((p) => p['id'] == phaseOrTestId, orElse: () => {});
+        if (mainPhaseStructure.isNotEmpty && (mainPhaseStructure['subPhases'] as List).isNotEmpty) {
+          List<Map<String,dynamic>> subPhases = mainPhaseStructure['subPhases'] as List<Map<String,dynamic>>;
+          for (var subPhaseMap in subPhases) {
+            final subPhaseId = subPhaseMap['id'] as String;
+            List<Map<String, dynamic>> subPhaseEntries = await _fetchEntriesForPdf('projects/${widget.projectId}/subphases_status/$subPhaseId/entries');
+            for (var entry in subPhaseEntries) {
+              final List<dynamic>? imageUrlsDynamic = entry['imageUrls'] as List<dynamic>?;
+              if (imageUrlsDynamic != null) {
+                allImageUrlsToFetch.addAll(imageUrlsDynamic.map((e) => e.toString()).toList());
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Now, fetch all identified images concurrently
+    await _fetchAndStoreImages(allImageUrlsToFetch.toSet().toList()); // Use toSet to avoid duplicate fetches
+    // --- END NEW: Fetch all images before building the PDF ---
+
+
     if (isTestSection) {
       contentWidgets.add(pw.Text('تقرير اختبار', style: subHeaderStyle, textDirection: pw.TextDirection.rtl));
       contentWidgets.add(pw.SizedBox(height: 5));
@@ -1617,32 +1709,24 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         contentWidgets.add(pw.Text('الملاحظات: $testNote', style: regularStyle, textDirection: pw.TextDirection.rtl));
       }
       contentWidgets.add(pw.SizedBox(height: 10));
-      if (testImageUrl != null) {
-        try {
-          final http.Response response = await http.get(Uri.parse(testImageUrl));
-          if (response.statusCode == 200) {
-            final image = pw.MemoryImage(response.bodyBytes);
-            contentWidgets.add(pw.Container(
-                alignment: pw.Alignment.centerRight,
-                child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text('صورة الاختبار:', style: boldStyle, textDirection: pw.TextDirection.rtl),
-                      pw.SizedBox(height: 5),
-                      pw.Image(image, width: 200, height: 200, fit: pw.BoxFit.contain), // Adjust size as needed
-                    ]
-                )
-            ));
-          } else {
-            contentWidgets.add(pw.Text('فشل تحميل صورة الاختبار.', style: regularStyle, textDirection: pw.TextDirection.rtl));
-          }
-        } catch (e) {
-          contentWidgets.add(pw.Text('خطأ أثناء تحميل صورة الاختبار: $e', style: regularStyle, textDirection: pw.TextDirection.rtl));
-          print("Error fetching image for PDF: $e");
-        }
+      if (testImageUrl != null && fetchedImages.containsKey(testImageUrl)) {
+        final image = fetchedImages[testImageUrl]!;
+        contentWidgets.add(pw.Container(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  pw.Text('صورة الاختبار:', style: boldStyle, textDirection: pw.TextDirection.rtl),
+                  pw.SizedBox(height: 5),
+                  pw.Image(image, width: 200, height: 200, fit: pw.BoxFit.contain),
+                ]
+            )
+        ));
+      } else if (testImageUrl != null) {
+        contentWidgets.add(pw.Text('فشل تحميل صورة الاختبار من: $testImageUrl', style: regularStyle, textDirection: pw.TextDirection.rtl));
       }
-    } else { // It's a Phase (Main or specific Sub-Phase)
-      if (isSubPhase) { // PDF for a single sub-phase
+    } else {
+      if (isSubPhase) {
         contentWidgets.add(pw.Text('تقرير مرحلة فرعية', style: subHeaderStyle, textDirection: pw.TextDirection.rtl));
         contentWidgets.add(pw.SizedBox(height: 5));
         contentWidgets.add(pw.Text('اسم المرحلة الفرعية: $name', style: boldStyle, textDirection: pw.TextDirection.rtl));
@@ -1666,211 +1750,233 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
-                    if (note.isNotEmpty) pw.Text('ملاحظة: $note', style: regularStyle, textDirection: pw.TextDirection.rtl),
-                pw.SizedBox(height: 3),
-                for (String imgUrl in imageUrls)
+                      if (note.isNotEmpty) pw.Text('ملاحظة: $note', style: regularStyle, textDirection: pw.TextDirection.rtl),
+                      pw.SizedBox(height: 3),
+                      for (String imgUrl in imageUrls)
+                        if (fetchedImages.containsKey(imgUrl))
+                          pw.Padding(
+                            padding: pw.EdgeInsets.symmetric(vertical: 2),
+                            child: pw.Image(fetchedImages[imgUrl]!, width: 150, height: 100, fit: pw.BoxFit.contain),
+                          )
+                        else
+                          pw.Text('  فشل تحميل الصورة من: $imgUrl', style: smallGreyStyle.copyWith(color: PdfColors.red), textDirection: pw.TextDirection.rtl),
+                      pw.Text('بواسطة: $entryEngineer - $entryDate', style: smallGreyStyle, textDirection: pw.TextDirection.rtl),
+                    ]
+                )
+            ));
+          }
+        } else {
+          contentWidgets.add(pw.Text('لا توجد ملاحظات أو صور لهذه المرحلة الفرعية.', style: regularStyle, textDirection: pw.TextDirection.rtl));
+        }
 
-    pw.Text('بواسطة: $entryEngineer - $entryDate', style: smallGreyStyle, textDirection: pw.TextDirection.rtl),
-    ]
-    )
-    ));
+      } else { // PDF for a Main Phase and ALL its sub-phases
+        contentWidgets.add(pw.Text('تقرير مرحلة رئيسية', style: subHeaderStyle, textDirection: pw.TextDirection.rtl));
+        contentWidgets.add(pw.SizedBox(height: 5));
+        contentWidgets.add(pw.Text('اسم المرحلة: $name', style: boldStyle, textDirection: pw.TextDirection.rtl));
+
+        String mainPhaseEntriesPath = 'projects/${widget.projectId}/phases_status/$phaseOrTestId/entries';
+        List<Map<String, dynamic>> mainPhaseEntries = await _fetchEntriesForPdf(mainPhaseEntriesPath);
+        if (mainPhaseEntries.isNotEmpty) {
+          contentWidgets.add(pw.SizedBox(height: 10));
+          contentWidgets.add(pw.Text('ملاحظات وصور المرحلة الرئيسية:', style: boldStyle, textDirection: pw.TextDirection.rtl));
+          for (var entry in mainPhaseEntries) {
+            final String note = entry['note'] ?? '';
+            final List<dynamic>? imageUrlsDynamic = entry['imageUrls'] as List<dynamic>?;
+            final List<String> imageUrls = imageUrlsDynamic?.map((e) => e.toString()).toList() ?? [];
+            final String entryEngineer = entry['engineerName'] ?? 'مهندس';
+            final Timestamp? ts = entry['timestamp'] as Timestamp?;
+            final String entryDate = ts != null ? DateFormat('dd/MM/yy hh:mm a', 'ar').format(ts.toDate()) : 'غير معروف';
+
+            contentWidgets.add(pw.Container(
+                padding: pw.EdgeInsets.symmetric(vertical: 5),
+                margin: pw.EdgeInsets.only(bottom:5),
+                decoration: pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300))),
+                child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      if (note.isNotEmpty) pw.Text('ملاحظة: $note', style: regularStyle, textDirection: pw.TextDirection.rtl),
+                      pw.SizedBox(height: 3),
+                      for (String imgUrl in imageUrls)
+                        if (fetchedImages.containsKey(imgUrl))
+                          pw.Padding(
+                            padding: pw.EdgeInsets.symmetric(vertical: 2),
+                            child: pw.Image(fetchedImages[imgUrl]!, width: 150, height: 100, fit: pw.BoxFit.contain),
+                          )
+                        else
+                          pw.Text('  فشل تحميل الصورة من: $imgUrl', style: smallGreyStyle.copyWith(color: PdfColors.red), textDirection: pw.TextDirection.rtl),
+                      pw.Text('بواسطة: $entryEngineer - $entryDate', style: smallGreyStyle, textDirection: pw.TextDirection.rtl),
+                    ]
+                )
+            ));
+          }
+        } else {
+          contentWidgets.add(pw.Text('لا توجد ملاحظات أو صور للمرحلة الرئيسية.', style: regularStyle, textDirection: pw.TextDirection.rtl));
+        }
+        contentWidgets.add(pw.SizedBox(height: 15));
+
+
+        final mainPhaseStructure = predefinedPhasesStructure.firstWhere((p) => p['id'] == phaseOrTestId, orElse: () => {});
+        if (mainPhaseStructure.isNotEmpty && (mainPhaseStructure['subPhases'] as List).isNotEmpty) {
+          contentWidgets.add(pw.Text('تفاصيل المهام (المراحل الفرعية):', style: subHeaderStyle, textDirection: pw.TextDirection.rtl));
+          contentWidgets.add(pw.SizedBox(height: 5));
+
+          List<Map<String,dynamic>> subPhases = mainPhaseStructure['subPhases'] as List<Map<String,dynamic>>;
+          for (var subPhaseMap in subPhases) {
+            final subPhaseId = subPhaseMap['id'] as String;
+            final subPhaseName = subPhaseMap['name'] as String;
+
+            bool isSubPhaseCompleted = false;
+            String subPhaseCompletedBy = "غير معروف";
+            try {
+              final subPhaseStatusDoc = await FirebaseFirestore.instance
+                  .collection('projects').doc(widget.projectId)
+                  .collection('subphases_status').doc(subPhaseId).get();
+              if (subPhaseStatusDoc.exists) {
+                isSubPhaseCompleted = subPhaseStatusDoc.data()?['completed'] ?? false;
+                subPhaseCompletedBy = subPhaseStatusDoc.data()?['lastUpdatedByName'] ?? "غير معروف";
+              }
+            } catch(e) { print("Error fetching subphase status: $e");}
+
+            String statusText = isSubPhaseCompleted ? 'مكتملة (بواسطة: $subPhaseCompletedBy)' : 'قيد التنفيذ';
+
+            contentWidgets.add(pw.Container(
+                margin: pw.EdgeInsets.only(bottom: 10),
+                padding: pw.EdgeInsets.all(8),
+                decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey400),
+                    borderRadius: pw.BorderRadius.circular(4)
+                ),
+                child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text(' المهمة: $subPhaseName', style: boldStyle, textDirection: pw.TextDirection.rtl),
+                      pw.Text(' الحالة: $statusText', style: regularStyle.copyWith(color: isSubPhaseCompleted ? PdfColors.green700 : PdfColors.orange700), textDirection: pw.TextDirection.rtl),
+                      pw.SizedBox(height: 5),
+                    ]
+                )
+            ));
+            List<Map<String, dynamic>> subPhaseEntries = await _fetchEntriesForPdf('projects/${widget.projectId}/subphases_status/$subPhaseId/entries');
+            if(subPhaseEntries.isNotEmpty){
+              contentWidgets.add(pw.Text('  ملاحظات وصور المهمة:', style: regularStyle.copyWith(fontWeight: pw.FontWeight.bold), textDirection: pw.TextDirection.rtl));
+              for (var entry in subPhaseEntries) {
+                final String note = entry['note'] ?? '';
+                final List<dynamic>? imageUrlsDynamic = entry['imageUrls'] as List<dynamic>?;
+                final List<String> imageUrls = imageUrlsDynamic?.map((e) => e.toString()).toList() ?? [];
+                final String entryEngineer = entry['engineerName'] ?? 'مهندس';
+                final Timestamp? ts = entry['timestamp'] as Timestamp?;
+                final String entryDate = ts != null ? DateFormat('dd/MM/yy hh:mm a', 'ar').format(ts.toDate()) : 'غير معروف';
+
+                contentWidgets.add(pw.Container(
+                    padding: pw.EdgeInsets.symmetric(vertical: 3, horizontal: 5),
+                    margin: pw.EdgeInsets.only(right: 10, bottom: 3, top:3),
+                    decoration: pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200))),
+                    child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          if (note.isNotEmpty) pw.Text('  $note', style: regularStyle, textDirection: pw.TextDirection.rtl),
+                          pw.SizedBox(height: 2),
+                          for (String imgUrl in imageUrls)
+                            if (fetchedImages.containsKey(imgUrl))
+                              pw.Padding(
+                                padding: pw.EdgeInsets.symmetric(vertical: 2),
+                                child: pw.Image(fetchedImages[imgUrl]!, width: 150, height: 100, fit: pw.BoxFit.contain),
+                              )
+                            else
+                              pw.Text('  فشل تحميل الصورة من: $imgUrl', style: smallGreyStyle.copyWith(color: PdfColors.red), textDirection: pw.TextDirection.rtl),
+                          pw.Text('  بواسطة: $entryEngineer - $entryDate', style: smallGreyStyle, textDirection: pw.TextDirection.rtl),
+                        ]
+                    )
+                ));
+              }
+              contentWidgets.add(pw.SizedBox(height:5));
+            }
+          }
+        }
+      }
     }
-    } else {
-    contentWidgets.add(pw.Text('لا توجد ملاحظات أو صور لهذه المرحلة الفرعية.', style: regularStyle, textDirection: pw.TextDirection.rtl));
-    }
 
-    } else { // PDF for a Main Phase and ALL its sub-phases
-    contentWidgets.add(pw.Text('تقرير مرحلة رئيسية', style: subHeaderStyle, textDirection: pw.TextDirection.rtl));
-    contentWidgets.add(pw.SizedBox(height: 5));
-    contentWidgets.add(pw.Text('اسم المرحلة: $name', style: boldStyle, textDirection: pw.TextDirection.rtl));
-
-    // Entries for the Main Phase itself
-    String mainPhaseEntriesPath = 'projects/${widget.projectId}/phases_status/$phaseOrTestId/entries';
-    List<Map<String, dynamic>> mainPhaseEntries = await _fetchEntriesForPdf(mainPhaseEntriesPath);
-    if (mainPhaseEntries.isNotEmpty) {
-    contentWidgets.add(pw.SizedBox(height: 10));
-    contentWidgets.add(pw.Text('ملاحظات وصور المرحلة الرئيسية:', style: boldStyle, textDirection: pw.TextDirection.rtl));
-    for (var entry in mainPhaseEntries) {
-    final String note = entry['note'] ?? '';
-    final List<dynamic>? imageUrlsDynamic = entry['imageUrls'] as List<dynamic>?;
-    final List<String> imageUrls = imageUrlsDynamic?.map((e) => e.toString()).toList() ?? [];
-    final String entryEngineer = entry['engineerName'] ?? 'مهندس';
-    final Timestamp? ts = entry['timestamp'] as Timestamp?;
-    final String entryDate = ts != null ? DateFormat('dd/MM/yy hh:mm a', 'ar').format(ts.toDate()) : 'غير معروف';
-
-    contentWidgets.add(pw.Container(
-    padding: pw.EdgeInsets.symmetric(vertical: 5),
-    margin: pw.EdgeInsets.only(bottom:5),
-    decoration: pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300))),
-    child: pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.end,
-    children: [
-    if (note.isNotEmpty) pw.Text('ملاحظة: $note', style: regularStyle, textDirection: pw.TextDirection.rtl),
-    pw.SizedBox(height: 3),
-    for (String imgUrl in imageUrls)
-
-    pw.Text('بواسطة: $entryEngineer - $entryDate', style: smallGreyStyle, textDirection: pw.TextDirection.rtl),
-    ]
-    )
-    ));
-    }
-    } else {
-    contentWidgets.add(pw.Text('لا توجد ملاحظات أو صور للمرحلة الرئيسية.', style: regularStyle, textDirection: pw.TextDirection.rtl));
-    }
-    contentWidgets.add(pw.SizedBox(height: 15));
-
-
-    // Sub-Phases details
-    final mainPhaseStructure = predefinedPhasesStructure.firstWhere((p) => p['id'] == phaseOrTestId, orElse: () => {});
-    if (mainPhaseStructure.isNotEmpty && (mainPhaseStructure['subPhases'] as List).isNotEmpty) {
-    contentWidgets.add(pw.Text('تفاصيل المهام (المراحل الفرعية):', style: subHeaderStyle, textDirection: pw.TextDirection.rtl));
-    contentWidgets.add(pw.SizedBox(height: 5));
-
-    List<Map<String,dynamic>> subPhases = mainPhaseStructure['subPhases'] as List<Map<String,dynamic>>;
-    for (var subPhaseMap in subPhases) {
-    final subPhaseId = subPhaseMap['id'] as String;
-    final subPhaseName = subPhaseMap['name'] as String;
-
-    // Fetch completion status of sub-phase
-    bool isSubPhaseCompleted = false;
-    String subPhaseCompletedBy = "غير معروف";
-    try {
-    final subPhaseStatusDoc = await FirebaseFirestore.instance
-        .collection('projects').doc(widget.projectId)
-        .collection('subphases_status').doc(subPhaseId).get();
-    if (subPhaseStatusDoc.exists) {
-    isSubPhaseCompleted = subPhaseStatusDoc.data()?['completed'] ?? false;
-    subPhaseCompletedBy = subPhaseStatusDoc.data()?['lastUpdatedByName'] ?? "غير معروف";
-    }
-    } catch(e) { print("Error fetching subphase status: $e");}
-
-    String statusText = isSubPhaseCompleted ? 'مكتملة (بواسطة: $subPhaseCompletedBy)' : 'قيد التنفيذ';
-
-    contentWidgets.add(pw.Container(
-    margin: pw.EdgeInsets.only(bottom: 10),
-    padding: pw.EdgeInsets.all(8),
-    decoration: pw.BoxDecoration(
-    border: pw.Border.all(color: PdfColors.grey400),
-    borderRadius: pw.BorderRadius.circular(4)
-    ),
-    child: pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.end,
-    children: [
-    pw.Text(' المهمة: $subPhaseName', style: boldStyle, textDirection: pw.TextDirection.rtl),
-    pw.Text(' الحالة: $statusText', style: regularStyle.copyWith(color: isSubPhaseCompleted ? PdfColors.green700 : PdfColors.orange700), textDirection: pw.TextDirection.rtl),
-    pw.SizedBox(height: 5),
-    // Entries for this sub-phase
-    _buildPdfEntriesForPhaseOrSubphase(
-    'projects/${widget.projectId}/subphases_status/$subPhaseId/entries',
-    regularStyle,
-    smallGreyStyle
-    ), // This returns a future, so we await it or use FutureBuilder if inside a build method of pw.Widget
-    ]
-    )
-    ));
-    // For simplicity in this direct generation, we will await inside a helper or directly
-    List<Map<String, dynamic>> subPhaseEntries = await _fetchEntriesForPdf('projects/${widget.projectId}/subphases_status/$subPhaseId/entries');
-    if(subPhaseEntries.isNotEmpty){
-    contentWidgets.add(pw.Text('  ملاحظات وصور المهمة:', style: regularStyle.copyWith(fontWeight: pw.FontWeight.bold), textDirection: pw.TextDirection.rtl));
-    for (var entry in subPhaseEntries) {
-    final String note = entry['note'] ?? '';
-    final List<dynamic>? imageUrlsDynamic = entry['imageUrls'] as List<dynamic>?;
-    final List<String> imageUrls = imageUrlsDynamic?.map((e) => e.toString()).toList() ?? [];
-    final String entryEngineer = entry['engineerName'] ?? 'مهندس';
-    final Timestamp? ts = entry['timestamp'] as Timestamp?;
-    final String entryDate = ts != null ? DateFormat('dd/MM/yy hh:mm a', 'ar').format(ts.toDate()) : 'غير معروف';
-
-    contentWidgets.add(pw.Container(
-    padding: pw.EdgeInsets.symmetric(vertical: 3, horizontal: 5),
-    margin: pw.EdgeInsets.only(right: 10, bottom: 3, top:3), // Indent sub-phase entries
-    decoration: pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey200))),
-    child: pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.end,
-    children: [
-    if (note.isNotEmpty) pw.Text('  $note', style: regularStyle, textDirection: pw.TextDirection.rtl),
-    pw.SizedBox(height: 2),
-    for (String imgUrl in imageUrls)
-
-    pw.Text('  بواسطة: $entryEngineer - $entryDate', style: smallGreyStyle, textDirection: pw.TextDirection.rtl),
-    ]
-    )
-    ));
-    }
-    contentWidgets.add(pw.SizedBox(height:5)); // Space after entries of a sub-phase
-    }
-    }
-    }
-    }
-    }
-
-    // --- Footer Note ---
     contentWidgets.add(pw.SizedBox(height: 30));
     contentWidgets.add(
-    pw.Container(
-    padding: pw.EdgeInsets.all(8),
-    decoration: pw.BoxDecoration(
-    border: pw.Border.all(color: PdfColors.red, width: 1.5),
-    borderRadius: pw.BorderRadius.circular(5),
-    ),
-    child: pw.Text(
-    "ملاحظة هامة: هذا التقرير صالح لمدة 24 ساعة من التسليم للتعقيب عليها او الملاحظة.",
-    style: pw.TextStyle(font: _arabicFont, color: PdfColors.red, fontWeight: pw.FontWeight.bold, fontSize: 10),
-    textDirection: pw.TextDirection.rtl,
-    textAlign: pw.TextAlign.center,
-    ),
-    )
+        pw.Container(
+          padding: pw.EdgeInsets.all(8),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: PdfColors.red, width: 1.5),
+            borderRadius: pw.BorderRadius.circular(5),
+          ),
+          child: pw.Text(
+            "ملاحظة هامة: هذا التقرير صالح لمدة 24 ساعة من التسليم للتعقيب عليها او الملاحظة.",
+            style: pw.TextStyle(font: _arabicFont, color: PdfColors.red, fontWeight: pw.FontWeight.bold, fontSize: 10),
+            textDirection: pw.TextDirection.rtl,
+            textAlign: pw.TextAlign.center,
+          ),
+        )
     );
 
-    // --- Add to PDF Document ---
     pdf.addPage(
-    pw.MultiPage(
-    pageTheme: pw.PageTheme(
-    pageFormat: PdfPageFormat.a4,
-    orientation: pw.PageOrientation.portrait,
-    textDirection: pw.TextDirection.rtl, // Set text direction for the whole page
-    theme: pw.ThemeData.withFont(base: _arabicFont, bold: _arabicFont), // Ensure font is applied
-    margin: pw.EdgeInsets.all(30),
-    ),
-    build: (context) => contentWidgets,
-    footer: (pw.Context context) {
-    return pw.Container(
-    alignment: pw.Alignment.center,
-    margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
-    child: pw.Text(
-    'صفحة ${context.pageNumber} من ${context.pagesCount}',
-    style: pw.Theme.of(context).defaultTextStyle.copyWith(color: PdfColors.grey, font: _arabicFont, fontSize: 10)
-    )
+        pw.MultiPage(
+            pageTheme: pw.PageTheme(
+              pageFormat: PdfPageFormat.a4,
+              orientation: pw.PageOrientation.portrait,
+              textDirection: pw.TextDirection.rtl,
+              theme: pw.ThemeData.withFont(base: _arabicFont, bold: _arabicFont),
+              margin: pw.EdgeInsets.all(30),
+            ),
+            build: (context) => contentWidgets,
+            footer: (pw.Context context) {
+              return pw.Container(
+                  alignment: pw.Alignment.center,
+                  margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
+                  child: pw.Text(
+                      'صفحة ${context.pageNumber} من ${context.pagesCount}',
+                      style: pw.Theme.of(context).defaultTextStyle.copyWith(color: PdfColors.grey, font: _arabicFont, fontSize: 10)
+                  )
+              );
+            }
+        )
     );
-    }
-    ),
-    );
-
 
     try {
-    final outputDir = await getTemporaryDirectory();
-    final sanitizedName = name.replaceAll(RegExp(r'[^\w\s]+'),'').replaceAll(' ', '_'); // Sanitize file name
-    final filePath = "${outputDir.path}/${sanitizedName}_report_${DateTime.now().millisecondsSinceEpoch}.pdf";
-    final file = File(filePath);
-    await file.writeAsBytes(await pdf.save());
+      final pdfBytes = await pdf.save();
 
-    _hideLoadingDialog(context);
-    _showFeedbackSnackBar(context, "تم إنشاء التقرير بنجاح.", isError: false);
+      final sanitizedName = name.replaceAll(RegExp(r'[^\w\s]+'),'').replaceAll(' ', '_');
+      final fileName = "${sanitizedName}_report_${DateTime.now().millisecondsSinceEpoch}.pdf";
 
-    // Share the PDF
-    // Note: Sharing directly to a specific WhatsApp number with a file is complex and often not directly supported by share_plus.
-    // It will open the general share dialog.
-    Share.shareXFiles(
-    [XFile(filePath)],
-    subject: 'تقرير مشروع: $projectName - $name',
-    text: 'الرجاء الإطلاع على تقرير ${isTestSection ? "الاختبار" : "المرحلة"}: $name لمشروع $projectName.'
-    );
+      _hideLoadingDialog(context);
+      _showFeedbackSnackBar(context, "تم إنشاء التقرير بنجاح.", isError: false);
+
+      if (kIsWeb) {
+        final blob = html.Blob([pdfBytes], 'application/pdf');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute("download", fileName)
+          ..click();
+        html.Url.revokeObjectUrl(url);
+      } else {
+        final outputDir = await getTemporaryDirectory();
+        final filePath = "${outputDir.path}/$fileName";
+        final file = File(filePath);
+        await file.writeAsBytes(pdfBytes);
+
+        Share.shareXFiles(
+            [XFile(filePath)],
+            subject: 'تقرير مشروع: $projectName - $name',
+            text: 'الرجاء الإطلاع على تقرير ${isTestSection ? "الاختبار" : "المرحلة"}: $name لمشروع $projectName.'
+        );
+      }
 
     } catch (e) {
-    _hideLoadingDialog(context);
-    _showFeedbackSnackBar(context, "فشل إنشاء أو مشاركة التقرير: $e", isError: true);
-    print("Error generating/sharing PDF: $e");
+      _hideLoadingDialog(context);
+      _showFeedbackSnackBar(context, "فشل إنشاء أو مشاركة التقرير: $e", isError: true);
+      print("Error generating/sharing PDF: $e");
     }
   }
+
+  // Dummy helper for _buildPdfEntriesForPhaseOrSubphase - no longer used/needed.
+  // You can remove this function entirely.
+  // pw.Widget _buildPdfEntriesForPhaseOrSubphase(String path, pw.TextStyle style, pw.TextStyle smallStyle) {
+  //   return pw.SizedBox();
+  // }
+} // End of _ProjectDetailsPageState
   // Dummy helper for _buildPdfEntriesForPhaseOrSubphase to avoid error, replace with actual implementation if needed.
   // This was an idea during thought process, but direct fetching in the loop is also viable.
   pw.Widget _buildPdfEntriesForPhaseOrSubphase(String path, pw.TextStyle style, pw.TextStyle smallStyle) {
@@ -1880,7 +1986,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     return pw.SizedBox();
   }
 
-} // End of _ProjectDetailsPageState
+
 
 
 // ... (ExpandableText Widget remains the same) ...

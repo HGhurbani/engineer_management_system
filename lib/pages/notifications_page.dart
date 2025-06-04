@@ -232,6 +232,41 @@ class _NotificationsPageState extends State<NotificationsPage> {
         }
         break;
 
+      case 'new_daily_task':
+        if (_currentUserRole == 'engineer') {
+          // يمكن توجيه المهندس إلى صفحة جدوله اليومي مباشرة
+          // إذا كان التبويب "جدولي اليومي" هو التبويب الافتراضي أو يمكن الوصول إليه بسهولة،
+          // فقد يكون Navigator.pushNamed(context, '/engineer'); كافيًا.
+          // أو يمكنك تمرير argument لتحديد التبويب المطلوب عند فتح EngineerHome
+          Navigator.pushNamed(context, '/engineer');
+          // يمكنك إضافة منطق لتحديد التبويب الخاص بالجدول اليومي هنا إذا لزم الأمر
+          // أو عرض رسالة تعلم المهندس بالانتقال إلى جدوله.
+          _showFeedbackSnackBar(context, 'تمت إضافة مهمة جديدة لجدولك اليومي. يرجى التحقق.', isError: false, isInfo: true);
+        } else if (_currentUserRole == 'admin') {
+          // إذا كان المسؤول هو من يتلقى هذا الإشعار (لسبب ما)، يمكن توجيهه لصفحة الجداول
+          if (projectId != null && projectId.isNotEmpty) {
+            // قد ترغب في فتح صفحة الجداول مع تحديد تاريخ معين أو مشروع معين
+            Navigator.pushNamed(context, '/admin/daily_schedule');
+          } else {
+            Navigator.pushNamed(context, '/admin/daily_schedule');
+          }
+        }
+        break;
+
+      case 'daily_task_status_update_by_engineer':
+        if (_currentUserRole == 'admin') {
+          // توجيه المسؤول إلى صفحة الجداول اليومية، وربما تحديد المشروع أو المهندس
+          // إذا كان itemId هو taskId, و projectId موجود
+          if (projectId != null && projectId.isNotEmpty) {
+            // يمكن تمرير projectId و itemId لفتح تفاصيل معينة إذا أردت
+            Navigator.pushNamed(context, '/admin/daily_schedule'); // أو صفحة تفاصيل مشروع
+            _showFeedbackSnackBar(context, 'قام مهندس بتحديث حالة مهمة يومية.', isError: false, isInfo: true);
+          } else {
+            Navigator.pushNamed(context, '/admin/daily_schedule');
+          }
+        }
+        break;
+
       default:
       // إذا لم يكن هناك مسار محدد، قم بتوجيه المستخدم إلى صفحته الرئيسية
         if (_currentUserRole == 'admin') {

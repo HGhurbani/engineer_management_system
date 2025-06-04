@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:signature/signature.dart';
@@ -64,7 +65,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _fadeController = AnimationController(duration: const Duration(milliseconds: 700), vsync: this);
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut));
 
@@ -484,12 +485,255 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
               _buildMyProjectsTab(),
               _buildAttendanceTab(),
               _buildPartRequestsTab(),
+              _buildDailyScheduleTab(),
             ],
           ),
         ),
       ),
     );
   }
+  // --- بداية الدالة الجديدة ---
+  Widget _buildDailyScheduleTab() {
+    if (_currentEngineerUid == null) {
+      return _buildErrorState('لا يمكن تحميل جدولك اليومي بدون معرّف مستخدم.');
+    }
+
+    // تحديد بداية ونهاية اليوم الحالي
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    final endOfToday = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('daily_schedules')
+          .where('engineerId', isEqualTo: _currentEngineerUid)
+          .where('scheduleDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday))
+          .where('scheduleDate', isLessThanOrEqualTo: Timestamp.fromDate(endOfToday))
+          .orderBy('createdAt', descending: false) // أو أي ترتيب آخر تفضله
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+        }
+        if (snapshot.hasError) {
+          return _buildErrorState('حدث خطأ أثناء تحميل جدولك اليومي: ${snapshot.error}');
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyState(
+            'لا توجد مهام مجدولة لك لهذا اليوم.',
+            icon: Icons.calendar_today_outlined,
+          );
+        }
+
+        final scheduledTasks = snapshot.data!.docs;
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+          itemCount: scheduledTasks.length,
+          itemBuilder: (context, index) {
+            final taskDoc = scheduledTasks[index];
+            final taskData = taskDoc.data() as Map<String, dynamic>;
+
+            final String projectName = taskData['projectName'] ?? 'مشروع غير محدد';
+            final String taskTitle = taskData['taskTitle'] ?? 'مهمة بدون عنوان';
+            final String taskDescription = taskData['taskDescription'] ?? 'لا يوجد وصف';
+            final Timestamp? scheduleTimestamp = taskData['scheduleDate'] as Timestamp?;
+            final String scheduleDateFormatted = scheduleTimestamp != null
+                ? DateFormat('EEEE, dd MMMM yyyy', 'ar_SA').format(scheduleTimestamp.toDate())
+                : 'تاريخ غير محدد';
+            final String taskStatus = taskData['status'] ?? 'pending'; // افتراضي إلى 'pending'
+
+            IconData statusIcon;
+            Color statusColor;
+            String statusText;
+
+            switch (taskStatus) {
+              case 'completed':
+                statusIcon = Icons.check_circle_outline_rounded;
+                statusColor = AppConstants.successColor;
+                statusText = 'مكتملة';
+                break;
+              case 'in-progress':
+                statusIcon = Icons.construction_rounded; // أو أيقونة أخرى مناسبة
+                statusColor = AppConstants.infoColor;
+                statusText = 'قيد التنفيذ';
+                break;
+              case 'pending':
+              default:
+                statusIcon = Icons.pending_actions_rounded;
+                statusColor = AppConstants.warningColor;
+                statusText = 'معلقة';
+                break;
+            }
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
+              elevation: 2,
+              shadowColor: AppConstants.primaryColor.withOpacity(0.1),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            taskTitle,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppConstants.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingSmall, vertical: AppConstants.paddingSmall / 2),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(statusIcon, color: statusColor, size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                statusText,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: AppConstants.paddingMedium, thickness: 0.5),
+                    _buildTaskDetailRow(Icons.business_center_outlined, 'المشروع:', projectName),
+                    _buildTaskDetailRow(Icons.description_outlined, 'الوصف:', taskDescription, isExpandable: true),
+                    _buildTaskDetailRow(Icons.calendar_month_outlined, 'التاريخ:', scheduleDateFormatted),
+                    // لاحقًا: إضافة أزرار لتحديث حالة المهمة
+                    if (taskStatus == 'pending' || taskStatus == 'in-progress')
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppConstants.paddingSmall),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (taskStatus == 'pending')
+                              ElevatedButton.icon(
+                                label: const Text(
+                                  'بدء المهمة',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppConstants.infoColor,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppConstants.paddingSmall,
+                                    vertical: AppConstants.paddingSmall / 2,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  _updateTaskStatus(taskDoc.id, 'in-progress');
+                                },
+                              ),
+
+                            if (taskStatus == 'in-progress') ...[
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                                label: const Text('إكمال المهمة'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppConstants.successColor,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingSmall, vertical: AppConstants.paddingSmall / 2),
+                                  textStyle: const TextStyle(fontSize: 12),
+                                ),
+                                onPressed: () {
+                                  _updateTaskStatus(taskDoc.id, 'completed');
+                                },
+                              ),
+                            ]
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+// --- نهاية الدالة الجديدة ---
+
+// --- بداية دالة مساعدة لعرض تفاصيل المهمة ---
+  Widget _buildTaskDetailRow(IconData icon, String label, String value, {bool isExpandable = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall / 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppConstants.primaryColor),
+          const SizedBox(width: AppConstants.paddingSmall),
+          Text('$label ', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary, fontWeight: FontWeight.w500)),
+          Expanded(
+            child: isExpandable
+                ? ExpandableText(value, valueColor: AppConstants.textPrimary, trimLines: 3) // استخدام ExpandableText
+                : Text(
+              value,
+              style: const TextStyle(fontSize: 14, color: AppConstants.textPrimary, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+// --- نهاية دالة مساعدة ---
+
+// --- بداية دالة تحديث حالة المهمة ---
+  Future<void> _updateTaskStatus(String taskId, String newStatus) async {
+    try {
+      await FirebaseFirestore.instance.collection('daily_schedules').doc(taskId).update({
+        'status': newStatus,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      _showFeedbackSnackBar(context, 'تم تحديث حالة المهمة بنجاح.', isError: false);
+
+      // إرسال إشعار للمسؤول (إذا لزم الأمر)
+      // يمكنك إضافة هذا الجزء إذا كنت تريد إعلام المسؤول بتحديثات حالة المهام
+      final taskDoc = await FirebaseFirestore.instance.collection('daily_schedules').doc(taskId).get();
+      final taskData = taskDoc.data();
+      if (taskData != null && _engineerName != null) {
+        final adminUids = await getAdminUids(); // تأكد من وجود هذه الدالة
+        if (adminUids.isNotEmpty) {
+          sendNotificationsToMultiple(
+            recipientUserIds: adminUids,
+            title: 'تحديث حالة مهمة يومية',
+            body: 'المهندس "$_engineerName" قام بتحديث حالة المهمة "${taskData['taskTitle']}" إلى "$newStatus".',
+            type: 'daily_task_status_update',
+            projectId: taskData['projectId'],
+            itemId: taskId,
+            senderName: _engineerName,
+          );
+        }
+      }
+
+    } catch (e) {
+      _showFeedbackSnackBar(context, 'فشل تحديث حالة المهمة: $e', isError: true);
+    }
+  }
+// --- نهاية دالة تحديث حالة المهمة ---
 
   Widget _buildPartRequestsTab() {
     if (_currentEngineerUid == null) {
@@ -658,6 +902,9 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         indicatorColor: Colors.white,
         indicatorWeight: 3.0,
         labelColor: Colors.white,
+        isScrollable: true,
+        labelPadding: EdgeInsets.symmetric(horizontal: 12.0), // يمكنك الإبقاء على هذا أو تعديله
+        tabAlignment: TabAlignment.start,
         unselectedLabelColor: Colors.white.withOpacity(0.7),
         labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.5, fontFamily: 'Tajawal'),
         unselectedLabelStyle: const TextStyle(fontSize: 16, fontFamily: 'Tajawal'),
@@ -665,6 +912,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
           Tab(text: 'مشاريعي', icon: Icon(Icons.business_center_outlined)),
           Tab(text: 'الحضور والانصراف', icon: Icon(Icons.timer_outlined)),
           Tab(text: 'طلبات القطع', icon: Icon(Icons.build_circle_outlined)),
+          Tab(text: 'جدولي اليومي', icon: Icon(Icons.calendar_today_rounded)),
         ],
       ),
     );
@@ -974,5 +1222,100 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         ),
       ),
     );
+  }
+}
+// ... (في نهاية ملف engineer_home.dart)
+
+class ExpandableText extends StatefulWidget {
+  final String text;
+  final int trimLines;
+  final Color? valueColor; // اجعلها اختيارية
+  final TextStyle? textStyle; // نمط النص
+
+  const ExpandableText(
+      this.text, {
+        super.key,
+        this.trimLines = 2,
+        this.valueColor, // قيمة افتراضية ستكون null
+        this.textStyle, // قيمة افتراضية ستكون null
+      });
+
+  @override
+  ExpandableTextState createState() => ExpandableTextState();
+}
+
+class ExpandableTextState extends State<ExpandableText> {
+  bool _readMore = true;
+  void _onTapLink() {
+    setState(() => _readMore = !_readMore);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final DefaultTextStyle defaultTextStyle = DefaultTextStyle.of(context);
+    TextStyle effectiveTextStyle = widget.textStyle ?? defaultTextStyle.style;
+    if (widget.valueColor != null) {
+      effectiveTextStyle = effectiveTextStyle.copyWith(color: widget.valueColor);
+    }
+
+
+    TextSpan link = TextSpan(
+        text: _readMore ? " عرض المزيد" : " عرض أقل",
+        style: effectiveTextStyle.copyWith( // استخدم النمط الفعال مع تعديل اللون
+            color: AppConstants.primaryColor,
+            fontWeight: FontWeight.bold), // استخدم لونًا مميزًا للرابط
+        recognizer: TapGestureRecognizer()..onTap = _onTapLink);
+
+    Widget result = LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        assert(constraints.hasBoundedWidth);
+        final double maxWidth = constraints.maxWidth;
+        final text = TextSpan(
+          text: widget.text,
+          style: effectiveTextStyle, // استخدم النمط الفعال هنا أيضًا
+        );
+        TextPainter textPainter = TextPainter(
+          text: link,
+          textAlign: TextAlign.start,
+          textDirection: ui.TextDirection.rtl,
+          maxLines: widget.trimLines,
+          ellipsis: '...',
+        );
+        textPainter.layout(minWidth: constraints.minWidth, maxWidth: maxWidth);
+        final linkSize = textPainter.size;
+        textPainter.text = text;
+        textPainter.layout(minWidth: constraints.minWidth, maxWidth: maxWidth);
+        final textSize = textPainter.size;
+        int endIndex = textPainter.getPositionForOffset(Offset(
+          textSize.width - linkSize.width,
+          textSize.height,
+        )).offset;
+
+        TextSpan textSpan;
+        if (textPainter.didExceedMaxLines) {
+          endIndex = textPainter.getOffsetBefore(endIndex) ?? widget.text.length;
+          textSpan = TextSpan(
+            text: _readMore && widget.text.length > endIndex && endIndex > 0
+                ? widget.text.substring(0, endIndex) + "..."
+                : widget.text,
+            style: effectiveTextStyle,
+            children: <TextSpan>[const TextSpan(text: " "), link],
+          );
+        } else {
+          textSpan = TextSpan(
+            text: widget.text,
+            style: effectiveTextStyle,
+          );
+        }
+        return RichText(
+          softWrap: true,
+          overflow: TextOverflow.clip,
+          textAlign: TextAlign.start,
+          textDirection: ui.TextDirection.rtl,
+          text: textSpan,
+        );
+      },
+    );
+    return result;
   }
 }

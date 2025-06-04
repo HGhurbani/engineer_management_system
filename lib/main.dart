@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'firebase_options.dart';
+import 'package:engineer_management_system/pages/admin/admin_daily_schedule_page.dart'; // افترض هذا المسار
 import 'package:engineer_management_system/pages/auth/login_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_dashboard.dart';
 import 'package:engineer_management_system/pages/engineer/engineer_home.dart';
@@ -28,24 +29,24 @@ import 'package:engineer_management_system/pages/admin/admin_evaluations_page.da
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (Firebase.apps.isEmpty) {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } else {
-    print('Firebase app [DEFAULT] already initialized.');
-  }
-  // await Firebase.initializeApp(
-  //   options: const FirebaseOptions(
-  //     apiKey: "AIzaSyDX_fhBTQmwm-KP8Qu2gfwFQylGuaEm4VA",
-  //     authDomain: "eng-system.firebaseapp.com",
-  //     projectId: "eng-system",
-  //     storageBucket: "eng-system.firebasestorage.app",
-  //     messagingSenderId: "526461382833",
-  //     appId: "1:526461382833:web:46090faa13de2d4b30f290",
-  //     measurementId: "G-NMMTY5PN4Y",
-  //   ),
-  // );
+  // if (Firebase.apps.isEmpty) {
+  //   await Firebase.initializeApp(
+  //     options: DefaultFirebaseOptions.currentPlatform,
+  //   );
+  // } else {
+  //   print('Firebase app [DEFAULT] already initialized.');
+  // }
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: "AIzaSyDX_fhBTQmwm-KP8Qu2gfwFQylGuaEm4VA",
+      authDomain: "eng-system.firebaseapp.com",
+      projectId: "eng-system",
+      storageBucket: "eng-system.firebasestorage.app",
+      messagingSenderId: "526461382833",
+      appId: "1:526461382833:web:46090faa13de2d4b30f290",
+      measurementId: "G-NMMTY5PN4Y",
+    ),
+  );
 
 
   await initializeDateFormatting('ar', null);
@@ -104,6 +105,7 @@ class MyApp extends StatelessWidget {
           final projectId = ModalRoute.of(context)!.settings.arguments as String;
           return ProjectDetailsPage(projectId: projectId);
         },
+        '/admin/daily_schedule': (context) => const AdminDailySchedulePage(),
         '/admin/settings': (context) => const AdminSettingsPage(),
         '/admin/attendance': (context) => const AdminAttendancePage(),
         '/notifications': (context) => const NotificationsPage(),

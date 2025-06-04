@@ -714,8 +714,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     backgroundColor: isCompleted ? AppConstants.successColor : AppConstants.primaryColor,
                     child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
-                  title: Text(phaseActualName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
-                  subtitle: Text(isCompleted ? 'مكتملة ✅' : 'قيد التنفيذ ⏳', style: TextStyle(color: isCompleted ? AppConstants.successColor : AppConstants.warningColor, fontWeight: FontWeight.w500)),
+                  title: Text(phaseActualName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary, decoration: null)),                  subtitle: Text(isCompleted ? 'مكتملة ✅' : 'قيد التنفيذ ⏳', style: TextStyle(color: isCompleted ? AppConstants.successColor : AppConstants.warningColor, fontWeight: FontWeight.w500)),
                   trailing: Row( // Combine icons in a Row
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -794,8 +793,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                                           isSubCompleted ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
                                           color: isSubCompleted ? AppConstants.successColor : AppConstants.textSecondary, size: 20,
                                         ),
-                                        title: Text(subPhaseActualName, style: TextStyle(fontSize: 13.5, color: AppConstants.textSecondary, decoration: isSubCompleted ? TextDecoration.lineThrough : null)),
-                                        trailing: (_currentUserRole == 'admin')
+                                        title: Text(subPhaseActualName, style: TextStyle(fontSize: 13.5, color: AppConstants.textSecondary, decoration: null)),                                        trailing: (_currentUserRole == 'admin')
                                             ? Checkbox( // Admin can mark sub-phase
                                           value: isSubCompleted,
                                           activeColor: AppConstants.successColor,
@@ -873,7 +871,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     }
 
                     return ListTile(
-                      title: Text(testName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: isTestCompleted ? TextDecoration.lineThrough : null)),
+                      title: Text(testName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: null)),
                       leading: Icon(
                         isTestCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
                         color: isTestCompleted ? AppConstants.successColor : AppConstants.textSecondary,

@@ -724,13 +724,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         color: AppConstants.infoColor,
         route: '/admin/clients',
       ),
-      // _ManagementItem(
-      //   title: 'إدارة الموظفين',
-      //   subtitle: 'عرض وإدارة الموظفين',
-      //   icon: Icons.badge_rounded,
-      //   color: AppConstants.primaryColor,
-      //   route: '/admin/employees',
-      // ),
+      _ManagementItem(
+        title: 'إدارة الموظفين',
+        subtitle: 'عرض وإدارة الموظفين',
+        icon: Icons.badge_rounded,
+        color: AppConstants.primaryColor,
+        route: '/admin/employees',
+      ),
       _ManagementItem(
         title: 'عرض المشاريع',
         subtitle: 'متابعة جميع المشاريع',
@@ -744,6 +744,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         icon: Icons.access_time_filled_rounded,
         color: const Color(0xFF8B5CF6),
         route: '/admin/attendance',
+      ),
+      _ManagementItem(
+        title: 'الجداول اليومية', // أو "تقويم المهام"
+        subtitle: 'إدارة جداول ومهام المهندسين',
+        icon: Icons.calendar_today_rounded, // أيقونة مناسبة
+        color: const Color(0xFF5E35B1), // اختر لوناً مناسباً (مثلاً بنفسجي غامق)
+        route: '/admin/daily_schedule', // المسار الذي أضفناه في main.dart
       ),
       _ManagementItem(
         title: 'تقييم الفنيين',
