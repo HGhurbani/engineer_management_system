@@ -86,7 +86,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
-          .where('role', isEqualTo: 'engineer')
+          .where('role', whereIn: ['engineer', 'employee'])
           .orderBy('name')
           .get();
       if (mounted) {
@@ -99,7 +99,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
       }
     } catch (e) {
       if (mounted) {
-        _showFeedbackSnackBar(context, 'فشل تحميل قائمة المهندسين: $e', isError: true);
+        _showFeedbackSnackBar(context, 'فشل تحميل قائمة الموظفين: $e', isError: true);
       }
     }
   }
@@ -301,7 +301,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
   Future<void> _triggerManualEvaluation() async {
     if (_selectedEngineerId == null) {
-      _showFeedbackSnackBar(context, 'الرجاء اختيار مهندس للتقييم.', isError: true);
+      _showFeedbackSnackBar(context, 'الرجاء اختيار موظف للتقييم.', isError: true);
       return;
     }
     if (_evaluationSettings == null) {
@@ -399,7 +399,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
                     return _buildErrorState('حدث خطأ في تحميل التقييم: ${snapshot.error}');
                   }
                   if (!snapshot.hasData || !snapshot.data!.exists) {
-                    return _buildEmptyState('لا توجد بيانات تقييم للمهندس في الفترة المحددة.', icon: Icons.person_off_rounded);
+                    return _buildEmptyState('لا توجد بيانات تقييم للموظف في الفترة المحددة.', icon: Icons.person_off_rounded);
                   }
 
                   final evaluation = EngineerEvaluation.fromFirestore(snapshot.data!);
@@ -416,7 +416,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       title: const Text(
-        'لوحة تقييم المهندسين',
+        'لوحة تقييم الموظفين',
         style: TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w600,
@@ -458,15 +458,15 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
             crossAxisAlignment: CrossAxisAlignment.start, // لمحاذاة العناوين لليمين
             children: [
 
-              // اختيار المهندس
+              // اختيار الموظف
               _buildStyledDropdown<String>(
-                hint: _engineers.isEmpty ? 'لا يوجد مهندسون متاحون' : 'اختر المهندس للتقييم',
+                hint: _engineers.isEmpty ? 'لا يوجد موظفون متاحون' : 'اختر الموظف للتقييم',
                 value: _selectedEngineerId,
                 items: _engineers.map((doc) {
                   final user = doc.data() as Map<String, dynamic>?;
                   return DropdownMenuItem<String>(
                     value: doc.id,
-                    child: Text(user?['name'] ?? 'مهندس غير مسمى'),
+                    child: Text(user?['name'] ?? 'موظف غير مسمى'),
                   );
                 }).toList(),
                 onChanged: _engineers.isEmpty ? null : (value) {
@@ -694,7 +694,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
         child: Column(
           children: [
             const Text(
-              'التقييم العام للمهندس',
+              'التقييم العام للموظف',
               style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
             ),
             const SizedBox(height: AppConstants.itemSpacing * 1.5),
@@ -864,7 +864,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
         if (evaluations.length < 2) {
           return _buildEmptyState(
-            'تحتاج إلى تقييمين على الأقل لعرض الرسم البياني التاريخي لأداء المهندس.',
+            'تحتاج إلى تقييمين على الأقل لعرض الرسم البياني التاريخي لأداء الموظف.',
             icon: Icons.timeline_rounded,
           );
         }
@@ -1010,17 +1010,17 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
             ),
             const SizedBox(height: AppConstants.itemSpacing),
             Text(
-              'للبدء، يرجى اختيار مهندس من القائمة أعلاه ثم تحديد الفترة الزمنية (شهرية أو سنوية) لعرض أو إنشاء التقييم الخاص به.',
+              'للبدء، يرجى اختيار موظف من القائمة أعلاه ثم تحديد الفترة الزمنية (شهرية أو سنوية) لعرض أو إنشاء التقييم الخاص به.',
               style: TextStyle(fontSize: 16, color: AppConstants.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppConstants.itemSpacing * 2),
             ElevatedButton.icon(
               onPressed: () {
-                // يمكن هنا فتح قائمة المهندسين بشكل تلقائي أو توجيه المستخدم
+                // يمكن هنا فتح قائمة الموظفين بشكل تلقائي أو توجيه المستخدم
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('الرجاء استخدام قائمة "اختر المهندس للتقييم" في الأعلى.'),
+                    content: Text('الرجاء استخدام قائمة "اختر الموظف للتقييم" في الأعلى.'),
                     backgroundColor: AppConstants.infoColor,
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
@@ -1029,7 +1029,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
                 );
               },
               icon: Icon(Icons.arrow_upward_rounded, color: Colors.white),
-              label: Text('ابدأ باختيار مهندس', style: TextStyle(color: Colors.white)),
+              label: Text('ابدأ باختيار موظف', style: TextStyle(color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppConstants.primaryColor,
                 padding: EdgeInsets.symmetric(horizontal: AppConstants.paddingMedium, vertical: AppConstants.paddingSmall),
