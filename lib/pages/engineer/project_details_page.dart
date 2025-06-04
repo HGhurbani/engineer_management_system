@@ -12,7 +12,8 @@ import 'dart:convert';
 import 'dart:ui' as ui; // For TextDirection
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:share_plus/share_plus.dart';
-import 'dart:html' as html;
+import '../../html_stub.dart'
+    if (dart.library.html) 'dart:html' as html;
 
 // --- PDF and Path Provider Imports ---
 import 'package:pdf/pdf.dart';
