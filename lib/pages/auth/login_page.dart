@@ -3,29 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:ui' as ui; // For TextDirection
+import 'package:engineer_management_system/theme/app_constants.dart';
 
-// AppConstants are mostly preserved from your original login page style
-class AppConstants {
-  static const Color primaryColor = Color(0xFF2E5BFF);
-  static const Color primaryLight = Color(0xFF3B82F6); // Added for consistency
-  static const Color accentColor = Color(0xFF64B5F6);
-  static const Color surfaceColor = Color(0xFFF8FAFF);
-  static const Color cardColor = Color(0xFFFFFFFF);
-  static const Color textPrimary = Color(0xFF1A1D29);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const Color errorColor = Color(0xFFEF4444);
-  static const Color successColor = Color(0xFF10B981);
-  static const Color borderColor = Color(0xFFE5E7EB);
-  static const Color focusBorderColor = Color(0xFF3B82F6);
-
-  static const double padding = 24.0;
-  static const double borderRadius = 12.0;
+class LoginConstants {
   static const double spacing = 20.0;
 
   static const String appName = 'منصة الجهد الآمن';
 
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF2E5BFF), Color(0xFF3B82F6)],
+    colors: [AppConstants.primaryColor, AppConstants.primaryLight],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -35,14 +21,16 @@ class AppConstants {
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
-  // Button specific colors for consistency
+
+  static const Color borderColor = Color(0xFFE5E7EB);
+  static const Color focusBorderColor = AppConstants.primaryLight;
+
   static const Color adminButtonColor1 = Color(0xFFFF6B35);
   static const Color adminButtonColor2 = Color(0xFFFF8E53);
   static const Color engineerButtonColor1 = Color(0xFF4CAF50);
   static const Color engineerButtonColor2 = Color(0xFF81C784);
-  // New colors for client button
-  static const Color clientButtonColor1 = Color(0xFF007BFF); // Standard blue
-  static const Color clientButtonColor2 = Color(0xFF3395FF); // Lighter blue
+  static const Color clientButtonColor1 = Color(0xFF007BFF);
+  static const Color clientButtonColor2 = Color(0xFF3395FF);
 }
 
 class LoginPage extends StatefulWidget {
@@ -295,7 +283,7 @@ class _LoginPageState extends State<LoginPage> {
                 elevation: 5,
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 400),
-                  padding: const EdgeInsets.all(AppConstants.padding),
+                  padding: const EdgeInsets.all(AppConstants.paddingLarge),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(AppConstants.borderRadius * 1.5),
                     gradient: const LinearGradient(colors: [Color(0xFFFFFFFF), Color(0xFFF8FAFF)], begin: Alignment.topCenter, end: Alignment.bottomCenter),
@@ -306,22 +294,22 @@ class _LoginPageState extends State<LoginPage> {
                       children: [
                         Container(
                           padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(gradient: AppConstants.primaryGradient, borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+                          decoration: BoxDecoration(gradient: LoginConstants.primaryGradient, borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
                           child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [ Icon(Icons.person_add_alt_1_rounded, color: Colors.white, size: 24), SizedBox(width: 8), Text('إنشاء حساب جديد', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white))]),
                         ),
-                        const SizedBox(height: AppConstants.spacing),
+                        const SizedBox(height: LoginConstants.spacing),
                         Form(
                           key: registerFormKey,
                           child: Column(
                             children: [
                               _buildEnhancedTextField(controller: nameController, label: 'الاسم الكامل', icon: Icons.person_outline_rounded, validator: (value) => (value == null || value.isEmpty) ? 'الرجاء إدخال الاسم الكامل' : (value.length < 2 ? 'الاسم يجب أن يكون حرفين على الأقل' : null)),
-                              const SizedBox(height: AppConstants.spacing),
+                              const SizedBox(height: LoginConstants.spacing),
                               _buildEnhancedTextField(controller: emailController, label: 'البريد الإلكتروني', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress, validator: (value) => (value == null || value.isEmpty) ? 'الرجاء إدخال البريد الإلكتروني' : (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value) ? 'صيغة البريد الإلكتروني غير صحيحة' : null)),
-                              const SizedBox(height: AppConstants.spacing),
+                              const SizedBox(height: LoginConstants.spacing),
                               _buildEnhancedTextField(controller: passwordController, label: 'كلمة المرور', icon: Icons.lock_outline_rounded, obscureText: obscureRegisterPassword, suffixIcon: IconButton(icon: Icon(obscureRegisterPassword ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: AppConstants.textSecondary), onPressed: () => setDialogState(() => obscureRegisterPassword = !obscureRegisterPassword)), validator: (value) => (value == null || value.isEmpty) ? 'الرجاء إدخال كلمة المرور' : (value.length < 6 ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' : null)),
-                              const SizedBox(height: AppConstants.spacing),
+                              const SizedBox(height: LoginConstants.spacing),
                               Container(
-                                decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppConstants.borderRadius), border: Border.all(color: AppConstants.borderColor), color: AppConstants.cardColor),
+                                decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppConstants.borderRadius), border: Border.all(color: LoginConstants.borderColor), color: AppConstants.cardColor),
                                 child: DropdownButtonFormField<String>(
                                   value: selectedRole,
                                   decoration: InputDecoration(labelText: 'نوع المستخدم', prefixIcon: const Icon(Icons.category_outlined, color: AppConstants.primaryColor), border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
@@ -335,9 +323,9 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                               if (selectedRole == 'client') ...[ // Show clientType dropdown only if role is client
-                                const SizedBox(height: AppConstants.spacing),
+                                const SizedBox(height: LoginConstants.spacing),
                                 Container(
-                                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppConstants.borderRadius), border: Border.all(color: AppConstants.borderColor), color: AppConstants.cardColor),
+                                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppConstants.borderRadius), border: Border.all(color: LoginConstants.borderColor), color: AppConstants.cardColor),
                                   child: DropdownButtonFormField<String>(
                                     value: selectedClientType,
                                     decoration: InputDecoration(labelText: 'نوع العميل', prefixIcon: const Icon(Icons.business_center_outlined, color: AppConstants.primaryColor), border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
@@ -353,15 +341,15 @@ class _LoginPageState extends State<LoginPage> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: AppConstants.spacing * 1.5),
+                        const SizedBox(height: LoginConstants.spacing * 1.5),
                         Row(
                           children: [
-                            Expanded(child: TextButton(onPressed: () => Navigator.pop(context), style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius), side: const BorderSide(color: AppConstants.borderColor))), child: const Text('إلغاء', style: TextStyle(color: AppConstants.textSecondary, fontSize: 16, fontWeight: FontWeight.w600)))),
+                            Expanded(child: TextButton(onPressed: () => Navigator.pop(context), style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius), side: const BorderSide(color: LoginConstants.borderColor))), child: const Text('إلغاء', style: TextStyle(color: AppConstants.textSecondary, fontSize: 16, fontWeight: FontWeight.w600)))),
                             const SizedBox(width: 12),
                             Expanded(
                               flex: 2,
                               child: Container(
-                                decoration: BoxDecoration(gradient: AppConstants.primaryGradient, borderRadius: BorderRadius.circular(AppConstants.borderRadius), boxShadow: [BoxShadow(color: AppConstants.primaryColor.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]),
+                                decoration: BoxDecoration(gradient: LoginConstants.primaryGradient, borderRadius: BorderRadius.circular(AppConstants.borderRadius), boxShadow: [BoxShadow(color: AppConstants.primaryColor.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]),
                                 child: ElevatedButton(
                                   onPressed: isRegistering ? null : () async {
                                     if (!registerFormKey.currentState!.validate()) return;
@@ -429,9 +417,9 @@ class _LoginPageState extends State<LoginPage> {
           labelStyle: const TextStyle(color: AppConstants.textSecondary, fontSize: 14),
           prefixIcon: Icon(icon, color: AppConstants.primaryColor, size: 22),
           suffixIcon: suffixIcon,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius), borderSide: const BorderSide(color: AppConstants.borderColor, width: 1)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius), borderSide: const BorderSide(color: AppConstants.borderColor, width: 1)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius), borderSide: const BorderSide(color: AppConstants.focusBorderColor, width: 1.5)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius), borderSide: const BorderSide(color: LoginConstants.borderColor, width: 1)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius), borderSide: const BorderSide(color: LoginConstants.borderColor, width: 1)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius), borderSide: const BorderSide(color: LoginConstants.focusBorderColor, width: 1.5)),
           errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius), borderSide: const BorderSide(color: AppConstants.errorColor, width: 1)),
           focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius), borderSide: const BorderSide(color: AppConstants.errorColor, width: 1.5)),
           filled: true,
@@ -479,11 +467,11 @@ class _LoginPageState extends State<LoginPage> {
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         body: Container(
-          decoration: const BoxDecoration(gradient: AppConstants.backgroundGradient),
+          decoration: const BoxDecoration(gradient: LoginConstants.backgroundGradient),
           child: SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppConstants.padding),
+                padding: const EdgeInsets.all(AppConstants.paddingLarge),
                 child: Form(
                   key: _loginFormKey,
                   child: Column(
@@ -492,28 +480,28 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(gradient: AppConstants.primaryGradient, shape: BoxShape.circle, boxShadow: [BoxShadow(color: AppConstants.primaryColor.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))]),
+                        decoration: BoxDecoration(gradient: LoginConstants.primaryGradient, shape: BoxShape.circle, boxShadow: [BoxShadow(color: AppConstants.primaryColor.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))]),
                         child: const Icon(Icons.engineering_rounded, size: 60, color: Colors.white),
                       ),
-                      const SizedBox(height: AppConstants.spacing),
-                      const Text(AppConstants.appName, textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                      const SizedBox(height: LoginConstants.spacing),
+                      const Text(LoginConstants.appName, textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
                       const SizedBox(height: 8),
                       const Text('مرحباً بك مرة أخرى', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: AppConstants.textSecondary)),
-                      const SizedBox(height: AppConstants.spacing * 1.5),
+                      const SizedBox(height: LoginConstants.spacing * 1.5),
                       _buildEnhancedTextField(controller: _emailController, label: 'البريد الإلكتروني', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress, validator: (value) => (value == null || value.isEmpty) ? 'الرجاء إدخال البريد الإلكتروني' : (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value) ? 'صيغة البريد الإلكتروني غير صحيحة' : null)),
-                      const SizedBox(height: AppConstants.spacing),
+                      const SizedBox(height: LoginConstants.spacing),
                       _buildEnhancedTextField(controller: _passwordController, label: 'كلمة المرور', icon: Icons.lock_outline_rounded, obscureText: _obscurePassword, suffixIcon: IconButton(icon: Icon(_obscurePassword ? Icons.visibility_rounded : Icons.visibility_off_rounded, color: AppConstants.textSecondary), onPressed: () => setState(() => _obscurePassword = !_obscurePassword)), validator: (value) => (value == null || value.isEmpty) ? 'الرجاء إدخال كلمة المرور' : (value.length < 6 ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' : null)),
-                      const SizedBox(height: AppConstants.spacing),
+                      const SizedBox(height: LoginConstants.spacing),
                       if (_error != null)
                         Container(
-                          margin: const EdgeInsets.only(bottom: AppConstants.spacing / 2),
-                          padding: const EdgeInsets.all(AppConstants.padding / 1.5),
+                          margin: const EdgeInsets.only(bottom: LoginConstants.spacing / 2),
+                          padding: const EdgeInsets.all(AppConstants.paddingLarge / 1.5),
                           decoration: BoxDecoration(color: AppConstants.errorColor.withOpacity(0.1), borderRadius: BorderRadius.circular(AppConstants.borderRadius), border: Border.all(color: AppConstants.errorColor.withOpacity(0.3), width: 1)),
                           child: Row(children: [const Icon(Icons.error_outline_rounded, color: AppConstants.errorColor, size: 20), const SizedBox(width: 12), Expanded(child: Text(_error!, style: const TextStyle(color: AppConstants.errorColor, fontSize: 14, fontWeight: FontWeight.w500)))]),
                         ),
 
                       Container(
-                        decoration: BoxDecoration(gradient: AppConstants.primaryGradient, borderRadius: BorderRadius.circular(AppConstants.borderRadius), boxShadow: [BoxShadow(color: AppConstants.primaryColor.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 6))]),
+                        decoration: BoxDecoration(gradient: LoginConstants.primaryGradient, borderRadius: BorderRadius.circular(AppConstants.borderRadius), boxShadow: [BoxShadow(color: AppConstants.primaryColor.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 6))]),
                         child: ElevatedButton.icon(
                           onPressed: _isLoading ? null : _loginUser,
                           icon: _isLoading ? const SizedBox.shrink() : const Icon(Icons.login_rounded, color: Colors.white, size: 20),
@@ -521,7 +509,7 @@ class _LoginPageState extends State<LoginPage> {
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent, padding: const EdgeInsets.symmetric(vertical: 17), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)), minimumSize: const Size(double.infinity, 50)),
                         ),
                       ),
-                      const SizedBox(height: AppConstants.spacing * 0.75),
+                      const SizedBox(height: LoginConstants.spacing * 0.75),
                       Row(
                         children: [
                           Expanded(
@@ -529,32 +517,32 @@ class _LoginPageState extends State<LoginPage> {
                               label: 'دخول كمسؤول',
                               icon: Icons.admin_panel_settings_rounded,
                               onPressed: _loginAsAdmin,
-                              color1: AppConstants.adminButtonColor1,
-                              color2: AppConstants.adminButtonColor2,
+                              color1: LoginConstants.adminButtonColor1,
+                              color2: LoginConstants.adminButtonColor2,
                             ),
                           ),
-                          const SizedBox(width: AppConstants.spacing / 2),
+                          const SizedBox(width: LoginConstants.spacing / 2),
                           Expanded(
                             child: _buildRoleLoginButton(
                               label: 'دخول كمهندس',
                               icon: Icons.engineering_rounded,
                               onPressed: _loginAsEngineer,
-                              color1: AppConstants.engineerButtonColor1,
-                              color2: AppConstants.engineerButtonColor2,
+                              color1: LoginConstants.engineerButtonColor1,
+                              color2: LoginConstants.engineerButtonColor2,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: AppConstants.spacing / 2), // Added spacing before the new button
+                      const SizedBox(height: LoginConstants.spacing / 2), // Added spacing before the new button
                       // New Client Login Button
                       _buildRoleLoginButton(
                         label: 'دخول كعميل',
                         icon: Icons.person_rounded, // Example icon for client
                         onPressed: _loginAsClient,
-                        color1: AppConstants.clientButtonColor1, // Using new client button colors
-                        color2: AppConstants.clientButtonColor2,
+                        color1: LoginConstants.clientButtonColor1, // Using new client button colors
+                        color2: LoginConstants.clientButtonColor2,
                       ),
-                      // const SizedBox(height: AppConstants.spacing * 0.75), // Adjusted spacing for register button
+                      // const SizedBox(height: LoginConstants.spacing * 0.75), // Adjusted spacing for register button
                       // // Register Button
                       // TextButton.icon(
                       //   onPressed: _isLoading ? null : _showRegisterDialog,
@@ -568,8 +556,8 @@ class _LoginPageState extends State<LoginPage> {
                       //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
                       //   ),
                       // ),
-                      const SizedBox(height: AppConstants.spacing),
-                      Text('© ${DateTime.now().year} ${AppConstants.appName}', textAlign: TextAlign.center, style: TextStyle(color: AppConstants.textSecondary.withOpacity(0.7), fontSize: 12)),
+                      const SizedBox(height: LoginConstants.spacing),
+                      Text('© ${DateTime.now().year} ${LoginConstants.appName}', textAlign: TextAlign.center, style: TextStyle(color: AppConstants.textSecondary.withOpacity(0.7), fontSize: 12)),
                     ],
                   ),
                 ),

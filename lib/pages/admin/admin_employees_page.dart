@@ -3,43 +3,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:engineer_management_system/theme/app_constants.dart';
 
-// Constants for consistent styling, aligned with the admin dashboard's style.
-class AppConstants {
-  // Primary colors
-  static const Color primaryColor = Color(0xFF2563EB); // Modern blue
-  static const Color primaryLight = Color(0xFF3B82F6); // Lighter blue
-
-  // Status and feedback colors
-  static const Color successColor = Color(0xFF10B981); // Emerald green
-  static const Color warningColor = Color(0xFFF59E0B); // Amber
-  static const Color errorColor = Color(0xFFEF4444); // Red
-  static const Color infoColor = Color(0xFF3B82F6); // Blue
-
-  // UI element colors
-  static const Color cardColor = Colors.white;
-  static const Color backgroundColor = Color(0xFFF8FAFC); // Soft background
-  static const Color deleteColor = errorColor;
-
-  // Text colors
-  static const Color textPrimary = Color(0xFF1F2937); // Dark gray
-  static const Color textSecondary = Color(0xFF6B7280); // Medium gray
-
-  // Spacing and dimensions
-  static const double paddingLarge = 24.0;
-  static const double paddingMedium = 16.0;
-  static const double borderRadius = 16.0;
-  static const double itemSpacing = 16.0;
-
-  // Shadows for depth
-  static const List<BoxShadow> cardShadow = [
-    BoxShadow(
-      color: Color(0x0A000000),
-      blurRadius: 10,
-      offset: Offset(0, 4),
-    ),
-  ];
-}
 
 class AdminEmployeesPage extends StatefulWidget {
   const AdminEmployeesPage({super.key});

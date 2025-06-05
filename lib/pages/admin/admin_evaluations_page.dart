@@ -1,5 +1,6 @@
 // lib/pages/admin/admin_evaluations_page.dart
 import 'package:flutter/material.dart';
+import 'package:engineer_management_system/theme/app_constants.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
@@ -12,39 +13,6 @@ import '../../main.dart'; // لاستخدام دوال الإشعارات getAdm
 
 // تأكد من وجود هذا الملف في مشروعك بنفس المسار أو قم بتعديله.
 // lib/config/app_constants.dart
-class AppConstants {
-  static const Color primaryColor = Color(0xFF2563EB); // Modern blue
-  static const Color primaryLight = Color(0xFF3B82F6); // Lighter blue
-  static const Color primaryDark = Color(0xFF1976D2);
-
-  static const Color successColor = Color(0xFF66BB6A); // أخضر
-  static const Color errorColor = Color(0xFFEF5350);   // أحمر
-  static const Color warningColor = Color(0xFFFFCA28); // أصفر
-  static const Color infoColor = Color(0xFF26C6DA);    // أزرق سماوي
-
-  static const Color backgroundColor = Color(0xFFF5F5F5); // خلفية فاتحة
-  static const Color cardColor = Colors.white;         // لون البطاقات
-
-  static const Color textPrimary = Color(0xFF333333);  // لون النص الأساسي
-  static const Color textSecondary = Color(0xFF757575); // لون النص الثانوي
-  static const Color dividerColor = Color(0xFFEEEEEE); // لون الخط الفاصل
-
-  static const double paddingSmall = 8.0;
-  static const double paddingMedium = 16.0;
-  static const double paddingLarge = 24.0;
-
-  static const double itemSpacing = 16.0; // تباعد قياسي بين العناصر
-
-  static const double borderRadius = 12.0; // حواف دائرية قياسية
-
-  static const List<BoxShadow> cardShadow = [
-    BoxShadow(
-      color: Colors.black12,
-      blurRadius: 8,
-      offset: Offset(0, 4),
-    ),
-  ];
-}
 
 
 class AdminEvaluationsPage extends StatefulWidget {
