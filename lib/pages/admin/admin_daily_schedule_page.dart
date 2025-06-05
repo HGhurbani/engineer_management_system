@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // تمت إضافته
 import 'package:flutter/material.dart';
+import 'package:engineer_management_system/theme/app_constants.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
@@ -9,19 +10,6 @@ import 'dart:ui' as ui;
 import '../../main.dart'; // For TextDirection
 
 // يمكنك نسخ AppConstants هنا مؤقتًا أو استيرادها إذا كانت في ملف منفصل
-class AppConstants {
-  static const Color primaryColor = Color(0xFF2563EB);
-  static const Color primaryLight = Color(0xFF3B82F6);
-  static const Color backgroundColor = Color(0xFFF8FAFC);
-  static const Color textPrimary = Color(0xFF1F2937);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const Color cardColor = Colors.white;
-  static const Color errorColor = Color(0xFFEF4444); // لإعادة استخدامها في زر الحذف
-  static const double borderRadius = 16.0;
-  static const double paddingMedium = 16.0;
-  static const double paddingSmall = 8.0;
-// أضف أي ثوابت أخرى تحتاجها
-}
 
 class AdminDailySchedulePage extends StatefulWidget {
   const AdminDailySchedulePage({super.key});

@@ -3,33 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:engineer_management_system/theme/app_constants.dart';
 import 'package:intl/intl.dart'; // For date formatting
 import 'dart:ui' as ui; // For TextDirection
 
 import 'dart:async'; // تم إضافة هذا الاستيراد للـ StreamSubscription
 
-// Constants for consistent styling, aligned with the admin dashboard's style.
-class AppConstants {
-  static const Color primaryColor = Color(0xFF2563EB);
-  static const Color primaryLight = Color(0xFF3B82F6);
-  static const Color successColor = Color(0xFF10B981);
-  static const Color warningColor = Color(0xFFF59E0B);
-  static const Color errorColor = Color(0xFFEF4444);
-  static const Color infoColor = Color(0xFF3B82F6);
-  static const Color cardColor = Colors.white;
-  static const Color backgroundColor = Color(0xFFF8FAFC);
-  static const Color textPrimary = Color(0xFF1F2937);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const double paddingLarge = 24.0;
-  static const double paddingMedium = 16.0;
-  static const double paddingSmall = 8.0;
-  static const double borderRadius = 16.0;
-  static const double itemSpacing = 16.0;
-  static const List<BoxShadow> cardShadow = [
-    BoxShadow(
-        color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 4)),
-  ];
-}
 
 class ClientHome extends StatefulWidget {
   const ClientHome({super.key});
