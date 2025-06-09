@@ -212,7 +212,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
                   backgroundColor: AppConstants.errorColor,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+                    borderRadius: BorderRadius.circular(AppConstants.borderRadius * 2),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingMedium, vertical: AppConstants.paddingSmall),
                 ),

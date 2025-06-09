@@ -402,19 +402,19 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                         title: Text(employeeName),
                         subtitle: Text(
                             'المرحلة: $phaseName${subPhaseName != null ? ' > $subPhaseName' : ''}\n$attendanceInfo'),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (value) {
-                            if (value == 'check_in') {
-                              _recordEmployeeAttendance(employeeId, 'check_in');
-                            } else if (value == 'check_out') {
-                              _recordEmployeeAttendance(employeeId, 'check_out');
-                            }
-                          },
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(value: 'check_in', child: Text('تسجيل حضور')),
-                            PopupMenuItem(value: 'check_out', child: Text('تسجيل انصراف')),
-                          ],
-                        ),
+                        // trailing: PopupMenuButton<String>(
+                        //   onSelected: (value) {
+                        //     if (value == 'check_in') {
+                        //       _recordEmployeeAttendance(employeeId, 'check_in');
+                        //     } else if (value == 'check_out') {
+                        //       _recordEmployeeAttendance(employeeId, 'check_out');
+                        //     }
+                        //   },
+                        //   itemBuilder: (_) => const [
+                        //     PopupMenuItem(value: 'check_in', child: Text('تسجيل حضور')),
+                        //     PopupMenuItem(value: 'check_out', child: Text('تسجيل انصراف')),
+                        //   ],
+                        // ),
                       );
                     },
                   );
