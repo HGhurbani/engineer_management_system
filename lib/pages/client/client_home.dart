@@ -752,7 +752,6 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
                                   .doc(projectId)
                                   .collection('subphases_status')
                                   .doc(subPhaseId)
-                                  .where('completed', isEqualTo: true)
                                   .snapshots(),
                               builder: (context, subPhaseStatusSnapshot) {
                                 if (subPhaseStatusSnapshot.connectionState == ConnectionState.waiting) {
@@ -762,6 +761,9 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
                                   return const SizedBox.shrink();
                                 }
                                 final subStatusData = subPhaseStatusSnapshot.data!.data() as Map<String, dynamic>;
+                                if (subStatusData['completed'] != true) {
+                                  return const SizedBox.shrink();
+                                }
                                 final subLastUpdatedBy = subStatusData['lastUpdatedByName'] ?? 'غير معروف';
                                 final subPhaseActualName = subStatusData['name'] ?? subPhaseName;
 
