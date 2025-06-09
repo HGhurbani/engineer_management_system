@@ -2114,7 +2114,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             subCompletedBy = subDoc.data()?['lastUpdatedByName'] ?? 'غير معروف';
           }
         } catch (e) { print('error fetching subphase status for pdf: $e'); }
-        String subStatusText = subCompleted ? 'مكتملة (بواسطة: $subCompletedBy) ✅' : 'قيد التنفيذ ⏳';
+        String subStatusText = subCompleted
+            ? 'مكتملة (بواسطة: $subCompletedBy)'
+            : 'قيد التنفيذ';
         contentWidgets.add(pw.Text('الحالة: $subStatusText', style: regularStyle.copyWith(color: subCompleted ? PdfColors.green700 : PdfColors.orange700), textDirection: pw.TextDirection.rtl));
 
         final subEmployees = await _fetchEmployeeNamesForPdf(phaseOrTestId, isSub: true);
@@ -2179,7 +2181,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             mainCompletedBy = phaseDoc.data()?['lastUpdatedByName'] ?? 'غير معروف';
           }
         } catch (e) { print('error fetching phase status for pdf: $e'); }
-        String mainStatusText = mainCompleted ? 'مكتملة (بواسطة: $mainCompletedBy) ✅' : 'قيد التنفيذ ⏳';
+        String mainStatusText =
+            mainCompleted ? 'مكتملة (بواسطة: $mainCompletedBy)' : 'قيد التنفيذ';
         contentWidgets.add(pw.Text('حالة المرحلة: $mainStatusText', style: regularStyle.copyWith(color: mainCompleted ? PdfColors.green700 : PdfColors.orange700), textDirection: pw.TextDirection.rtl));
 
         final mainEmployees = await _fetchEmployeeNamesForPdf(phaseOrTestId, isSub: false);
@@ -2250,7 +2253,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               }
             } catch(e) { print("Error fetching subphase status: $e");}
 
-            String statusText = isSubPhaseCompleted ? 'مكتملة (بواسطة: $subPhaseCompletedBy) ✅' : 'قيد التنفيذ ⏳';
+            String statusText = isSubPhaseCompleted
+                ? 'مكتملة (بواسطة: $subPhaseCompletedBy)'
+                : 'قيد التنفيذ';
 
             contentWidgets.add(pw.Container(
                 margin: pw.EdgeInsets.only(bottom: 10),
