@@ -800,13 +800,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                         _generateAndSharePdf(phaseId, phaseName, isTestSection: false, isSubPhase: false);
                       },
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.html, color: Colors.orange),
-                      tooltip: 'تقرير HTML',
-                      onPressed: () {
-                        _generateHtmlReport(phaseId, phaseName, isTestSection: false, isSubPhase: false);
-                      },
-                    ),
                   ],
                 );
               } else if (isMainPhaseCompletedByAnyEngineer) {
@@ -876,13 +869,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                           tooltip: 'تقرير PDF للمرحلة الفرعية (خاص بك)',
                                           onPressed: () {
                                             _generateAndSharePdf(subPhaseId, subPhaseName, isTestSection: false, isSubPhase: true);
-                                          },
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.html, color: Colors.orange, size: 20),
-                                          tooltip: 'تقرير HTML',
-                                          onPressed: () {
-                                            _generateHtmlReport(subPhaseId, subPhaseName, isTestSection: false, isSubPhase: true);
                                           },
                                         ),
                                       ],
@@ -998,21 +984,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                             tooltip: 'إنشاء ومشاركة تقرير PDF للاختبار',
                             onPressed: () {
                               _generateAndSharePdf(
-                                  testId,
-                                  testName,
-                                  isTestSection: true,
-                                  sectionName: sectionName,
-                                  testNote: testNote,
-                                  testImageUrl: testImageUrl,
-                                  engineerNameOnTest: engineerNameOnTestCompletion ?? _currentEngineerName
-                              );
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.html, color: Colors.orange),
-                            tooltip: 'تقرير HTML',
-                            onPressed: () {
-                              _generateHtmlReport(
                                   testId,
                                   testName,
                                   isTestSection: true,
@@ -2453,183 +2424,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
   }
 
-  Future<void> _saveOrShareHtml(String htmlContent, String fileName, String subject, String text) async {
-    final bytes = Uint8List.fromList(utf8.encode(htmlContent));
-    if (kIsWeb) {
-      final blob = html.Blob([bytes], 'text/html');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute("download", fileName)
-        ..click();
-      html.Url.revokeObjectUrl(url);
-    } else {
-      final outputDir = await getTemporaryDirectory();
-      final filePath = "${outputDir.path}/$fileName";
-      final file = File(filePath);
-      await file.writeAsBytes(bytes);
-      Share.shareXFiles(
-        [XFile(filePath)],
-        subject: subject,
-        text: text,
-      );
-    }
-  }
-
-  Future<void> _generateHtmlReport(
-      String phaseOrTestId,
-      String name, {
-        required bool isTestSection,
-        bool isSubPhase = false,
-        String? sectionName,
-        String? testNote,
-        String? testImageUrl,
-        String? engineerNameOnTest,
-      }) async {
-    _showLoadingDialog(context, "جاري إنشاء التقرير...");
-
-    String projectName = (_projectDataSnapshot?.data() as Map<String, dynamic>?)?['name'] ?? 'اسم المشروع غير محدد';
-    final List<dynamic> assignedEngs = (_projectDataSnapshot?.data() as Map<String, dynamic>?)?['assignedEngineers'] as List<dynamic>? ?? [];
-    final String responsibleEngineers = assignedEngs.isNotEmpty
-        ? assignedEngs.map((e) => (e as Map<String, dynamic>)['name'] ?? 'مهندس').join('، ')
-        : '';
-
-    final partRequests = await _fetchPartRequestsForPdf();
-
-    final buffer = StringBuffer();
-    buffer.writeln('<!DOCTYPE html><html lang="ar"><head><meta charset="UTF-8">');
-    buffer.writeln('<style>body{font-family:\'NotoSansArabic\',sans-serif;direction:rtl;} img{max-width:100%;height:auto;} .entry{margin-bottom:10px;border-bottom:1px solid #ccc;}</style>');
-    buffer.writeln('</head><body>');
-    buffer.writeln('<h1>${LoginConstants.appName}</h1>');
-    buffer.writeln('<h2>تقرير مشروع: $projectName</h2>');
-    buffer.writeln('<p>تاريخ الإنشاء: ${DateFormat('yyyy/MM/dd HH:mm', 'ar').format(DateTime.now())}</p>');
-    buffer.writeln('<p>بواسطة المهندس: ${_currentEngineerName ?? 'غير محدد'}</p>');
-    if (responsibleEngineers.isNotEmpty) buffer.writeln('<p>المهندس المسؤول: $responsibleEngineers</p>');
-    if (partRequests.isNotEmpty) {
-      buffer.writeln('<h3>القطع المطلوبة للمشروع:</h3><ul>');
-      for (var pr in partRequests) {
-        final String pName = pr['partName'] ?? '';
-        final String qty = pr['quantity']?.toString() ?? '1';
-        final String status = pr['status'] ?? '';
-        final Timestamp? ts = pr['requestedAt'] as Timestamp?;
-        final String dt = ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts.toDate()) : '';
-        buffer.writeln('<li>$pName - الكمية: $qty - $status - $dt</li>');
-      }
-      buffer.writeln('</ul>');
-    }
-
-    if (isTestSection) {
-      buffer.writeln('<h3>تقرير اختبار</h3>');
-      if (sectionName != null) buffer.writeln('<p>قسم الاختبار: $sectionName</p>');
-      buffer.writeln('<p>اسم الاختبار: $name</p>');
-      if (engineerNameOnTest != null) buffer.writeln('<p>أكمل بواسطة: $engineerNameOnTest</p>');
-      if (testNote != null && testNote.isNotEmpty) buffer.writeln('<p>الملاحظات: $testNote</p>');
-      if (testImageUrl != null) buffer.writeln('<img src="$testImageUrl" width="300"/>');
-    } else {
-      if (isSubPhase) {
-        bool subCompleted = false;
-        String subCompletedBy = 'غير معروف';
-        try {
-          final subDoc = await FirebaseFirestore.instance
-              .collection('projects')
-              .doc(widget.projectId)
-              .collection('subphases_status')
-              .doc(phaseOrTestId)
-              .get();
-          if (subDoc.exists) {
-            subCompleted = subDoc.data()?['completed'] ?? false;
-            subCompletedBy = subDoc.data()?['lastUpdatedByName'] ?? 'غير معروف';
-          }
-        } catch (_) {}
-        String subStatusText = subCompleted ? 'مكتملة (بواسطة: $subCompletedBy)' : 'قيد التنفيذ';
-        buffer.writeln('<h3>تقرير مرحلة فرعية</h3>');
-        buffer.writeln('<p>اسم المرحلة الفرعية: $name</p>');
-        buffer.writeln('<p>الحالة: $subStatusText</p>');
-
-        final subEmployees = await _fetchEmployeeNamesForPdf(phaseOrTestId, isSub: true);
-        if (subEmployees.isNotEmpty) buffer.writeln('<p>العمال المشاركون: ${subEmployees.join('، ')}</p>');
-
-        String entriesPath = 'projects/${widget.projectId}/subphases_status/$phaseOrTestId/entries';
-        List<Map<String, dynamic>> entries = await _fetchEntriesForPdf(entriesPath);
-        if (entries.isNotEmpty) {
-          buffer.writeln('<h4>الملاحظات والصور:</h4>');
-          for (var entry in entries) {
-            final String note = entry['note'] ?? '';
-            final List<dynamic>? imageUrlsDynamic = entry['imageUrls'] as List<dynamic>?;
-            final List<String> imageUrls = imageUrlsDynamic?.map((e) => e.toString()).toList() ?? [];
-            final String entryEngineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
-            final Timestamp? ts = entry['timestamp'] as Timestamp?;
-            final String entryDate = ts != null ? DateFormat('dd/MM/yy hh:mm a', 'ar').format(ts.toDate()) : 'غير معروف';
-            buffer.writeln('<div class="entry">');
-            if (note.isNotEmpty) buffer.writeln('<p>ملاحظة: $note</p>');
-            for (var imgUrl in imageUrls) buffer.writeln('<img src="$imgUrl" width="200"/>');
-            buffer.writeln('<p>بواسطة: $entryEngineer - $entryDate</p></div>');
-          }
-        }
-      } else {
-        bool mainCompleted = false;
-        String mainCompletedBy = 'غير معروف';
-        try {
-          final phaseDoc = await FirebaseFirestore.instance
-              .collection('projects')
-              .doc(widget.projectId)
-              .collection('phases_status')
-              .doc(phaseOrTestId)
-              .get();
-          if (phaseDoc.exists) {
-            mainCompleted = phaseDoc.data()?['completed'] ?? false;
-            mainCompletedBy = phaseDoc.data()?['lastUpdatedByName'] ?? 'غير معروف';
-          }
-        } catch (_) {}
-        String mainStatusText = mainCompleted ? 'مكتملة (بواسطة: $mainCompletedBy)' : 'قيد التنفيذ';
-        buffer.writeln('<h3>تقرير مرحلة رئيسية</h3>');
-        buffer.writeln('<p>اسم المرحلة: $name</p>');
-        buffer.writeln('<p>حالة المرحلة: $mainStatusText</p>');
-
-        final mainEmployees = await _fetchEmployeeNamesForPdf(phaseOrTestId, isSub: false);
-        if (mainEmployees.isNotEmpty) buffer.writeln('<p>العمال المشاركون: ${mainEmployees.join('، ')}</p>');
-
-        String mainPhaseEntriesPath = 'projects/${widget.projectId}/phases_status/$phaseOrTestId/entries';
-        List<Map<String, dynamic>> mainPhaseEntries = await _fetchEntriesForPdf(mainPhaseEntriesPath);
-        if (mainPhaseEntries.isNotEmpty) {
-          buffer.writeln('<h4>ملاحظات وصور المرحلة الرئيسية:</h4>');
-          for (var entry in mainPhaseEntries) {
-            final String note = entry['note'] ?? '';
-            final List<dynamic>? imageUrlsDynamic = entry['imageUrls'] as List<dynamic>?;
-            final List<String> imageUrls = imageUrlsDynamic?.map((e) => e.toString()).toList() ?? [];
-            final String entryEngineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
-            final Timestamp? ts = entry['timestamp'] as Timestamp?;
-            final String entryDate = ts != null ? DateFormat('dd/MM/yy hh:mm a', 'ar').format(ts.toDate()) : 'غير معروف';
-            buffer.writeln('<div class="entry">');
-            if (note.isNotEmpty) buffer.writeln('<p>ملاحظة: $note</p>');
-            for (var imgUrl in imageUrls) buffer.writeln('<img src="$imgUrl" width="200"/>');
-            buffer.writeln('<p>بواسطة: $entryEngineer - $entryDate</p></div>');
-          }
-        }
-      }
-    }
-
-    buffer.writeln('<p style="color:red;border:1px solid red;padding:4px;">ملاحظة هامة: هذا التقرير صالح لمدة 24 ساعة من التسليم للتعقيب عليها او الملاحظة.</p>');
-    buffer.writeln('</body></html>');
-
-    try {
-      final sanitizedName = name.replaceAll(RegExp(r'[^\w\s]+'),'').replaceAll(' ', '_');
-      final fileName = "${sanitizedName}_report_${DateTime.now().millisecondsSinceEpoch}.html";
-
-      _hideLoadingDialog(context);
-      _showFeedbackSnackBar(context, "تم إنشاء التقرير بنجاح.", isError: false);
-
-      await _saveOrShareHtml(
-        buffer.toString(),
-        fileName,
-        'تقرير مشروع: $projectName - $name',
-        'الرجاء الإطلاع على تقرير ${isTestSection ? "الاختبار" : "المرحلة"}: $name لمشروع $projectName.'
-      );
-    } catch (e) {
-      _hideLoadingDialog(context);
-      _showFeedbackSnackBar(context, "فشل إنشاء أو مشاركة التقرير: $e", isError: true);
-      print('Error generating HTML report: $e');
-    }
-  }
 
 } // End of _ProjectDetailsPageState
 
