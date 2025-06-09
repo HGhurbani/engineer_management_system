@@ -2399,23 +2399,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
   }
 
-  // Dummy helper for _buildPdfEntriesForPhaseOrSubphase - no longer used/needed.
-  // You can remove this function entirely.
-  // pw.Widget _buildPdfEntriesForPhaseOrSubphase(String path, pw.TextStyle style, pw.TextStyle smallStyle) {
-  //   return pw.SizedBox();
-  // }
 } // End of _ProjectDetailsPageState
-  // Dummy helper for _buildPdfEntriesForPhaseOrSubphase to avoid error, replace with actual implementation if needed.
-  // This was an idea during thought process, but direct fetching in the loop is also viable.
-  pw.Widget _buildPdfEntriesForPhaseOrSubphase(String path, pw.TextStyle style, pw.TextStyle smallStyle) {
-    // This function would ideally return Future<List<pw.Widget>> and be awaited,
-    // or the fetching logic placed directly in the loop as done in the code above.
-    // For now, returning an empty container to avoid breaking the flow.
-    return pw.SizedBox();
-  }
-
-
-
 
 // ... (ExpandableText Widget remains the same) ...
 class ExpandableText extends StatefulWidget {
