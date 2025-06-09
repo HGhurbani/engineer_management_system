@@ -570,10 +570,16 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       elevation: 4,
       centerTitle: true,
       bottom: TabBar(
-        controller: _tabController,
+        controller: _tabController, // Ensure this is using your state's _tabController
         indicatorColor: Colors.white,
+        indicatorWeight: 3.0,
         labelColor: Colors.white,
-        unselectedLabelColor: Colors.white70,
+        isScrollable: true,
+        labelPadding: EdgeInsets.symmetric(horizontal: 12.0), // يمكنك الإبقاء على هذا أو تعديله
+        tabAlignment: TabAlignment.start,
+        unselectedLabelColor: Colors.white.withOpacity(0.7),
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.5, fontFamily: 'Tajawal'),
+        unselectedLabelStyle: const TextStyle(fontSize: 16, fontFamily: 'Tajawal'),
         tabs: const [
           Tab(text: 'مراحل المشروع', icon: Icon(Icons.list_alt_rounded)),
           Tab(text: 'اختبارات التشغيل', icon: Icon(Icons.checklist_rtl_rounded)),

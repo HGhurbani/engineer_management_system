@@ -774,7 +774,7 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
                                   child: ExpansionTile(
                                     key: PageStorageKey<String>('sub_$subPhaseId'),
                                     leading: const Icon(Icons.check_box_rounded, color: AppConstants.successColor, size: 20),
-                                    title: Text(subPhaseActualName, style: const TextStyle(fontSize: 13.5, color: AppConstants.textSecondary, decoration: TextDecoration.lineThrough)),
+                                    title: Text(subPhaseActualName, style: const TextStyle(fontSize: 13.5, color: AppConstants.textSecondary)),
                                     subtitle: Text('مكتملة بواسطة: $subLastUpdatedBy', style: const TextStyle(fontSize: 11, color: AppConstants.successColor)),
                                     children: [
                                       Padding(
@@ -966,7 +966,7 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
 
                   return ListTile(
                     leading: const Icon(Icons.check_circle_rounded, color: AppConstants.successColor, size: 20),
-                    title: Text(testName, style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: TextDecoration.lineThrough)),
+                    title: Text(testName, style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
