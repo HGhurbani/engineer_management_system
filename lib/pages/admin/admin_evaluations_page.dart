@@ -5,6 +5,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
 import 'package:fl_chart/fl_chart.dart'; // استيراد مكتبة الرسوم البيانية
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:flutter/services.dart' show rootBundle;
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../html_stub.dart'
+    if (dart.library.html) 'dart:html' as html;
 
 // استيراد النماذج والإعدادات ومربع الحوار
 import '../../models/evaluation_models.dart'; // تم تحديث هذا الملف
@@ -30,12 +39,14 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
   EvaluationSettings? _evaluationSettings;
   bool _isLoadingInitialData = true;
   bool _isProcessingManualEvaluation = false;
+  pw.Font? _arabicFont;
 
 
   @override
   void initState() {
     super.initState();
     _loadInitialData();
+    _loadArabicFont();
   }
 
   Future<void> _loadInitialData() async {
@@ -628,6 +639,17 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           _buildRawMetricsCard(evaluation.rawMetrics),
           const SizedBox(height: AppConstants.itemSpacing * 1.5), // تباعد أكبر
           _buildHistoricalPerformanceChart(evaluation.engineerId, evaluation.periodType),
+          const SizedBox(height: AppConstants.itemSpacing * 1.5),
+          ElevatedButton.icon(
+            onPressed: () => _generateAndShareEvaluationPdf(evaluation),
+            icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
+            label: const Text('مشاركة التقييم PDF', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppConstants.primaryColor,
+              padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall, horizontal: AppConstants.paddingMedium),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+            ),
+          ),
         ],
       ),
     );
@@ -1064,6 +1086,116 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
     if (result == true) {
       _loadEvaluationSettings(); // إعادة تحميل الإعدادات بعد الحفظ
+    }
+  }
+
+  Future<void> _loadArabicFont() async {
+    try {
+      final fontData = await rootBundle.load('assets/fonts/Tajawal-Regular.ttf');
+      _arabicFont = pw.Font.ttf(fontData);
+    } catch (e) {
+      print('Error loading Arabic font: $e');
+    }
+  }
+
+  void _showLoadingDialog(BuildContext context, String message) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(color: AppConstants.primaryColor),
+              const SizedBox(width: 20),
+              Text(message, style: const TextStyle(fontFamily: 'NotoSansArabic')),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _hideLoadingDialog(BuildContext context) {
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+  }
+
+  Future<void> _generateAndShareEvaluationPdf(EngineerEvaluation evaluation) async {
+    if (_arabicFont == null) {
+      await _loadArabicFont();
+      if (_arabicFont == null) {
+        _showFeedbackSnackBar(context, 'فشل تحميل الخط العربي.', isError: true);
+        return;
+      }
+    }
+
+    _showLoadingDialog(context, 'جاري إنشاء التقرير...');
+
+    final pdf = pw.Document();
+    final pw.TextStyle regular = pw.TextStyle(font: _arabicFont, fontSize: 12);
+    final pw.TextStyle bold = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 14);
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          textDirection: pw.TextDirection.rtl,
+          theme: pw.ThemeData.withFont(base: _arabicFont),
+          margin: const pw.EdgeInsets.all(30),
+        ),
+        build: (context) => [
+          pw.Header(level: 0, child: pw.Text('تقرير تقييم الموظف', style: bold)),
+          pw.Text('اسم الموظف: ${evaluation.engineerName}', style: regular),
+          pw.Text('الفترة: ${evaluation.periodIdentifier}', style: regular),
+          pw.Text('النتيجة الكلية: ${evaluation.totalScore.toStringAsFixed(1)}%', style: bold),
+          pw.SizedBox(height: 10),
+          pw.Text('تفاصيل التقييم:', style: bold),
+          pw.Bullet(text: 'ساعات العمل: ${evaluation.criteriaScores['workingHours']?.toStringAsFixed(1) ?? '0'}%', style: regular),
+          pw.Bullet(text: 'المهام المكتملة: ${evaluation.criteriaScores['tasksCompleted']?.toStringAsFixed(1) ?? '0'}%', style: regular),
+          pw.Bullet(text: 'معدل النشاط: ${evaluation.criteriaScores['activityRate']?.toStringAsFixed(1) ?? '0'}%', style: regular),
+          pw.Bullet(text: 'الإنتاجية العامة: ${evaluation.criteriaScores['productivity']?.toStringAsFixed(1) ?? '0'}%', style: regular),
+          pw.SizedBox(height: 10),
+          pw.Text('المقاييس الأولية:', style: bold),
+          pw.Bullet(text: 'ساعات العمل الفعلية: ${evaluation.rawMetrics['actualWorkingHours']?.toStringAsFixed(1) ?? '0'}', style: regular),
+          pw.Bullet(text: 'المهام المكتملة: ${evaluation.rawMetrics['completedTasks'] ?? '0'}', style: regular),
+          pw.Bullet(text: 'عدد الإدخالات: ${evaluation.rawMetrics['totalEntries'] ?? '0'}', style: regular),
+        ],
+        footer: (context) => pw.Container(
+          alignment: pw.Alignment.center,
+          margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
+          child: pw.Text('صفحة ${context.pageNumber} من ${context.pagesCount}', style: pw.TextStyle(font: _arabicFont, fontSize: 10, color: PdfColors.grey)),
+        ),
+      ),
+    );
+
+    try {
+      final bytes = await pdf.save();
+      final sanitizedName = evaluation.engineerName.replaceAll(RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
+      final fileName = '${sanitizedName}_${evaluation.periodIdentifier}.pdf';
+
+      _hideLoadingDialog(context);
+      _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
+
+      if (kIsWeb) {
+        final blob = html.Blob([bytes], 'application/pdf');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute('download', fileName)
+          ..click();
+        html.Url.revokeObjectUrl(url);
+      } else {
+        final dir = await getTemporaryDirectory();
+        final path = '${dir.path}/$fileName';
+        final file = File(path);
+        await file.writeAsBytes(bytes);
+        await Share.shareXFiles([XFile(path)], text: 'تقرير تقييم ${evaluation.engineerName}');
+      }
+    } catch (e) {
+      _hideLoadingDialog(context);
+      _showFeedbackSnackBar(context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
     }
   }
 }
