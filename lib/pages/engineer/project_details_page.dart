@@ -1992,20 +1992,25 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     // --- NEW: Fetch all images before building the PDF ---
     final Map<String, pw.MemoryImage> fetchedImages = {};
 
-    // Helper to fetch and store images
+    // Helper to fetch and store images with basic validation
     Future<void> _fetchAndStoreImages(List<String> imageUrls) async {
-      for (String url in imageUrls) {
-        if (!fetchedImages.containsKey(url)) {
-          try {
-            final response = await http.get(Uri.parse(url));
-            if (response.statusCode == 200) {
+      for (final url in imageUrls) {
+        if (fetchedImages.containsKey(url)) continue;
+        try {
+          final response = await http.get(Uri.parse(url));
+          final contentType = response.headers['content-type'] ?? '';
+          if (response.statusCode == 200 && contentType.startsWith('image/')) {
+            try {
               fetchedImages[url] = pw.MemoryImage(response.bodyBytes);
-            } else {
-              print("Failed to load image from URL $url: Status code ${response.statusCode}");
+            } catch (e) {
+              // If the bytes cannot be decoded into an image, skip this URL
+              print('Invalid image data for URL $url: $e');
             }
-          } catch (e) {
-            print("Error fetching image from URL $url: $e");
+          } else {
+            print('Failed to load image from URL $url: status ${response.statusCode}, content-type $contentType');
           }
+        } catch (e) {
+          print('Error fetching image from URL $url: $e');
         }
       }
     }
@@ -2109,7 +2114,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             subCompletedBy = subDoc.data()?['lastUpdatedByName'] ?? 'غير معروف';
           }
         } catch (e) { print('error fetching subphase status for pdf: $e'); }
-        String subStatusText = subCompleted ? 'مكتملة (بواسطة: $subCompletedBy) ✅' : 'قيد التنفيذ ⏳';
+        String subStatusText = subCompleted
+            ? 'مكتملة (بواسطة: $subCompletedBy)'
+            : 'قيد التنفيذ';
         contentWidgets.add(pw.Text('الحالة: $subStatusText', style: regularStyle.copyWith(color: subCompleted ? PdfColors.green700 : PdfColors.orange700), textDirection: pw.TextDirection.rtl));
 
         final subEmployees = await _fetchEmployeeNamesForPdf(phaseOrTestId, isSub: true);
@@ -2174,7 +2181,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             mainCompletedBy = phaseDoc.data()?['lastUpdatedByName'] ?? 'غير معروف';
           }
         } catch (e) { print('error fetching phase status for pdf: $e'); }
-        String mainStatusText = mainCompleted ? 'مكتملة (بواسطة: $mainCompletedBy) ✅' : 'قيد التنفيذ ⏳';
+        String mainStatusText =
+            mainCompleted ? 'مكتملة (بواسطة: $mainCompletedBy)' : 'قيد التنفيذ';
         contentWidgets.add(pw.Text('حالة المرحلة: $mainStatusText', style: regularStyle.copyWith(color: mainCompleted ? PdfColors.green700 : PdfColors.orange700), textDirection: pw.TextDirection.rtl));
 
         final mainEmployees = await _fetchEmployeeNamesForPdf(phaseOrTestId, isSub: false);
@@ -2245,7 +2253,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               }
             } catch(e) { print("Error fetching subphase status: $e");}
 
-            String statusText = isSubPhaseCompleted ? 'مكتملة (بواسطة: $subPhaseCompletedBy) ✅' : 'قيد التنفيذ ⏳';
+            String statusText = isSubPhaseCompleted
+                ? 'مكتملة (بواسطة: $subPhaseCompletedBy)'
+                : 'قيد التنفيذ';
 
             contentWidgets.add(pw.Container(
                 margin: pw.EdgeInsets.only(bottom: 10),
