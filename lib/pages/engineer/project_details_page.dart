@@ -2009,8 +2009,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 print('Invalid image bytes for URL $url');
               }
             } catch (e) {
-              fetchedImages[url] = pw.MemoryImage(response.bodyBytes);
-            } catch (e) {
               // If the bytes cannot be decoded into an image, skip this URL
               print('Invalid image data for URL $url: $e');
             }
