@@ -14,6 +14,8 @@ class AdminSettingsPage extends StatefulWidget {
 class _AdminSettingsPageState extends State<AdminSettingsPage> {
   final TextEditingController _defaultWorkingHoursController = TextEditingController();
   final TextEditingController _engineerHourlyRateController = TextEditingController();
+  final TextEditingController _workStartTimeController = TextEditingController();
+  final TextEditingController _workEndTimeController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   bool _isLoading = true; // Start with loading true
@@ -28,6 +30,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
   void dispose() {
     _defaultWorkingHoursController.dispose();
     _engineerHourlyRateController.dispose();
+    _workStartTimeController.dispose();
+    _workEndTimeController.dispose();
     super.dispose();
   }
 
@@ -46,12 +50,18 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         Map<String, dynamic> data = settingsDoc.data() as Map<String, dynamic>;
         _defaultWorkingHoursController.text = (data['defaultWorkingHours'] ?? 8.0).toString();
         _engineerHourlyRateController.text = (data['engineerHourlyRate'] ?? 50.0).toString();
+        _workStartTimeController.text = data['workStartTime'] ?? '09:00';
+        _workEndTimeController.text = data['workEndTime'] ?? '17:00';
       } else {
         _defaultWorkingHoursController.text = '8.0';
         _engineerHourlyRateController.text = '50.0';
+        _workStartTimeController.text = '09:00';
+        _workEndTimeController.text = '17:00';
         await FirebaseFirestore.instance.collection('settings').doc('app_settings').set({
           'defaultWorkingHours': 8.0,
           'engineerHourlyRate': 50.0,
+          'workStartTime': '09:00',
+          'workEndTime': '17:00',
           'lastUpdated': FieldValue.serverTimestamp(),
         });
       }
@@ -80,11 +90,15 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     try {
       double defaultWorkingHours = double.parse(_defaultWorkingHoursController.text);
       double engineerHourlyRate = double.parse(_engineerHourlyRateController.text);
+      String startTime = _workStartTimeController.text;
+      String endTime = _workEndTimeController.text;
 
       await FirebaseFirestore.instance.collection('settings').doc('app_settings').set(
         {
           'defaultWorkingHours': defaultWorkingHours,
           'engineerHourlyRate': engineerHourlyRate,
+          'workStartTime': startTime,
+          'workEndTime': endTime,
           'lastUpdated': FieldValue.serverTimestamp(),
         },
         SetOptions(merge: true),
@@ -151,6 +165,41 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         }
         return validator?.call(value);
       },
+    );
+  }
+
+  Widget _buildTimeField({
+    required TextEditingController controller,
+    required String labelText,
+    required IconData icon,
+  }) {
+    return TextFormField(
+      controller: controller,
+      readOnly: true,
+      decoration: InputDecoration(
+        labelText: labelText,
+        labelStyle: const TextStyle(color: AppConstants.textSecondary),
+        prefixIcon: Icon(icon, color: AppConstants.primaryColor),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: const BorderSide(color: AppConstants.textSecondary, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+          borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
+        ),
+        filled: true,
+        fillColor: AppConstants.cardColor,
+        contentPadding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 16.0),
+      ),
+      onTap: () async {
+        final now = TimeOfDay.now();
+        final picked = await showTimePicker(context: context, initialTime: now);
+        if (picked != null) {
+          controller.text = picked.format(context);
+        }
+      },
+      validator: (value) => value == null || value.isEmpty ? 'هذا الحقل مطلوب.' : null,
     );
   }
 
@@ -235,6 +284,18 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                           controller: _defaultWorkingHoursController,
                           labelText: 'ساعات العمل الافتراضية (يومياً)',
                           icon: Icons.access_time_filled_rounded,
+                        ),
+                        const SizedBox(height: AppConstants.itemSpacing),
+                        _buildTimeField(
+                          controller: _workStartTimeController,
+                          labelText: 'بداية ساعات العمل',
+                          icon: Icons.play_arrow_rounded,
+                        ),
+                        const SizedBox(height: AppConstants.itemSpacing),
+                        _buildTimeField(
+                          controller: _workEndTimeController,
+                          labelText: 'نهاية ساعات العمل',
+                          icon: Icons.stop_rounded,
                         ),
                         const SizedBox(height: AppConstants.itemSpacing),
                         _buildStyledTextField(
