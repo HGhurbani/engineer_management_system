@@ -1,6 +1,7 @@
 // lib/main.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:engineer_management_system/pages/admin/admin_attendance_page.dart';
+import 'package:engineer_management_system/pages/admin/admin_attendance_report_page.dart';
 import 'package:engineer_management_system/pages/notifications_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -110,6 +111,7 @@ class MyApp extends StatelessWidget {
         '/admin/daily_schedule': (context) => const AdminDailySchedulePage(),
         '/admin/settings': (context) => const AdminSettingsPage(),
         '/admin/attendance': (context) => const AdminAttendancePage(),
+        '/admin/attendance_report': (context) => const AdminAttendanceReportPage(),
         '/notifications': (context) => const NotificationsPage(),
         // New route for requesting parts
         '/engineer/request_part': (context) {
