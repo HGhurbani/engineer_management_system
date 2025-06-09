@@ -21,6 +21,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart' show rootBundle; // For font loading
+import 'package:image/image.dart' as img;
 // --- End PDF Imports ---
 
 import '../../main.dart'; // Assuming helper functions are in main.dart
@@ -2001,6 +2002,13 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           final contentType = response.headers['content-type'] ?? '';
           if (response.statusCode == 200 && contentType.startsWith('image/')) {
             try {
+              final decoded = img.decodeImage(response.bodyBytes);
+              if (decoded != null) {
+                fetchedImages[url] = pw.MemoryImage(response.bodyBytes);
+              } else {
+                print('Invalid image bytes for URL $url');
+              }
+            } catch (e) {
               fetchedImages[url] = pw.MemoryImage(response.bodyBytes);
             } catch (e) {
               // If the bytes cannot be decoded into an image, skip this URL
