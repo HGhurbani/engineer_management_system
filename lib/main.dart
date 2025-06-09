@@ -1,6 +1,7 @@
 // lib/main.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:engineer_management_system/pages/admin/admin_attendance_page.dart';
+import 'package:engineer_management_system/pages/admin/admin_attendance_report_page.dart';
 import 'package:engineer_management_system/pages/notifications_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -14,6 +15,7 @@ import 'package:engineer_management_system/pages/engineer/engineer_home.dart';
 import 'package:engineer_management_system/pages/client/client_home.dart';
 import 'package:engineer_management_system/pages/admin/admin_engineers_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_clients_page.dart';
+import 'package:engineer_management_system/pages/admin/admin_employees_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_projects_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_project_details_page.dart';
 import 'package:engineer_management_system/pages/engineer/project_details_page.dart';
@@ -30,24 +32,24 @@ import 'package:engineer_management_system/pages/admin/admin_evaluations_page.da
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // if (Firebase.apps.isEmpty) {
-  //   await Firebase.initializeApp(
-  //     options: DefaultFirebaseOptions.currentPlatform,
-  //   );
-  // } else {
-  //   print('Firebase app [DEFAULT] already initialized.');
-  // }
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: "AIzaSyDX_fhBTQmwm-KP8Qu2gfwFQylGuaEm4VA",
-      authDomain: "eng-system.firebaseapp.com",
-      projectId: "eng-system",
-      storageBucket: "eng-system.firebasestorage.app",
-      messagingSenderId: "526461382833",
-      appId: "1:526461382833:web:46090faa13de2d4b30f290",
-      measurementId: "G-NMMTY5PN4Y",
-    ),
-  );
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } else {
+    print('Firebase app [DEFAULT] already initialized.');
+  }
+  // await Firebase.initializeApp(
+  //   options: const FirebaseOptions(
+  //     apiKey: "AIzaSyDX_fhBTQmwm-KP8Qu2gfwFQylGuaEm4VA",
+  //     authDomain: "eng-system.firebaseapp.com",
+  //     projectId: "eng-system",
+  //     storageBucket: "eng-system.firebasestorage.app",
+  //     messagingSenderId: "526461382833",
+  //     appId: "1:526461382833:web:46090faa13de2d4b30f290",
+  //     measurementId: "G-NMMTY5PN4Y",
+  //   ),
+  // );
 
 
   await initializeDateFormatting('ar', null);
@@ -96,6 +98,7 @@ class MyApp extends StatelessWidget {
         '/client': (context) => const ClientHome(),
         '/admin/engineers': (context) => const AdminEngineersPage(),
         '/admin/clients': (context) => const AdminClientsPage(),
+        '/admin/employees': (context) => const AdminEmployeesPage(),
         '/admin/projects': (context) => const AdminProjectsPage(),
         '/admin/projectDetails': (context) {
           final projectId = ModalRoute.of(context)!.settings.arguments as String;
@@ -108,6 +111,7 @@ class MyApp extends StatelessWidget {
         '/admin/daily_schedule': (context) => const AdminDailySchedulePage(),
         '/admin/settings': (context) => const AdminSettingsPage(),
         '/admin/attendance': (context) => const AdminAttendancePage(),
+        '/admin/attendance_report': (context) => const AdminAttendanceReportPage(),
         '/notifications': (context) => const NotificationsPage(),
         // New route for requesting parts
         '/engineer/request_part': (context) {

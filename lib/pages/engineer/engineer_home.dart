@@ -11,7 +11,6 @@ import 'package:signature/signature.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
 import '../../main.dart';
-import 'employees_tab.dart';
 import 'meeting_logs_page.dart';
 
 
@@ -511,7 +510,6 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
               _buildMyProjectsTab(),
               _buildPartRequestsTab(),
               _buildDailyScheduleTab(),
-              _buildEmployeesTab(),
               _buildMeetingLogsTab(),
             ],
           ),
@@ -962,7 +960,6 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
           Tab(text: 'مشاريعي', icon: Icon(Icons.business_center_outlined)),
           Tab(text: 'طلبات القطع', icon: Icon(Icons.build_circle_outlined)),
           Tab(text: 'جدولي اليومي', icon: Icon(Icons.calendar_today_rounded)),
-          Tab(text: 'موظفيني', icon: Icon(Icons.group_outlined)),
           Tab(text: 'محاضر الاجتماعات', icon: Icon(Icons.event_note_outlined)),
         ],
       ),
@@ -1057,7 +1054,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
                         label: const Text('إنهاء يوم العمل', style: TextStyle(color: Colors.white)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppConstants.primaryColor,
-                          padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingMedium),
+                          padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall, horizontal: 20),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
                         ),
                       ),
@@ -1254,12 +1251,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     );
   }
 
-  Widget _buildEmployeesTab() {
-    if (_currentEngineerUid == null) {
-      return _buildErrorState('لا يمكن تحميل الموظفين.');
-    }
-    return EmployeesTab(engineerId: _currentEngineerUid!);
-  }
+
 
   Widget _buildMeetingLogsTab() {
     if (_currentEngineerUid == null) {

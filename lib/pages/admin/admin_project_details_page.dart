@@ -578,7 +578,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           Tab(text: 'مراحل المشروع', icon: Icon(Icons.list_alt_rounded)),
           Tab(text: 'اختبارات التشغيل', icon: Icon(Icons.checklist_rtl_rounded)),
           Tab(text: 'طلبات القطع', icon: Icon(Icons.build_circle_outlined)),
-          Tab(text: 'موظفو المشروع', icon: Icon(Icons.group)),
+          Tab(text: 'عمال المشروع', icon: Icon(Icons.group)),
         ],
       ),
     );

@@ -78,7 +78,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
       }
     } catch (e) {
       if (mounted) {
-        _showFeedbackSnackBar(context, 'فشل تحميل قائمة الموظفين: $e', isError: true);
+        _showFeedbackSnackBar(
+            context, 'فشل تحميل قائمة الموظفين: $e', isError: true);
       }
     }
   }
@@ -107,7 +108,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           enableYearlyEvaluation: false,
           sendNotifications: true,
         );
-        await FirebaseFirestore.instance.collection('evaluation_settings').doc('weights').set(defaultSettings.toFirestore());
+        await FirebaseFirestore.instance.collection('evaluation_settings').doc(
+            'weights').set(defaultSettings.toFirestore());
         if (mounted) {
           setState(() {
             _evaluationSettings = defaultSettings;
@@ -117,12 +119,14 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
     } catch (e) {
       print('Error loading evaluation settings: $e');
       if (mounted) {
-        _showFeedbackSnackBar(context, 'فشل تحميل إعدادات التقييم.', isError: true);
+        _showFeedbackSnackBar(
+            context, 'فشل تحميل إعدادات التقييم.', isError: true);
       }
     }
   }
 
-  void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError}) {
+  void _showFeedbackSnackBar(BuildContext context, String message,
+      {required bool isError}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -138,9 +142,12 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
             ),
           ],
         ),
-        backgroundColor: isError ? AppConstants.errorColor : AppConstants.successColor,
+        backgroundColor: isError ? AppConstants.errorColor : AppConstants
+            .successColor,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)), // حواف أكثر دائرية
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+        // حواف أكثر دائرية
         margin: const EdgeInsets.all(AppConstants.paddingMedium),
         duration: const Duration(seconds: 3), // مدة عرض أطول قليلاً
       ),
@@ -155,7 +162,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
     }
   }
 
-  Future<Map<String, dynamic>> _calculateEvaluationMetrics(String engineerId, DateTime date, String periodType) async {
+  Future<Map<String, dynamic>> _calculateEvaluationMetrics(String engineerId,
+      DateTime date, String periodType) async {
     double totalWorkingHours = 0.0;
     int completedTasks = 0;
     int totalEntries = 0;
@@ -185,8 +193,11 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
       if (type == 'check_in' && timestamp != null) {
         checkInTime = timestamp;
-      } else if (type == 'check_out' && timestamp != null && checkInTime != null) {
-        totalWorkingHours += timestamp.difference(checkInTime).inMinutes / 60.0;
+      } else
+      if (type == 'check_out' && timestamp != null && checkInTime != null) {
+        totalWorkingHours += timestamp
+            .difference(checkInTime)
+            .inMinutes / 60.0;
         checkInTime = null;
       }
     }
@@ -208,7 +219,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           .get();
       completedTasks += subPhasesSnapshot.docs.where((doc) {
         final timestamp = (doc.data()['lastUpdatedAt'] as Timestamp?)?.toDate();
-        return timestamp != null && timestamp.isAfter(startPeriod) && timestamp.isBefore(endPeriod);
+        return timestamp != null && timestamp.isAfter(startPeriod) &&
+            timestamp.isBefore(endPeriod);
       }).length;
 
       final testsSnapshot = await FirebaseFirestore.instance
@@ -220,7 +232,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           .get();
       completedTasks += testsSnapshot.docs.where((doc) {
         final timestamp = (doc.data()['lastUpdatedAt'] as Timestamp?)?.toDate();
-        return timestamp != null && timestamp.isAfter(startPeriod) && timestamp.isBefore(endPeriod);
+        return timestamp != null && timestamp.isAfter(startPeriod) &&
+            timestamp.isBefore(endPeriod);
       }).length;
 
       final mainPhaseEntriesSnapshot = await FirebaseFirestore.instance
@@ -228,13 +241,14 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           .doc(projectId)
           .collection('phases_status')
           .get();
-      for(var mainPhaseDoc in mainPhaseEntriesSnapshot.docs) {
+      for (var mainPhaseDoc in mainPhaseEntriesSnapshot.docs) {
         final entries = await mainPhaseDoc.reference.collection('entries')
             .where('engineerUid', isEqualTo: engineerId)
             .get();
         totalEntries += entries.docs.where((doc) {
           final timestamp = (doc.data()['timestamp'] as Timestamp?)?.toDate();
-          return timestamp != null && timestamp.isAfter(startPeriod) && timestamp.isBefore(endPeriod);
+          return timestamp != null && timestamp.isAfter(startPeriod) &&
+              timestamp.isBefore(endPeriod);
         }).length;
       }
 
@@ -243,13 +257,14 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           .doc(projectId)
           .collection('subphases_status')
           .get();
-      for(var subPhaseDoc in subPhaseEntriesSnapshot.docs) {
+      for (var subPhaseDoc in subPhaseEntriesSnapshot.docs) {
         final entries = await subPhaseDoc.reference.collection('entries')
             .where('engineerUid', isEqualTo: engineerId)
             .get();
         totalEntries += entries.docs.where((doc) {
           final timestamp = (doc.data()['timestamp'] as Timestamp?)?.toDate();
-          return timestamp != null && timestamp.isAfter(startPeriod) && timestamp.isBefore(endPeriod);
+          return timestamp != null && timestamp.isAfter(startPeriod) &&
+              timestamp.isBefore(endPeriod);
         }).length;
       }
     }
@@ -258,10 +273,15 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
     int targetTasks = periodType == 'monthly' ? 10 : 120;
     int targetEntries = periodType == 'monthly' ? 50 : 600;
 
-    double workingHoursScore = (totalWorkingHours / targetWorkingHours).clamp(0.0, 1.0) * 100;
-    double tasksCompletedScore = (completedTasks / targetTasks).clamp(0.0, 1.0) * 100;
-    double activityRateScore = (totalEntries / targetEntries).clamp(0.0, 1.0) * 100;
-    double productivityScore = ((completedTasks / (totalWorkingHours > 0 ? totalWorkingHours : 1)) / (targetTasks / targetWorkingHours)).clamp(0.0, 1.0) * 100;
+    double workingHoursScore = (totalWorkingHours / targetWorkingHours).clamp(
+        0.0, 1.0) * 100;
+    double tasksCompletedScore = (completedTasks / targetTasks).clamp(
+        0.0, 1.0) * 100;
+    double activityRateScore = (totalEntries / targetEntries).clamp(0.0, 1.0) *
+        100;
+    double productivityScore = ((completedTasks /
+        (totalWorkingHours > 0 ? totalWorkingHours : 1)) /
+        (targetTasks / targetWorkingHours)).clamp(0.0, 1.0) * 100;
 
     return {
       'rawMetrics': {
@@ -280,36 +300,47 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
   Future<void> _triggerManualEvaluation() async {
     if (_selectedEngineerId == null) {
-      _showFeedbackSnackBar(context, 'الرجاء اختيار موظف للتقييم.', isError: true);
+      _showFeedbackSnackBar(
+          context, 'الرجاء اختيار موظف للتقييم.', isError: true);
       return;
     }
     if (_evaluationSettings == null) {
-      _showFeedbackSnackBar(context, 'إعدادات التقييم غير محملة.', isError: true);
+      _showFeedbackSnackBar(
+          context, 'إعدادات التقييم غير محملة.', isError: true);
       return;
     }
     if (!mounted) return;
     setState(() => _isProcessingManualEvaluation = true);
 
     try {
-      final engineerData = _engineers.firstWhere((doc) => doc.id == _selectedEngineerId).data() as Map<String, dynamic>?;
+      final engineerData = _engineers.firstWhere((doc) =>
+      doc.id == _selectedEngineerId).data() as Map<String, dynamic>?;
       final engineerName = engineerData?['name'] as String? ?? 'غير معروف';
-      final periodIdentifier = _getPeriodIdentifier(_selectedDate, _selectedPeriodType);
+      final periodIdentifier = _getPeriodIdentifier(
+          _selectedDate, _selectedPeriodType);
 
-      final metrics = await _calculateEvaluationMetrics(_selectedEngineerId!, _selectedDate, _selectedPeriodType);
+      final metrics = await _calculateEvaluationMetrics(
+          _selectedEngineerId!, _selectedDate, _selectedPeriodType);
 
-      final criteriaScores = metrics['criteriaScores'] as Map<String, double>? ?? {};
+      final criteriaScores = metrics['criteriaScores'] as Map<String,
+          double>? ?? {};
       final rawMetrics = metrics['rawMetrics'] as Map<String, dynamic>? ?? {};
 
       double totalScore = (
-          (criteriaScores['workingHours']! * (_evaluationSettings?.workingHoursWeight ?? 0.0)) +
-              (criteriaScores['tasksCompleted']! * (_evaluationSettings?.tasksCompletedWeight ?? 0.0)) +
-              (criteriaScores['activityRate']! * (_evaluationSettings?.activityRateWeight ?? 0.0)) +
-              (criteriaScores['productivity']! * (_evaluationSettings?.productivityWeight ?? 0.0))
+          (criteriaScores['workingHours']! *
+              (_evaluationSettings?.workingHoursWeight ?? 0.0)) +
+              (criteriaScores['tasksCompleted']! *
+                  (_evaluationSettings?.tasksCompletedWeight ?? 0.0)) +
+              (criteriaScores['activityRate']! *
+                  (_evaluationSettings?.activityRateWeight ?? 0.0)) +
+              (criteriaScores['productivity']! *
+                  (_evaluationSettings?.productivityWeight ?? 0.0))
       ) / 100;
 
       final evaluationDocId = '${_selectedEngineerId}_$periodIdentifier';
 
-      await FirebaseFirestore.instance.collection('evaluations').doc(evaluationDocId).set(
+      await FirebaseFirestore.instance.collection('evaluations').doc(
+          evaluationDocId).set(
         EngineerEvaluation(
           engineerId: _selectedEngineerId!,
           engineerName: engineerName,
@@ -323,7 +354,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
         SetOptions(merge: true),
       );
 
-      _showFeedbackSnackBar(context, 'تم إجراء التقييم يدوياً بنجاح.', isError: false);
+      _showFeedbackSnackBar(
+          context, 'تم إجراء التقييم يدوياً بنجاح.', isError: false);
 
       if (_evaluationSettings?.sendNotifications ?? false) {
         // تأكد من وجود دالة sendNotification في AppConstants أو مكان آخر يمكن الوصول إليه
@@ -333,14 +365,18 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
         await sendNotification(
           recipientUserId: _selectedEngineerId!,
           title: "تم إصدار تقييم جديد",
-          body: "تم إصدار تقييم أدائك ${ _selectedPeriodType == 'monthly' ? 'للشهر' : 'للسنة' } $periodIdentifier. النتيجة: ${totalScore.toStringAsFixed(1)}%",
+          body: "تم إصدار تقييم أدائك ${ _selectedPeriodType == 'monthly'
+              ? 'للشهر'
+              : 'للسنة' } $periodIdentifier. النتيجة: ${totalScore
+              .toStringAsFixed(1)}%",
           type: "engineer_evaluation",
           itemId: evaluationDocId,
           senderName: "نظام التقييم",
         );
       }
     } catch (e) {
-      _showFeedbackSnackBar(context, 'فشل إجراء التقييم اليدوي: $e', isError: true);
+      _showFeedbackSnackBar(
+          context, 'فشل إجراء التقييم اليدوي: $e', isError: true);
     } finally {
       if (mounted) setState(() => _isProcessingManualEvaluation = false);
     }
@@ -355,16 +391,20 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
         backgroundColor: AppConstants.backgroundColor,
         appBar: _buildAppBar(),
         body: _isLoadingInitialData
-            ? const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor))
+            ? const Center(
+            child: CircularProgressIndicator(color: AppConstants.primaryColor))
             : Column(
           children: [
             _buildFiltersAndActions(),
             Expanded(
               child: StreamBuilder<DocumentSnapshot>(
-                stream: (_selectedEngineerId != null && _getPeriodIdentifier(_selectedDate, _selectedPeriodType).isNotEmpty) ?
+                stream: (_selectedEngineerId != null &&
+                    _getPeriodIdentifier(_selectedDate, _selectedPeriodType)
+                        .isNotEmpty) ?
                 FirebaseFirestore.instance
                     .collection('evaluations')
-                    .doc('${_selectedEngineerId}_${_getPeriodIdentifier(_selectedDate, _selectedPeriodType)}')
+                    .doc('${_selectedEngineerId}_${_getPeriodIdentifier(
+                    _selectedDate, _selectedPeriodType)}')
                     .snapshots() : null,
                 builder: (context, snapshot) {
                   if (_selectedEngineerId == null) {
@@ -372,16 +412,21 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
                     return _buildWelcomeAndGuidanceState();
                   }
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+                    return const Center(child: CircularProgressIndicator(
+                        color: AppConstants.primaryColor));
                   }
                   if (snapshot.hasError) {
-                    return _buildErrorState('حدث خطأ في تحميل التقييم: ${snapshot.error}');
+                    return _buildErrorState(
+                        'حدث خطأ في تحميل التقييم: ${snapshot.error}');
                   }
                   if (!snapshot.hasData || !snapshot.data!.exists) {
-                    return _buildEmptyState('لا توجد بيانات تقييم للموظف في الفترة المحددة.', icon: Icons.person_off_rounded);
+                    return _buildEmptyState(
+                        'لا توجد بيانات تقييم للموظف في الفترة المحددة.',
+                        icon: Icons.person_off_rounded);
                   }
 
-                  final evaluation = EngineerEvaluation.fromFirestore(snapshot.data!);
+                  final evaluation = EngineerEvaluation.fromFirestore(
+                      snapshot.data!);
                   return _buildEvaluationDetails(evaluation);
                 },
               ),
@@ -400,7 +445,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           color: Colors.white,
           fontWeight: FontWeight.w600,
           fontSize: 22,
-        ),      ),
+        ),),
       backgroundColor: AppConstants.primaryColor,
       flexibleSpace: Container(
         decoration: const BoxDecoration(
@@ -430,16 +475,21 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
       child: Card(
         elevation: AppConstants.cardShadow[0].blurRadius + 2, // ظل أوضح للبطاقة
         shadowColor: AppConstants.primaryColor.withOpacity(0.15), // ظل أقوى
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
         child: Padding(
-          padding: const EdgeInsets.all(AppConstants.paddingLarge), // مسافة داخلية أكبر
+          padding: const EdgeInsets.all(AppConstants.paddingLarge),
+          // مسافة داخلية أكبر
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start, // لمحاذاة العناوين لليمين
+            crossAxisAlignment: CrossAxisAlignment.start,
+            // لمحاذاة العناوين لليمين
             children: [
 
               // اختيار الموظف
               _buildStyledDropdown<String>(
-                hint: _engineers.isEmpty ? 'لا يوجد موظفون متاحون' : 'اختر الموظف للتقييم',
+                hint: _engineers.isEmpty
+                    ? 'لا يوجد موظفون متاحون'
+                    : 'اختر الموظف للتقييم',
                 value: _selectedEngineerId,
                 items: _engineers.map((doc) {
                   final user = doc.data() as Map<String, dynamic>?;
@@ -469,7 +519,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
                       ],
                       onChanged: (value) {
                         if (mounted) {
-                          setState(() => _selectedPeriodType = value ?? 'monthly');
+                          setState(() =>
+                          _selectedPeriodType = value ?? 'monthly');
                         }
                       },
                       icon: Icons.calendar_today_rounded,
@@ -482,24 +533,34 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
                       child: InputDecorator(
                         decoration: InputDecoration(
                           labelText: 'تاريخ الفترة',
-                          labelStyle: const TextStyle(color: AppConstants.textSecondary),
-                          prefixIcon: const Icon(Icons.date_range_rounded, color: AppConstants.primaryColor),
+                          labelStyle: const TextStyle(color: AppConstants
+                              .textSecondary),
+                          prefixIcon: const Icon(Icons.date_range_rounded,
+                              color: AppConstants.primaryColor),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+                            borderRadius: BorderRadius.circular(
+                                AppConstants.borderRadius / 1.5),
                           ),
                           filled: true,
-                          fillColor: AppConstants.cardColor.withOpacity(0.8), // لون تعبئة أوضح
+                          fillColor: AppConstants.cardColor.withOpacity(
+                              0.8), // لون تعبئة أوضح
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               _selectedPeriodType == 'monthly'
-                                  ? DateFormat('MMMM yyyy', 'ar').format(_selectedDate) // تنسيق الشهر والسنة
-                                  : DateFormat('yyyy', 'ar').format(_selectedDate),
-                              style: const TextStyle(fontSize: 16, color: AppConstants.textPrimary, fontWeight: FontWeight.w500),
+                                  ? DateFormat('MMMM yyyy', 'ar').format(
+                                  _selectedDate) // تنسيق الشهر والسنة
+                                  : DateFormat('yyyy', 'ar').format(
+                                  _selectedDate),
+                              style: const TextStyle(fontSize: 16,
+                                  color: AppConstants.textPrimary,
+                                  fontWeight: FontWeight.w500),
                             ),
-                            const Icon(Icons.calendar_month_rounded, color: AppConstants.primaryColor), // أيقونة أوضح
+                            const Icon(Icons.calendar_month_rounded,
+                                color: AppConstants.primaryColor),
+                            // أيقونة أوضح
                           ],
                         ),
                       ),
@@ -507,28 +568,37 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: AppConstants.itemSpacing * 1.5), // مسافة أكبر قبل الزر
+              const SizedBox(height: AppConstants.itemSpacing * 1.5),
+              // مسافة أكبر قبل الزر
               ElevatedButton.icon(
-                onPressed: _selectedEngineerId == null || _isProcessingManualEvaluation
+                onPressed: _selectedEngineerId == null ||
+                    _isProcessingManualEvaluation
                     ? null
                     : _triggerManualEvaluation,
                 icon: _isProcessingManualEvaluation
                     ? const SizedBox(
                   width: 20, height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                  child: CircularProgressIndicator(strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
                 )
                     : const Icon(Icons.bar_chart_rounded, color: Colors.white),
                 label: Text(
                   _isProcessingManualEvaluation
                       ? 'جاري إنشاء التقييم...'
                       : 'إنشاء تقييم يدوي الآن',
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppConstants.primaryColor,
-                  minimumSize: const Size(double.infinity, 50), // ارتفاع أكبر للزر
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
-                  padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall),
+                  minimumSize: const Size(double.infinity, 50),
+                  // ارتفاع أكبر للزر
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                          AppConstants.borderRadius)),
+                  padding: const EdgeInsets.symmetric(
+                      vertical: AppConstants.paddingSmall),
                 ),
               ),
             ],
@@ -557,11 +627,13 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
         prefixIcon: Icon(icon, color: AppConstants.primaryColor),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.textSecondary, width: 1.5),
+          borderSide: const BorderSide(
+              color: AppConstants.textSecondary, width: 1.5),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
+          borderSide: const BorderSide(
+              color: AppConstants.primaryColor, width: 2),
         ),
         filled: true,
         fillColor: AppConstants.cardColor.withOpacity(0.8), // لون تعبئة أوضح
@@ -586,7 +658,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
                 onSurface: AppConstants.textPrimary,
               ),
               textButtonTheme: TextButtonThemeData(
-                style: TextButton.styleFrom(foregroundColor: AppConstants.primaryColor),
+                style: TextButton.styleFrom(
+                    foregroundColor: AppConstants.primaryColor),
               ),
             ),
             child: child!,
@@ -632,22 +705,29 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       child: Column(
         children: [
-          _buildOverallScoreCard(evaluation.totalScore, evaluation.evaluationDate),
+          _buildOverallScoreCard(
+              evaluation.totalScore, evaluation.evaluationDate),
           const SizedBox(height: AppConstants.itemSpacing * 1.5), // تباعد أكبر
           _buildCriteriaScoresCard(evaluation.criteriaScores),
           const SizedBox(height: AppConstants.itemSpacing * 1.5), // تباعد أكبر
           _buildRawMetricsCard(evaluation.rawMetrics),
           const SizedBox(height: AppConstants.itemSpacing * 1.5), // تباعد أكبر
-          _buildHistoricalPerformanceChart(evaluation.engineerId, evaluation.periodType),
+          _buildHistoricalPerformanceChart(
+              evaluation.engineerId, evaluation.periodType),
           const SizedBox(height: AppConstants.itemSpacing * 1.5),
           ElevatedButton.icon(
             onPressed: () => _generateAndShareEvaluationPdf(evaluation),
-            icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
-            label: const Text('مشاركة التقييم PDF', style: TextStyle(color: Colors.white)),
+            icon: const Icon(
+                Icons.picture_as_pdf_outlined, color: Colors.white),
+            label: const Text(
+                'مشاركة التقييم PDF', style: TextStyle(color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppConstants.primaryColor,
-              padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall, horizontal: AppConstants.paddingMedium),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+              padding: const EdgeInsets.symmetric(
+                  vertical: AppConstants.paddingSmall,
+                  horizontal: AppConstants.paddingMedium),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(
+                  AppConstants.borderRadius)),
             ),
           ),
         ],
@@ -676,16 +756,23 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
     }
 
     return Card(
-      elevation: AppConstants.cardShadow[0].blurRadius + 2, // ظل أوضح
-      shadowColor: color.withOpacity(0.3), // ظل أقوى
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius + 4)), // حواف أكثر دائرية
+      elevation: AppConstants.cardShadow[0].blurRadius + 2,
+      // ظل أوضح
+      shadowColor: color.withOpacity(0.3),
+      // ظل أقوى
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius + 4)),
+      // حواف أكثر دائرية
       child: Padding(
-        padding: const EdgeInsets.all(AppConstants.paddingLarge * 1.2), // مسافة داخلية أكبر
+        padding: const EdgeInsets.all(AppConstants.paddingLarge * 1.2),
+        // مسافة داخلية أكبر
         child: Column(
           children: [
             const Text(
               'التقييم العام للموظف',
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
+              style: TextStyle(fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.textPrimary),
             ),
             const SizedBox(height: AppConstants.itemSpacing * 1.5),
             Stack(
@@ -703,20 +790,26 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
                 ),
                 Text(
                   '${score.toStringAsFixed(1)}%',
-                  style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: color.withOpacity(0.9)), // حجم خط أكبر
+                  style: TextStyle(fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: color.withOpacity(0.9)), // حجم خط أكبر
                 ),
               ],
             ),
             const SizedBox(height: AppConstants.itemSpacing),
             Text(
               feedback,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color.withOpacity(0.9)),
+              style: TextStyle(fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: color.withOpacity(0.9)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppConstants.paddingSmall),
             Text(
-              'تاريخ التقييم: ${DateFormat('yyyy/MM/dd - hh:mm a', 'ar').format(evaluationDate)}', // تنسيق تاريخ أوضح
-              style: const TextStyle(fontSize: 15, color: AppConstants.textSecondary),
+              'تاريخ التقييم: ${DateFormat('yyyy/MM/dd - hh:mm a', 'ar').format(
+                  evaluationDate)}', // تنسيق تاريخ أوضح
+              style: const TextStyle(
+                  fontSize: 15, color: AppConstants.textSecondary),
             ),
           ],
         ),
@@ -728,7 +821,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
     return Card(
       elevation: AppConstants.cardShadow[0].blurRadius,
       shadowColor: AppConstants.primaryColor.withOpacity(0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.paddingLarge),
         child: Column(
@@ -736,13 +830,19 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           children: [
             const Text(
               'تقييم المعايير الفردية',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
+              style: TextStyle(fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.textPrimary),
             ),
             const Divider(height: AppConstants.itemSpacing * 1.5),
-            _buildCriterionRow('ساعات العمل:', criteriaScores['workingHours'] ?? 0.0),
-            _buildCriterionRow('المهام المكتملة:', criteriaScores['tasksCompleted'] ?? 0.0),
-            _buildCriterionRow('معدل النشاط:', criteriaScores['activityRate'] ?? 0.0),
-            _buildCriterionRow('الإنتاجية العامة:', criteriaScores['productivity'] ?? 0.0),
+            _buildCriterionRow(
+                'ساعات العمل:', criteriaScores['workingHours'] ?? 0.0),
+            _buildCriterionRow(
+                'المهام المكتملة:', criteriaScores['tasksCompleted'] ?? 0.0),
+            _buildCriterionRow(
+                'معدل النشاط:', criteriaScores['activityRate'] ?? 0.0),
+            _buildCriterionRow(
+                'الإنتاجية العامة:', criteriaScores['productivity'] ?? 0.0),
           ],
         ),
       ),
@@ -757,7 +857,9 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(fontSize: 16, color: AppConstants.textSecondary, fontWeight: FontWeight.w500),
+              style: const TextStyle(fontSize: 16,
+                  color: AppConstants.textSecondary,
+                  fontWeight: FontWeight.w500),
             ),
           ),
           SizedBox(
@@ -765,7 +867,9 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
             child: LinearProgressIndicator(
               value: score / 100,
               backgroundColor: AppConstants.primaryColor.withOpacity(0.1),
-              valueColor: AlwaysStoppedAnimation<Color>(score > 70 ? AppConstants.successColor : AppConstants.warningColor),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                  score > 70 ? AppConstants.successColor : AppConstants
+                      .warningColor),
               minHeight: 8,
               borderRadius: BorderRadius.circular(4),
             ),
@@ -773,7 +877,9 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           const SizedBox(width: AppConstants.paddingSmall),
           Text(
             '${score.toStringAsFixed(1)}%',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
+            style: const TextStyle(fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppConstants.textPrimary),
           ),
         ],
       ),
@@ -784,7 +890,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
     return Card(
       elevation: AppConstants.cardShadow[0].blurRadius,
       shadowColor: AppConstants.primaryColor.withOpacity(0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.paddingLarge),
         child: Column(
@@ -792,12 +899,18 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           children: [
             const Text(
               'المقاييس الأولية',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
+              style: TextStyle(fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.textPrimary),
             ),
             const Divider(height: AppConstants.itemSpacing * 1.5),
-            _buildRawMetricRow('ساعات العمل الفعلية:', '${rawMetrics['actualWorkingHours']?.toStringAsFixed(1) ?? '0.0'} ساعة'),
-            _buildRawMetricRow('المهام المكتملة:', '${rawMetrics['completedTasks']?.toString() ?? '0'} مهمة'),
-            _buildRawMetricRow('عدد الإدخالات/النشاط:', '${rawMetrics['totalEntries']?.toString() ?? '0'} إدخال'),
+            _buildRawMetricRow('ساعات العمل الفعلية:',
+                '${rawMetrics['actualWorkingHours']?.toStringAsFixed(1) ??
+                    '0.0'} ساعة'),
+            _buildRawMetricRow('المهام المكتملة:',
+                '${rawMetrics['completedTasks']?.toString() ?? '0'} مهمة'),
+            _buildRawMetricRow('عدد الإدخالات/النشاط:',
+                '${rawMetrics['totalEntries']?.toString() ?? '0'} إدخال'),
           ],
         ),
       ),
@@ -806,24 +919,29 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
   Widget _buildRawMetricRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall / 2),
+      padding: const EdgeInsets.symmetric(
+          vertical: AppConstants.paddingSmall / 2),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 15, color: AppConstants.textSecondary),
+            style: const TextStyle(
+                fontSize: 15, color: AppConstants.textSecondary),
           ),
           Text(
             value,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppConstants.textPrimary),
+            style: const TextStyle(fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppConstants.textPrimary),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHistoricalPerformanceChart(String engineerId, String periodType) {
+  Widget _buildHistoricalPerformanceChart(String engineerId,
+      String periodType) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('evaluations')
@@ -836,17 +954,22 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(
             height: 250,
-            child: Center(child: CircularProgressIndicator(color: AppConstants.primaryColor)),
+            child: Center(child: CircularProgressIndicator(
+                color: AppConstants.primaryColor)),
           );
         }
         if (snapshot.hasError) {
-          return _buildErrorState('فشل تحميل الأداء التاريخي: ${snapshot.error}');
+          return _buildErrorState(
+              'فشل تحميل الأداء التاريخي: ${snapshot.error}');
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState('لا توجد بيانات تاريخية كافية لعرض الرسم البياني.', icon: Icons.bar_chart_outlined);
+          return _buildEmptyState(
+              'لا توجد بيانات تاريخية كافية لعرض الرسم البياني.',
+              icon: Icons.bar_chart_outlined);
         }
 
-        final List<EngineerEvaluation> evaluations = snapshot.data!.docs
+        final List<EngineerEvaluation> evaluations = snapshot.data!
+            .docs
             .map((doc) => EngineerEvaluation.fromFirestore(doc))
             .toList()
             .reversed
@@ -862,7 +985,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
         return Card(
           elevation: AppConstants.cardShadow[0].blurRadius,
           shadowColor: AppConstants.primaryColor.withOpacity(0.1),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
           child: Padding(
             padding: const EdgeInsets.all(AppConstants.paddingLarge),
             child: Column(
@@ -870,7 +994,9 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
               children: [
                 const Text(
                   'الأداء التاريخي (آخر 6 فترات)',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
+                  style: TextStyle(fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppConstants.textPrimary),
                 ),
                 const Divider(height: AppConstants.itemSpacing * 1.5),
                 SizedBox(
@@ -910,9 +1036,12 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
                                   space: 8.0,
                                   child: Text(
                                     periodType == 'monthly'
-                                        ? DateFormat('MMM yy', 'ar').format(evaluations[index].evaluationDate)
-                                        : DateFormat('yyyy', 'ar').format(evaluations[index].evaluationDate),
-                                    style: const TextStyle(fontSize: 11, color: AppConstants.textSecondary),
+                                        ? DateFormat('MMM yy', 'ar').format(
+                                        evaluations[index].evaluationDate)
+                                        : DateFormat('yyyy', 'ar').format(
+                                        evaluations[index].evaluationDate),
+                                    style: const TextStyle(fontSize: 11,
+                                        color: AppConstants.textSecondary),
                                   ),
                                 );
                               }
@@ -926,21 +1055,27 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
                             interval: 25,
                             reservedSize: 40,
                             getTitlesWidget: (value, meta) {
-                              return Text(value.toInt().toString(), style: const TextStyle(fontSize: 11, color: AppConstants.textSecondary));
+                              return Text(value.toInt().toString(),
+                                  style: const TextStyle(fontSize: 11,
+                                      color: AppConstants.textSecondary));
                             },
                           ),
                         ),
-                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(
+                            showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(
+                            showTitles: false)),
                       ),
                       borderData: FlBorderData(
                         show: true,
-                        border: Border.all(color: AppConstants.dividerColor, width: 1),
+                        border: Border.all(color: AppConstants.dividerColor,
+                            width: 1),
                       ),
                       lineBarsData: [
                         LineChartBarData(
                           spots: List.generate(evaluations.length, (i) {
-                            return FlSpot(i.toDouble(), evaluations[i].totalScore);
+                            return FlSpot(
+                                i.toDouble(), evaluations[i].totalScore);
                           }),
                           isCurved: true,
                           color: AppConstants.primaryColor,
@@ -948,12 +1083,13 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
                           isStrokeCapRound: true,
                           dotData: FlDotData(
                             show: true,
-                            getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-                              radius: 4,
-                              color: AppConstants.primaryDark,
-                              strokeWidth: 1.5,
-                              strokeColor: Colors.white,
-                            ),
+                            getDotPainter: (spot, percent, bar, index) =>
+                                FlDotCirclePainter(
+                                  radius: 4,
+                                  color: AppConstants.primaryDark,
+                                  strokeWidth: 1.5,
+                                  strokeColor: Colors.white,
+                                ),
                           ),
                           belowBarData: BarAreaData(
                             show: true,
@@ -991,11 +1127,14 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.insights_rounded, size: 100, color: AppConstants.primaryColor.withOpacity(0.6)),
+            Icon(Icons.insights_rounded, size: 100,
+                color: AppConstants.primaryColor.withOpacity(0.6)),
             const SizedBox(height: AppConstants.itemSpacing * 2),
             Text(
               'مرحباً بك في لوحة تقييم الأداء',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
+              style: TextStyle(fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.textPrimary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppConstants.itemSpacing),
@@ -1010,20 +1149,28 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
                 // يمكن هنا فتح قائمة الموظفين بشكل تلقائي أو توجيه المستخدم
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('الرجاء استخدام قائمة "اختر الموظف للتقييم" في الأعلى.'),
+                    content: Text(
+                        'الرجاء استخدام قائمة "اختر الموظف للتقييم" في الأعلى.'),
                     backgroundColor: AppConstants.infoColor,
                     behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                            AppConstants.borderRadius)),
                     margin: const EdgeInsets.all(AppConstants.paddingMedium),
                   ),
                 );
               },
               icon: Icon(Icons.arrow_upward_rounded, color: Colors.white),
-              label: Text('ابدأ باختيار موظف', style: TextStyle(color: Colors.white)),
+              label: Text(
+                  'ابدأ باختيار موظف', style: TextStyle(color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppConstants.primaryColor,
-                padding: EdgeInsets.symmetric(horizontal: AppConstants.paddingMedium, vertical: AppConstants.paddingSmall),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+                padding: EdgeInsets.symmetric(
+                    horizontal: AppConstants.paddingMedium,
+                    vertical: AppConstants.paddingSmall),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                        AppConstants.borderRadius)),
               ),
             ),
           ],
@@ -1032,18 +1179,22 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
     );
   }
 
-  Widget _buildEmptyState(String message, {IconData icon = Icons.info_outline}) {
+  Widget _buildEmptyState(String message,
+      {IconData icon = Icons.info_outline}) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.paddingLarge),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 80, color: AppConstants.textSecondary.withOpacity(0.4)),
+            Icon(icon, size: 80,
+                color: AppConstants.textSecondary.withOpacity(0.4)),
             const SizedBox(height: AppConstants.itemSpacing),
             Text(
               message,
-              style: const TextStyle(fontSize: 18, color: AppConstants.textSecondary, fontWeight: FontWeight.w500),
+              style: const TextStyle(fontSize: 18,
+                  color: AppConstants.textSecondary,
+                  fontWeight: FontWeight.w500),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1059,9 +1210,12 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 70, color: AppConstants.errorColor),
+            const Icon(Icons.error_outline_rounded, size: 70,
+                color: AppConstants.errorColor),
             const SizedBox(height: AppConstants.itemSpacing),
-            Text(message, style: const TextStyle(fontSize: 17, color: AppConstants.textPrimary, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+            Text(message, style: const TextStyle(fontSize: 17,
+                color: AppConstants.textPrimary,
+                fontWeight: FontWeight.w500), textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -1071,17 +1225,21 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
   Future<void> _showEvaluationSettingsDialog() async {
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => Directionality(
-        textDirection: ui.TextDirection.rtl,
-        child: EvaluationSettingsDialog(
-          currentSettings: _evaluationSettings ?? EvaluationSettings(
-            workingHoursWeight: 40.0, tasksCompletedWeight: 30.0,
-            activityRateWeight: 20.0, productivityWeight: 10.0,
-            enableMonthlyEvaluation: true, enableYearlyEvaluation: false,
-            sendNotifications: true,
+      builder: (context) =>
+          Directionality(
+            textDirection: ui.TextDirection.rtl,
+            child: EvaluationSettingsDialog(
+              currentSettings: _evaluationSettings ?? EvaluationSettings(
+                workingHoursWeight: 40.0,
+                tasksCompletedWeight: 30.0,
+                activityRateWeight: 20.0,
+                productivityWeight: 10.0,
+                enableMonthlyEvaluation: true,
+                enableYearlyEvaluation: false,
+                sendNotifications: true,
+              ),
+            ),
           ),
-        ),
-      ),
     );
 
     if (result == true) {
@@ -1091,7 +1249,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
   Future<void> _loadArabicFont() async {
     try {
-      final fontData = await rootBundle.load('assets/fonts/Tajawal-Regular.ttf');
+      final fontData = await rootBundle.load(
+          'assets/fonts/Tajawal-Regular.ttf');
       _arabicFont = pw.Font.ttf(fontData);
     } catch (e) {
       print('Error loading Arabic font: $e');
@@ -1109,7 +1268,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
             children: [
               const CircularProgressIndicator(color: AppConstants.primaryColor),
               const SizedBox(width: 20),
-              Text(message, style: const TextStyle(fontFamily: 'NotoSansArabic')),
+              Text(message,
+                  style: const TextStyle(fontFamily: 'NotoSansArabic')),
             ],
           ),
         );
@@ -1123,7 +1283,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
     }
   }
 
-  Future<void> _generateAndShareEvaluationPdf(EngineerEvaluation evaluation) async {
+  Future<void> _generateAndShareEvaluationPdf(
+      EngineerEvaluation evaluation) async {
     if (_arabicFont == null) {
       await _loadArabicFont();
       if (_arabicFont == null) {
@@ -1136,7 +1297,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
     final pdf = pw.Document();
     final pw.TextStyle regular = pw.TextStyle(font: _arabicFont, fontSize: 12);
-    final pw.TextStyle bold = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 14);
+    final pw.TextStyle bold = pw.TextStyle(
+        font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 14);
 
     pdf.addPage(
       pw.MultiPage(
@@ -1146,34 +1308,56 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           theme: pw.ThemeData.withFont(base: _arabicFont),
           margin: const pw.EdgeInsets.all(30),
         ),
-        build: (context) => [
-          pw.Header(level: 0, child: pw.Text('تقرير تقييم الموظف', style: bold)),
+        build: (context) =>
+        [
+          pw.Header(
+              level: 0, child: pw.Text('تقرير تقييم الموظف', style: bold)),
           pw.Text('اسم الموظف: ${evaluation.engineerName}', style: regular),
           pw.Text('الفترة: ${evaluation.periodIdentifier}', style: regular),
-          pw.Text('النتيجة الكلية: ${evaluation.totalScore.toStringAsFixed(1)}%', style: bold),
+          pw.Text(
+              'النتيجة الكلية: ${evaluation.totalScore.toStringAsFixed(1)}%',
+              style: bold),
           pw.SizedBox(height: 10),
           pw.Text('تفاصيل التقييم:', style: bold),
-          pw.Bullet(text: 'ساعات العمل: ${evaluation.criteriaScores['workingHours']?.toStringAsFixed(1) ?? '0'}%', style: regular),
-          pw.Bullet(text: 'المهام المكتملة: ${evaluation.criteriaScores['tasksCompleted']?.toStringAsFixed(1) ?? '0'}%', style: regular),
-          pw.Bullet(text: 'معدل النشاط: ${evaluation.criteriaScores['activityRate']?.toStringAsFixed(1) ?? '0'}%', style: regular),
-          pw.Bullet(text: 'الإنتاجية العامة: ${evaluation.criteriaScores['productivity']?.toStringAsFixed(1) ?? '0'}%', style: regular),
+          pw.Bullet(
+              text: 'ساعات العمل: ${evaluation.criteriaScores['workingHours']
+                  ?.toStringAsFixed(1) ?? '0'}%', style: regular),
+          pw.Bullet(text: 'المهام المكتملة: ${evaluation
+              .criteriaScores['tasksCompleted']?.toStringAsFixed(1) ?? '0'}%',
+              style: regular),
+          pw.Bullet(
+              text: 'معدل النشاط: ${evaluation.criteriaScores['activityRate']
+                  ?.toStringAsFixed(1) ?? '0'}%', style: regular),
+          pw.Bullet(text: 'الإنتاجية العامة: ${evaluation
+              .criteriaScores['productivity']?.toStringAsFixed(1) ?? '0'}%',
+              style: regular),
           pw.SizedBox(height: 10),
           pw.Text('المقاييس الأولية:', style: bold),
-          pw.Bullet(text: 'ساعات العمل الفعلية: ${evaluation.rawMetrics['actualWorkingHours']?.toStringAsFixed(1) ?? '0'}', style: regular),
-          pw.Bullet(text: 'المهام المكتملة: ${evaluation.rawMetrics['completedTasks'] ?? '0'}', style: regular),
-          pw.Bullet(text: 'عدد الإدخالات: ${evaluation.rawMetrics['totalEntries'] ?? '0'}', style: regular),
+          pw.Bullet(text: 'ساعات العمل الفعلية: ${evaluation
+              .rawMetrics['actualWorkingHours']?.toStringAsFixed(1) ?? '0'}',
+              style: regular),
+          pw.Bullet(text: 'المهام المكتملة: ${evaluation
+              .rawMetrics['completedTasks'] ?? '0'}', style: regular),
+          pw.Bullet(
+              text: 'عدد الإدخالات: ${evaluation.rawMetrics['totalEntries'] ??
+                  '0'}', style: regular),
         ],
-        footer: (context) => pw.Container(
-          alignment: pw.Alignment.center,
-          margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
-          child: pw.Text('صفحة ${context.pageNumber} من ${context.pagesCount}', style: pw.TextStyle(font: _arabicFont, fontSize: 10, color: PdfColors.grey)),
-        ),
+        footer: (context) =>
+            pw.Container(
+              alignment: pw.Alignment.center,
+              margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
+              child: pw.Text(
+                  'صفحة ${context.pageNumber} من ${context.pagesCount}',
+                  style: pw.TextStyle(
+                      font: _arabicFont, fontSize: 10, color: PdfColors.grey)),
+            ),
       ),
     );
 
     try {
       final bytes = await pdf.save();
-      final sanitizedName = evaluation.engineerName.replaceAll(RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
+      final sanitizedName = evaluation.engineerName.replaceAll(
+          RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
       final fileName = '${sanitizedName}_${evaluation.periodIdentifier}.pdf';
 
       _hideLoadingDialog(context);
@@ -1191,11 +1375,14 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
         final path = '${dir.path}/$fileName';
         final file = File(path);
         await file.writeAsBytes(bytes);
-        await Share.shareXFiles([XFile(path)], text: 'تقرير تقييم ${evaluation.engineerName}');
+        await Share.shareXFiles(
+            [XFile(path)], text: 'تقرير تقييم ${evaluation.engineerName}');
       }
     } catch (e) {
       _hideLoadingDialog(context);
-      _showFeedbackSnackBar(context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
+      _showFeedbackSnackBar(
+          context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
     }
   }
 
+}

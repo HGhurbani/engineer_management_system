@@ -1,7 +1,8 @@
 // lib/pages/admin/evaluation_settings_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../models/evaluation_models.dart'; // استيراد النماذج
+import '../../models/evaluation_models.dart';
+import '../../theme/app_constants.dart'; // استيراد النماذج
 
 class EvaluationSettingsDialog extends StatefulWidget {
   final EvaluationSettings currentSettings;

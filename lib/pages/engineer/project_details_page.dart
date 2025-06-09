@@ -39,7 +39,29 @@ class ProjectDetailsPage extends StatefulWidget {
   @override
   State<ProjectDetailsPage> createState() => _ProjectDetailsPageState();
 }
-
+class AppConstants {
+  static const Color primaryColor = Color(0xFF2563EB);
+  static const Color primaryLight = Color(0xFF3B82F6);
+  static const Color successColor = Color(0xFF10B981);
+  static const Color warningColor = Color(0xFFF59E0B);
+  static const Color errorColor = Color(0xFFEF4444);
+  static const Color infoColor = Color(0xFF3B82F6);
+  static const Color cardColor = Colors.white;
+  static const Color backgroundColor = Color(0xFFF8FAFC);
+  static const Color deleteColor = errorColor;
+  static const Color textPrimary = Color(0xFF1F2937);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const double paddingLarge = 24.0;
+  static const double paddingMedium = 16.0;
+  static const double paddingSmall = 8.0;
+  static const double borderRadius = 16.0;
+  static const double itemSpacing = 16.0;
+  static const List<BoxShadow> cardShadow = [
+    BoxShadow(
+        color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 4)),
+  ];
+  static const String UPLOAD_URL = 'https://mobileapp.alfatehestates.com/images_upload/upload_image.php';
+}
 class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProviderStateMixin {
   String? _currentEngineerUid;
   String? _currentEngineerName;
@@ -328,7 +350,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             alignment: AlignmentDirectional.centerStart,
             child: ElevatedButton.icon(
               icon: const Icon(Icons.person_add, color: Colors.white, size: 18),
-              label: const Text('إضافة موظف', style: TextStyle(color: Colors.white)),
+              label: const Text('إضافة عامل', style: TextStyle(color: Colors.white)),
               onPressed: _showAddEmployeeDialog,
               style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
             ),
@@ -444,7 +466,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           return Directionality(
             textDirection: ui.TextDirection.rtl,
             child: AlertDialog(
-              title: const Text('إضافة موظف للمشروع'),
+              title: const Text('إضافة عامل للمشروع'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -665,7 +687,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         tabs: const [
           Tab(text: 'مراحل المشروع', icon: Icon(Icons.list_alt_rounded)),
           Tab(text: 'اختبارات التشغيل', icon: Icon(Icons.checklist_rtl_rounded)),
-          Tab(text: 'موظفو المشروع', icon: Icon(Icons.group)),
+          Tab(text: 'عمال المشروع', icon: Icon(Icons.group)),
         ],
       ),
     );
@@ -2001,7 +2023,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         final String status = pr['status'] ?? '';
         final Timestamp? ts = pr['requestedAt'] as Timestamp?;
         final String dt = ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts.toDate()) : '';
-        contentWidgets.add(pw.Bullet(text: '$pName - الكمية: $qty - $status - $dt', textDirection: pw.TextDirection.rtl, style: smallGreyStyle));
+        contentWidgets.add(pw.Bullet(text: '$pName - الكمية: $qty - $status - $dt', textAlign: pw.TextAlign.right, style: smallGreyStyle));
       }
     }
     contentWidgets.add(pw.Divider(height: 20, thickness: 1, color: PdfColors.grey400));
