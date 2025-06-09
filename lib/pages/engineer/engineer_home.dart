@@ -46,7 +46,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _fadeController = AnimationController(duration: const Duration(milliseconds: 700), vsync: this);
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut));
 
@@ -416,6 +416,51 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     return DateFormat('hh:mm a  dd/MM/yyyy', 'ar').format(dateTime);
   }
 
+  Future<void> _endWorkDayForProject(String projectId) async {
+    try {
+      final settingsDoc = await FirebaseFirestore.instance
+          .collection('settings')
+          .doc('app_settings')
+          .get();
+      final settings = settingsDoc.data() as Map<String, dynamic>? ?? {};
+      final startString = settings['workStartTime'] ?? '09:00';
+      final parts = startString.split(':');
+      final now = DateTime.now();
+      final startDate = DateTime(now.year, now.month, now.day,
+          int.parse(parts[0]), int.parse(parts[1]));
+
+      final assignments = await FirebaseFirestore.instance
+          .collection('projects')
+          .doc(projectId)
+          .collection('employeeAssignments')
+          .get();
+
+      for (final doc in assignments.docs) {
+        final empId = doc['employeeId'];
+        await FirebaseFirestore.instance.collection('attendance').add({
+          'userId': empId,
+          'projectId': projectId,
+          'type': 'check_in',
+          'timestamp': Timestamp.fromDate(startDate),
+        });
+        await FirebaseFirestore.instance.collection('attendance').add({
+          'userId': empId,
+          'projectId': projectId,
+          'type': 'check_out',
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (mounted) {
+        _showFeedbackSnackBar(context, 'تم إنهاء يوم العمل.', isError: false);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showFeedbackSnackBar(context, 'فشل إنهاء يوم العمل: $e', isError: true);
+      }
+    }
+  }
+
   @override
   void dispose() {
     _fadeController.dispose();
@@ -460,11 +505,10 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             ? const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor))
             : FadeTransition(
           opacity: _fadeAnimation,
-          child: TabBarView( // Pass the controller here
+          child: TabBarView(
             controller: _tabController,
             children: [
               _buildMyProjectsTab(),
-              _buildAttendanceTab(),
               _buildPartRequestsTab(),
               _buildDailyScheduleTab(),
               _buildEmployeesTab(),
@@ -916,7 +960,6 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         unselectedLabelStyle: const TextStyle(fontSize: 16, fontFamily: 'Tajawal'),
         tabs: const [
           Tab(text: 'مشاريعي', icon: Icon(Icons.business_center_outlined)),
-          Tab(text: 'الحضور والانصراف', icon: Icon(Icons.timer_outlined)),
           Tab(text: 'طلبات القطع', icon: Icon(Icons.build_circle_outlined)),
           Tab(text: 'جدولي اليومي', icon: Icon(Icons.calendar_today_rounded)),
           Tab(text: 'موظفيني', icon: Icon(Icons.group_outlined)),
@@ -1007,6 +1050,17 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
                       _buildProjectInfoRow(Icons.person_outline_rounded, 'العميل:', clientName),
                       _buildProjectInfoRow(Icons.business_center_outlined, 'نوع العميل:', clientTypeDisplay),
                       _buildProjectInfoRow(statusIcon, 'الحالة:', status, valueColor: statusColor),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      ElevatedButton.icon(
+                        onPressed: () => _endWorkDayForProject(project.id),
+                        icon: const Icon(Icons.stop_circle_outlined, color: Colors.white),
+                        label: const Text('إنهاء يوم العمل', style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppConstants.primaryColor,
+                          padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingMedium),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
+                        ),
+                      ),
                     ],
                   ),
                 ),
