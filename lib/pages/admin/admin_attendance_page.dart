@@ -27,6 +27,9 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
   double _defaultWorkingHours = 8.0;
   double _engineerHourlyRate = 50.0;
   bool _isLoadingFilters = true;
+  bool _showReport = false;
+  bool _isReportLoading = false;
+  Map<String, Map<String, dynamic>> _reportSummaries = {};
 
   @override
   void initState() {
@@ -110,18 +113,19 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
 
   // ... (الكود السابق في admin_attendance_page.dart)
 
-  Future<void> _selectDate(BuildContext context) async { //
+  Future<void> _selectDate(BuildContext context) async {
     picker.DatePicker.showDatePicker(
       context,
       showTitleActions: true,
       minTime: DateTime(2020, 1, 1),
       maxTime: DateTime.now().add(const Duration(days: 365)),
-      onConfirm: (date) {
+      onConfirm: (date) async {
         if (mounted) {
           setState(() {
             _selectedDate = date;
           });
         }
+        if (_showReport) await _fetchAttendanceReportSummaries();
       },
       currentTime: _selectedDate,
       locale: picker.LocaleType.ar,
@@ -192,6 +196,95 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
     return DateFormat('hh:mm a', 'ar').format(dateTime); // Arabic AM/PM
   }
 
+  Future<void> _fetchAttendanceReportSummaries() async {
+    setState(() {
+      _isReportLoading = true;
+    });
+    try {
+      DateTime start = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+      DateTime end = start.add(const Duration(days: 1));
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('attendance')
+          .where('timestamp', isGreaterThanOrEqualTo: start)
+          .where('timestamp', isLessThan: end)
+          .orderBy('timestamp')
+          .get();
+
+      Map<String, List<DocumentSnapshot>> grouped = {};
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final userId = data['userId'] as String?;
+        if (userId == null) continue;
+        grouped.putIfAbsent(userId, () => []).add(doc);
+      }
+
+      Map<String, Map<String, dynamic>> summaries = {};
+      for (var entry in grouped.entries) {
+        final userId = entry.key;
+        final summary = _calculateSummaryWithTimes(entry.value);
+        if (summary['checkIn'] != null && summary['checkOut'] != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+          final name = userDoc.exists ? (userDoc.data() as Map<String, dynamic>)['name'] ?? '' : '';
+          summaries[userId] = {
+            'name': name,
+            ...summary,
+          };
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _reportSummaries = summaries;
+          _isReportLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _reportSummaries = {};
+          _isReportLoading = false;
+        });
+      }
+    }
+  }
+
+  Map<String, dynamic> _calculateSummaryWithTimes(List<DocumentSnapshot> records) {
+    DateTime? firstCheckIn;
+    DateTime? lastCheckOut;
+    DateTime? currentCheckIn;
+    double totalHours = 0.0;
+
+    records.sort((a, b) => (a['timestamp'] as Timestamp).compareTo(b['timestamp'] as Timestamp));
+    for (var recordDoc in records) {
+      final record = recordDoc.data() as Map<String, dynamic>;
+      final type = record['type'] as String;
+      final timestamp = (record['timestamp'] as Timestamp).toDate();
+
+      if (type == 'check_in') {
+        currentCheckIn ??= timestamp;
+        firstCheckIn ??= timestamp;
+      } else if (type == 'check_out') {
+        lastCheckOut = timestamp;
+        if (currentCheckIn != null) {
+          totalHours += lastCheckOut.difference(currentCheckIn).inMinutes / 60.0;
+          currentCheckIn = null;
+        }
+      }
+    }
+
+    double dailyPayment = totalHours > _defaultWorkingHours
+        ? (_defaultWorkingHours * _engineerHourlyRate) + ((totalHours - _defaultWorkingHours) * _engineerHourlyRate * 1.5)
+        : totalHours * _engineerHourlyRate;
+
+    return {
+      'checkIn': firstCheckIn,
+      'checkOut': lastCheckOut,
+      'totalHours': totalHours,
+      'dailyPayment': dailyPayment,
+    };
+  }
+
   void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -218,7 +311,7 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
             Expanded(
               child: _isLoadingFilters
                   ? const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor))
-                  : _buildAttendanceStream(),
+                  : (_showReport ? _buildReportView() : _buildAttendanceStream()),
             ),
           ],
         ),
@@ -244,6 +337,20 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
       ),
       elevation: 4,
       centerTitle: true,
+      actions: [
+        IconButton(
+          tooltip: _showReport ? 'عرض السجل' : 'عرض التقرير',
+          icon: Icon(_showReport ? Icons.list_alt_rounded : Icons.assignment_rounded),
+          onPressed: () async {
+            if (!_showReport) await _fetchAttendanceReportSummaries();
+            if (mounted) {
+              setState(() {
+                _showReport = !_showReport;
+              });
+            }
+          },
+        ),
+      ],
     );
   }
 
@@ -258,40 +365,42 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
           padding: const EdgeInsets.all(AppConstants.paddingMedium),
           child: Column(
             children: [
-              _buildStyledDropdown(
-                hint: 'اختر النوع',
-                value: _selectedRole,
-                items: const [
-                  DropdownMenuItem(value: 'engineer', child: Text('مهندس')),
-                  DropdownMenuItem(value: 'employee', child: Text('موظف')),
-                ],
-                onChanged: (value) {
-                  if (mounted && value != null) {
-                    setState(() {
-                      _selectedRole = value;
-                      _selectedUserId = null;
-                    });
-                  }
-                },
-                icon: Icons.person_rounded,
-              ),
-              const SizedBox(height: AppConstants.itemSpacing),
-              _buildStyledDropdown(
-                hint: _selectedRole == 'engineer' ? 'اختر المهندس' : 'اختر الموظف',
-                value: _selectedUserId,
-                items: (_selectedRole == 'engineer' ? _engineers : _employees).map((doc) {
-                  final user = doc.data() as Map<String, dynamic>;
-                  return DropdownMenuItem<String>(
-                    value: doc.id,
-                    child: Text(user['name'] ?? ''),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (mounted) setState(() => _selectedUserId = value);
-                },
-                icon: _selectedRole == 'engineer' ? Icons.engineering_rounded : Icons.badge_rounded,
-              ),
-              const SizedBox(height: AppConstants.itemSpacing),
+              if (!_showReport) ...[
+                _buildStyledDropdown(
+                  hint: 'اختر النوع',
+                  value: _selectedRole,
+                  items: const [
+                    DropdownMenuItem(value: 'engineer', child: Text('مهندس')),
+                    DropdownMenuItem(value: 'employee', child: Text('موظف')),
+                  ],
+                  onChanged: (value) {
+                    if (mounted && value != null) {
+                      setState(() {
+                        _selectedRole = value;
+                        _selectedUserId = null;
+                      });
+                    }
+                  },
+                  icon: Icons.person_rounded,
+                ),
+                const SizedBox(height: AppConstants.itemSpacing),
+                _buildStyledDropdown(
+                  hint: _selectedRole == 'engineer' ? 'اختر المهندس' : 'اختر الموظف',
+                  value: _selectedUserId,
+                  items: (_selectedRole == 'engineer' ? _engineers : _employees).map((doc) {
+                    final user = doc.data() as Map<String, dynamic>;
+                    return DropdownMenuItem<String>(
+                      value: doc.id,
+                      child: Text(user['name'] ?? ''),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (mounted) setState(() => _selectedUserId = value);
+                  },
+                  icon: _selectedRole == 'engineer' ? Icons.engineering_rounded : Icons.badge_rounded,
+                ),
+                const SizedBox(height: AppConstants.itemSpacing),
+              ],
               _buildStyledDatePicker(),
             ],
           ),
@@ -398,6 +507,41 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildReportView() {
+    if (_isReportLoading) {
+      return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+    }
+    if (_reportSummaries.isEmpty) {
+      return const Center(child: Text('لا توجد سجلات لهذا اليوم'));
+    }
+    return ListView(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      children: _reportSummaries.values.map((summary) {
+        final name = summary['name'] ?? '';
+        final checkIn = summary['checkIn'] as DateTime?;
+        final checkOut = summary['checkOut'] as DateTime?;
+        final totalHours = summary['totalHours'] as double;
+        final dailyPayment = summary['dailyPayment'] as double;
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
+          child: ListTile(
+            title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (checkIn != null) Text('حضور: ${_formatTime(checkIn)}'),
+                if (checkOut != null) Text('انصراف: ${_formatTime(checkOut)}'),
+                Text('إجمالي الساعات: ${totalHours.toStringAsFixed(2)}'),
+                Text('المبلغ المستحق: ${dailyPayment.toStringAsFixed(2)} ر.ق'),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
