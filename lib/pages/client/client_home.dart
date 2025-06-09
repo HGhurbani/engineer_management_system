@@ -664,65 +664,74 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
   }
 
   // Placeholder - Implement this based on AdminProjectDetailsPage logic (read-only)
+  // Show only completed phases for the client
   Widget _buildClientPhasesTab(String projectId) {
-    return ListView.builder(
-      key: const PageStorageKey<String>('clientPhasesTab'),
-      padding: const EdgeInsets.all(AppConstants.paddingMedium),
-      itemCount: predefinedPhasesStructure.length,
-      itemBuilder: (context, index) {
-        final phaseStructure = predefinedPhasesStructure[index];
-        final phaseId = phaseStructure['id'] as String;
-        final phaseName = phaseStructure['name'] as String;
-        final subPhasesStructure = phaseStructure['subPhases'] as List<Map<String, dynamic>>;
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('projects')
+          .doc(projectId)
+          .collection('phases_status')
+          .where('completed', isEqualTo: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+        }
+        if (snapshot.hasError) {
+          return _buildErrorState('حدث خطأ في تحميل المراحل المكتملة.');
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyState('لا توجد مهام أو مراحل مكتملة بعد.', icon: Icons.checklist_rtl_rounded);
+        }
 
-        return StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('projects')
-              .doc(projectId)
-              .collection('phases_status')
-              .doc(phaseId)
-              .snapshots(),
-          builder: (context, phaseStatusSnapshot) {
-            bool isCompleted = false;
-            String lastUpdatedBy = "";
-            String phaseActualName = phaseName; // Default to predefined name
+        final completedDocs = snapshot.data!.docs;
+        final Map<String, Map<String, dynamic>> completedMap = {
+          for (var doc in completedDocs) doc.id: doc.data() as Map<String, dynamic>
+        };
 
-            if (phaseStatusSnapshot.hasData && phaseStatusSnapshot.data!.exists) {
-              final statusData = phaseStatusSnapshot.data!.data() as Map<String, dynamic>;
-              isCompleted = statusData['completed'] ?? false;
-              lastUpdatedBy = statusData['lastUpdatedByName'] ?? "غير معروف";
-              phaseActualName = statusData['name'] ?? phaseName; // Use stored name if available
-            }
+        final List<Map<String, dynamic>> phasesToShow = [];
+        for (var phase in predefinedPhasesStructure) {
+          final id = phase['id'] as String;
+          if (completedMap.containsKey(id)) {
+            phasesToShow.add({...phase, 'status': completedMap[id]});
+          }
+        }
+
+        return ListView.builder(
+          key: const PageStorageKey<String>('clientPhasesTab'),
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+          itemCount: phasesToShow.length,
+          itemBuilder: (context, index) {
+            final phaseStructure = phasesToShow[index];
+            final phaseId = phaseStructure['id'] as String;
+            final statusData = phaseStructure['status'] as Map<String, dynamic>?;
+            final phaseName = statusData?['name'] ?? phaseStructure['name'] as String;
+            final subPhasesStructure = phaseStructure['subPhases'] as List<Map<String, dynamic>>;
+            final lastUpdatedBy = statusData?['lastUpdatedByName'] ?? 'غير معروف';
 
             return Card(
               margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
               elevation: 1.5,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
               child: ExpansionTile(
-                key: PageStorageKey<String>(phaseId), // For scroll position preservation
+                key: PageStorageKey<String>(phaseId),
                 leading: CircleAvatar(
-                  backgroundColor: isCompleted ? AppConstants.successColor : AppConstants.warningColor.withOpacity(0.7),
+                  backgroundColor: AppConstants.successColor,
                   child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
-                title: Text(phaseActualName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
-                subtitle: Text(
-                  isCompleted ? 'مكتملة بواسطة: $lastUpdatedBy ✅' : 'قيد التنفيذ ⏳',
-                  style: TextStyle(color: isCompleted ? AppConstants.successColor : AppConstants.warningColor, fontWeight: FontWeight.w500),
-                ),
+                title: Text(phaseName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                subtitle: Text('مكتملة بواسطة: $lastUpdatedBy ✅', style: const TextStyle(color: AppConstants.successColor, fontWeight: FontWeight.w500)),
                 children: [
                   Padding(
-                      padding: const EdgeInsets.all(AppConstants.paddingSmall).copyWith(right: AppConstants.paddingMedium + 8, left: AppConstants.paddingSmall),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (isCompleted)
-                            _buildEntriesListForClient(projectId, phaseId, isSubEntry: false)
-                          else
-                            const Text('تفاصيل المرحلة متاحة بعد الاكتمال.', style: TextStyle(color: AppConstants.textSecondary)),
-                          if (subPhasesStructure.isNotEmpty)
-                            const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
-                        ],
-                      )
+                    padding: const EdgeInsets.all(AppConstants.paddingSmall).copyWith(right: AppConstants.paddingMedium + 8, left: AppConstants.paddingSmall),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildEntriesListForClient(projectId, phaseId, isSubEntry: false),
+                        if (subPhasesStructure.isNotEmpty)
+                          const Divider(height: AppConstants.itemSpacing, thickness: 0.5),
+                      ],
+                    ),
                   ),
                   if (subPhasesStructure.isNotEmpty)
                     Padding(
@@ -732,7 +741,7 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
                         children: [
                           const Padding(
                             padding: EdgeInsets.only(bottom: AppConstants.paddingSmall / 2),
-                            child: Text("المراحل الفرعية:", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                            child: Text('المراحل الفرعية:', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
                           ),
                           ...subPhasesStructure.map((subPhaseMap) {
                             final subPhaseId = subPhaseMap['id'] as String;
@@ -743,37 +752,32 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
                                   .doc(projectId)
                                   .collection('subphases_status')
                                   .doc(subPhaseId)
+                                  .where('completed', isEqualTo: true)
                                   .snapshots(),
                               builder: (context, subPhaseStatusSnapshot) {
-                                bool isSubCompleted = false;
-                                String subLastUpdatedBy = "";
-                                String subPhaseActualName = subPhaseName;
-
-
-                                if (subPhaseStatusSnapshot.hasData && subPhaseStatusSnapshot.data!.exists) {
-                                  final subStatusData = subPhaseStatusSnapshot.data!.data() as Map<String, dynamic>;
-                                  isSubCompleted = subStatusData['completed'] ?? false;
-                                  subLastUpdatedBy = subStatusData['lastUpdatedByName'] ?? "غير معروف";
-                                  subPhaseActualName = subStatusData['name'] ?? subPhaseName;
+                                if (subPhaseStatusSnapshot.connectionState == ConnectionState.waiting) {
+                                  return const SizedBox.shrink();
                                 }
+                                if (!subPhaseStatusSnapshot.hasData || !subPhaseStatusSnapshot.data!.exists) {
+                                  return const SizedBox.shrink();
+                                }
+                                final subStatusData = subPhaseStatusSnapshot.data!.data() as Map<String, dynamic>;
+                                final subLastUpdatedBy = subStatusData['lastUpdatedByName'] ?? 'غير معروف';
+                                final subPhaseActualName = subStatusData['name'] ?? subPhaseName;
+
                                 return Card(
                                   elevation: 0.2,
                                   color: AppConstants.backgroundColor,
                                   margin: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall / 2),
                                   child: ExpansionTile(
                                     key: PageStorageKey<String>('sub_$subPhaseId'),
-                                    leading: Icon(
-                                      isSubCompleted ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
-                                      color: isSubCompleted ? AppConstants.successColor : AppConstants.textSecondary, size: 20,
-                                    ),
-                                    title: Text(subPhaseActualName, style: TextStyle(fontSize: 13.5, color: AppConstants.textSecondary, decoration: isSubCompleted ? TextDecoration.lineThrough : null)),
-                                    subtitle: isSubCompleted ? Text('مكتملة بواسطة: $subLastUpdatedBy', style: const TextStyle(fontSize: 11, color: AppConstants.successColor)) : null,
+                                    leading: const Icon(Icons.check_box_rounded, color: AppConstants.successColor, size: 20),
+                                    title: Text(subPhaseActualName, style: const TextStyle(fontSize: 13.5, color: AppConstants.textSecondary, decoration: TextDecoration.lineThrough)),
+                                    subtitle: Text('مكتملة بواسطة: $subLastUpdatedBy', style: const TextStyle(fontSize: 11, color: AppConstants.successColor)),
                                     children: [
                                       Padding(
                                         padding: const EdgeInsets.only(left: AppConstants.paddingSmall, right: AppConstants.paddingMedium + 8, bottom: AppConstants.paddingSmall, top: 0),
-                                        child: isSubCompleted
-                                            ? _buildEntriesListForClient(projectId, phaseId, subPhaseId: subPhaseId, isSubEntry: true)
-                                            : const Text('ستظهر التفاصيل بعد اكتمال المرحلة الفرعية.', style: TextStyle(color: AppConstants.textSecondary)),
+                                        child: _buildEntriesListForClient(projectId, phaseId, subPhaseId: subPhaseId, isSubEntry: true),
                                       )
                                     ],
                                   ),
@@ -792,8 +796,6 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
       },
     );
   }
-
-
   Widget _buildEntriesListForClient(String projectId, String mainPhaseId, {String? subPhaseId, bool isSubEntry = false}) {
     String entriesCollectionPath = subPhaseId == null
         ? 'projects/$projectId/phases_status/$mainPhaseId/entries'
@@ -896,98 +898,112 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
 
 
   // Placeholder - Implement this based on AdminProjectDetailsPage logic (read-only)
+
   Widget _buildClientTestsTab(String projectId) {
-    return ListView.builder(
-      key: const PageStorageKey<String>('clientTestsTab'),
-      padding: const EdgeInsets.all(AppConstants.paddingMedium),
-      itemCount: finalCommissioningTests.length,
-      itemBuilder: (context, sectionIndex) {
-        final section = finalCommissioningTests[sectionIndex];
-        final sectionId = section['section_id'] as String; // Not used directly in client view for now
-        final sectionName = section['section_name'] as String;
-        final tests = section['tests'] as List<Map<String, dynamic>>;
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('projects')
+          .doc(projectId)
+          .collection('tests_status')
+          .where('completed', isEqualTo: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+        }
+        if (snapshot.hasError) {
+          return _buildErrorState('حدث خطأ في تحميل الاختبارات المكتملة.');
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyState('لا توجد اختبارات مكتملة بعد.', icon: Icons.check_circle_outline_rounded);
+        }
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
-          elevation: 1.5,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
-          child: ExpansionTile(
-            key: PageStorageKey<String>(sectionId),
-            title: Text(sectionName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
-            childrenPadding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingSmall, vertical: AppConstants.paddingSmall / 2),
-            children: tests.map((test) {
-              final testId = test['id'] as String;
-              final testName = test['name'] as String;
-              return StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('projects')
-                    .doc(projectId)
-                    .collection('tests_status')
-                    .doc(testId)
-                    .snapshots(),
-                builder: (context, testStatusSnapshot) {
-                  bool isTestCompleted = false;
-                  String testNote = "";
-                  String? testImageUrl;
-                  String? engineerName;
+        final completedDocs = snapshot.data!.docs;
+        final Map<String, Map<String, dynamic>> completedMap = {
+          for (var doc in completedDocs) doc.id: doc.data() as Map<String, dynamic>
+        };
 
-                  if (testStatusSnapshot.hasData && testStatusSnapshot.data!.exists) {
-                    final statusData = testStatusSnapshot.data!.data() as Map<String, dynamic>;
-                    isTestCompleted = statusData['completed'] ?? false;
-                    testNote = statusData['note'] ?? '';
-                    testImageUrl = statusData['imageUrl'] as String?;
-                    engineerName = statusData['lastUpdatedByName'] as String?;
-                  }
+        final sectionsToShow = <Map<String, dynamic>>[];
+        for (var section in finalCommissioningTests) {
+          final tests = <Map<String, dynamic>>[];
+          for (var test in section['tests'] as List<Map<String, dynamic>>) {
+            final id = test['id'] as String;
+            if (completedMap.containsKey(id)) {
+              tests.add({...test, 'status': completedMap[id]});
+            }
+          }
+          if (tests.isNotEmpty) {
+            sectionsToShow.add({'section_name': section['section_name'], 'tests': tests});
+          }
+        }
+
+        return ListView.builder(
+          key: const PageStorageKey<String>('clientTestsTab'),
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+          itemCount: sectionsToShow.length,
+          itemBuilder: (context, sectionIndex) {
+            final section = sectionsToShow[sectionIndex];
+            final sectionName = section['section_name'] as String;
+            final tests = section['tests'] as List<Map<String, dynamic>>;
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
+              elevation: 1.5,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
+              child: ExpansionTile(
+                key: PageStorageKey<String>(sectionName),
+                title: Text(sectionName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                childrenPadding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingSmall, vertical: AppConstants.paddingSmall / 2),
+                children: tests.map((test) {
+                  final testId = test['id'] as String;
+                  final testName = test['name'] as String;
+                  final statusData = test['status'] as Map<String, dynamic>;
+                  final testNote = statusData['note'] ?? '';
+                  final testImageUrl = statusData['imageUrl'] as String?;
+                  final engineerName = statusData['lastUpdatedByName'] as String?;
 
                   return ListTile(
-                    leading: Icon(
-                      isTestCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                      color: isTestCompleted ? AppConstants.successColor : AppConstants.textSecondary,
-                      size: 20,
+                    leading: const Icon(Icons.check_circle_rounded, color: AppConstants.successColor, size: 20),
+                    title: Text(testName, style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: TextDecoration.lineThrough)),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (engineerName != null && engineerName.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2.0),
+                            child: Text('بواسطة: $engineerName', style: const TextStyle(fontSize: 10, color: AppConstants.textSecondary, fontStyle: FontStyle.italic)),
+                          ),
+                        if (testNote.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2.0),
+                            child: ExpandableText('ملاحظة: $testNote', valueColor: AppConstants.infoColor, trimLines: 1),
+                          ),
+                        if (testImageUrl != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2.0),
+                            child: InkWell(
+                              onTap: () => _viewImageDialog(testImageUrl),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.image_outlined, size: 14, color: AppConstants.primaryLight),
+                                  SizedBox(width: 2),
+                                  Text('عرض الصورة', style: TextStyle(fontSize: 11, color: AppConstants.primaryLight, decoration: TextDecoration.underline)),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                    title: Text(testName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: isTestCompleted ? TextDecoration.lineThrough : null)),
-                    subtitle: isTestCompleted
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (engineerName != null && engineerName.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2.0),
-                                  child: Text("بواسطة: $engineerName", style: const TextStyle(fontSize: 10, color: AppConstants.textSecondary, fontStyle: FontStyle.italic)),
-                                ),
-                              if (testNote.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2.0),
-                                  child: ExpandableText("ملاحظة: $testNote", valueColor: AppConstants.infoColor, trimLines: 1),
-                                ),
-                              if (testImageUrl != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2.0),
-                                  child: InkWell(
-                                    onTap: () => _viewImageDialog(testImageUrl ?? ''),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.image_outlined, size: 14, color: AppConstants.primaryLight),
-                                        SizedBox(width: 2),
-                                        Text("عرض الصورة", style: TextStyle(fontSize: 11, color: AppConstants.primaryLight, decoration: TextDecoration.underline)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          )
-                        : const Text('سيتم عرض تفاصيل الاختبار بعد اكتماله.', style: TextStyle(color: AppConstants.textSecondary)),
                   );
-                },
-              );
-            }).toList(),
-          ),
+                }).toList(),
+              ),
+            );
+          },
         );
       },
     );
   }
-
   // Placeholder - Implement to show part requests related to the project
   Widget _buildClientPartRequestsTab(String projectId) {
     return StreamBuilder<QuerySnapshot>(
