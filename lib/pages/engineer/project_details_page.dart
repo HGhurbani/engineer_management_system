@@ -24,6 +24,7 @@ import 'package:flutter/services.dart' show rootBundle; // For font loading
 // --- End PDF Imports ---
 
 import '../../main.dart'; // Assuming helper functions are in main.dart
+import '../auth/login_page.dart' show LoginConstants;
 
 // ... (AppConstants remains the same) ...
 
@@ -46,6 +47,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
   // --- Font for PDF ---
   pw.Font? _arabicFont; // To store the loaded font for PDF
+  static const String platformLogoBase64 =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8AAAgMBAyeVNt8AAAAASUVORK5CYII=';
 
   static const List<Map<String, dynamic>> predefinedPhasesStructure = [
     // ... (Your existing predefinedPhasesStructure - no changes here) ...
@@ -1865,6 +1868,40 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     return entriesList;
   }
 
+  Future<List<String>> _fetchEmployeeNamesForPdf(String id, {required bool isSub}) async {
+    try {
+      Query<Map<String, dynamic>> q = FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .collection('employeeAssignments');
+      q = isSub ? q.where('subPhaseId', isEqualTo: id) : q.where('phaseId', isEqualTo: id);
+      final snap = await q.get();
+      return snap.docs
+          .map((d) => d.data()['employeeName']?.toString() ?? 'موظف')
+          .toList();
+    } catch (e) {
+      print('Error fetching employees for PDF: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchPartRequestsForPdf() async {
+    final List<Map<String, dynamic>> requests = [];
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('partRequests')
+          .where('projectId', isEqualTo: widget.projectId)
+          .orderBy('requestedAt', descending: false)
+          .get();
+      for (var doc in snap.docs) {
+        requests.add(doc.data());
+      }
+    } catch (e) {
+      print('Error fetching part requests for PDF: $e');
+    }
+    return requests;
+  }
+
 
   // ... (inside _ProjectDetailsPageState) ...
 
@@ -1893,6 +1930,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final pdf = pw.Document();
     final List<pw.Widget> contentWidgets = [];
 
+    final pw.MemoryImage platformLogo =
+        pw.MemoryImage(base64Decode(platformLogoBase64));
+
     final pw.TextStyle regularStyle = pw.TextStyle(font: _arabicFont, fontSize: 11);
     final pw.TextStyle boldStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 12);
     final pw.TextStyle headerStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16, color: PdfColors.blueGrey800);
@@ -1900,6 +1940,19 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final pw.TextStyle smallGreyStyle = pw.TextStyle(font: _arabicFont, fontSize: 9, color: PdfColors.grey600);
 
     String projectName = (_projectDataSnapshot?.data() as Map<String, dynamic>)?['name'] ?? 'اسم المشروع غير محدد';
+    final List<dynamic> assignedEngs = (_projectDataSnapshot?.data() as Map<String, dynamic>?)?['assignedEngineers'] as List<dynamic>? ?? [];
+    final String responsibleEngineers = assignedEngs.isNotEmpty
+        ? assignedEngs.map((e) => (e as Map<String, dynamic>)['name'] ?? 'مهندس').join('، ')
+        : '';
+
+    contentWidgets.add(pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        pw.Text(LoginConstants.appName, style: headerStyle, textDirection: pw.TextDirection.rtl),
+        pw.Image(platformLogo, width: 40, height: 40),
+      ],
+    ));
+    contentWidgets.add(pw.SizedBox(height: 8));
     contentWidgets.add(pw.Header(
         level: 0,
         child: pw.Container(
@@ -1916,6 +1969,24 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         pw.Text('بواسطة المهندس: ${_currentEngineerName ?? 'غير محدد'}', style: regularStyle, textDirection: pw.TextDirection.rtl),
       ],
     ));
+    if (responsibleEngineers.isNotEmpty) {
+      contentWidgets.add(pw.SizedBox(height: 4));
+      contentWidgets.add(pw.Text('المهندس المسؤول: $responsibleEngineers', style: regularStyle, textDirection: pw.TextDirection.rtl));
+    }
+
+    final partRequests = await _fetchPartRequestsForPdf();
+    if (partRequests.isNotEmpty) {
+      contentWidgets.add(pw.SizedBox(height: 6));
+      contentWidgets.add(pw.Text('القطع المطلوبة للمشروع:', style: boldStyle, textDirection: pw.TextDirection.rtl));
+      for (var pr in partRequests) {
+        final String pName = pr['partName'] ?? '';
+        final String qty = pr['quantity']?.toString() ?? '1';
+        final String status = pr['status'] ?? '';
+        final Timestamp? ts = pr['requestedAt'] as Timestamp?;
+        final String dt = ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts.toDate()) : '';
+        contentWidgets.add(pw.Bullet(text: '$pName - الكمية: $qty - $status - $dt', textDirection: pw.TextDirection.rtl, style: smallGreyStyle));
+      }
+    }
     contentWidgets.add(pw.Divider(height: 20, thickness: 1, color: PdfColors.grey400));
 
     // --- NEW: Fetch all images before building the PDF ---
@@ -2024,6 +2095,28 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         contentWidgets.add(pw.SizedBox(height: 5));
         contentWidgets.add(pw.Text('اسم المرحلة الفرعية: $name', style: boldStyle, textDirection: pw.TextDirection.rtl));
 
+        bool subCompleted = false;
+        String subCompletedBy = 'غير معروف';
+        try {
+          final subDoc = await FirebaseFirestore.instance
+              .collection('projects')
+              .doc(widget.projectId)
+              .collection('subphases_status')
+              .doc(phaseOrTestId)
+              .get();
+          if (subDoc.exists) {
+            subCompleted = subDoc.data()?['completed'] ?? false;
+            subCompletedBy = subDoc.data()?['lastUpdatedByName'] ?? 'غير معروف';
+          }
+        } catch (e) { print('error fetching subphase status for pdf: $e'); }
+        String subStatusText = subCompleted ? 'مكتملة (بواسطة: $subCompletedBy) ✅' : 'قيد التنفيذ ⏳';
+        contentWidgets.add(pw.Text('الحالة: $subStatusText', style: regularStyle.copyWith(color: subCompleted ? PdfColors.green700 : PdfColors.orange700), textDirection: pw.TextDirection.rtl));
+
+        final subEmployees = await _fetchEmployeeNamesForPdf(phaseOrTestId, isSub: true);
+        if (subEmployees.isNotEmpty) {
+          contentWidgets.add(pw.Text('العمال المشاركون: ${subEmployees.join('، ')}', style: regularStyle, textDirection: pw.TextDirection.rtl));
+        }
+
         String entriesPath = 'projects/${widget.projectId}/subphases_status/$phaseOrTestId/entries';
         List<Map<String, dynamic>> entries = await _fetchEntriesForPdf(entriesPath);
         if (entries.isNotEmpty) {
@@ -2066,6 +2159,28 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         contentWidgets.add(pw.Text('تقرير مرحلة رئيسية', style: subHeaderStyle, textDirection: pw.TextDirection.rtl));
         contentWidgets.add(pw.SizedBox(height: 5));
         contentWidgets.add(pw.Text('اسم المرحلة: $name', style: boldStyle, textDirection: pw.TextDirection.rtl));
+
+        bool mainCompleted = false;
+        String mainCompletedBy = 'غير معروف';
+        try {
+          final phaseDoc = await FirebaseFirestore.instance
+              .collection('projects')
+              .doc(widget.projectId)
+              .collection('phases_status')
+              .doc(phaseOrTestId)
+              .get();
+          if (phaseDoc.exists) {
+            mainCompleted = phaseDoc.data()?['completed'] ?? false;
+            mainCompletedBy = phaseDoc.data()?['lastUpdatedByName'] ?? 'غير معروف';
+          }
+        } catch (e) { print('error fetching phase status for pdf: $e'); }
+        String mainStatusText = mainCompleted ? 'مكتملة (بواسطة: $mainCompletedBy) ✅' : 'قيد التنفيذ ⏳';
+        contentWidgets.add(pw.Text('حالة المرحلة: $mainStatusText', style: regularStyle.copyWith(color: mainCompleted ? PdfColors.green700 : PdfColors.orange700), textDirection: pw.TextDirection.rtl));
+
+        final mainEmployees = await _fetchEmployeeNamesForPdf(phaseOrTestId, isSub: false);
+        if (mainEmployees.isNotEmpty) {
+          contentWidgets.add(pw.Text('العمال المشاركون: ${mainEmployees.join('، ')}', style: regularStyle, textDirection: pw.TextDirection.rtl));
+        }
 
         String mainPhaseEntriesPath = 'projects/${widget.projectId}/phases_status/$phaseOrTestId/entries';
         List<Map<String, dynamic>> mainPhaseEntries = await _fetchEntriesForPdf(mainPhaseEntriesPath);
@@ -2130,7 +2245,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               }
             } catch(e) { print("Error fetching subphase status: $e");}
 
-            String statusText = isSubPhaseCompleted ? 'مكتملة (بواسطة: $subPhaseCompletedBy)' : 'قيد التنفيذ';
+            String statusText = isSubPhaseCompleted ? 'مكتملة (بواسطة: $subPhaseCompletedBy) ✅' : 'قيد التنفيذ ⏳';
 
             contentWidgets.add(pw.Container(
                 margin: pw.EdgeInsets.only(bottom: 10),
@@ -2148,6 +2263,10 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                     ]
                 )
             ));
+            final subEmpNames = await _fetchEmployeeNamesForPdf(subPhaseId, isSub: true);
+            if (subEmpNames.isNotEmpty) {
+              contentWidgets.add(pw.Text('العمال: ' + subEmpNames.join('، '), style: regularStyle, textDirection: pw.TextDirection.rtl));
+            }
             List<Map<String, dynamic>> subPhaseEntries = await _fetchEntriesForPdf('projects/${widget.projectId}/subphases_status/$subPhaseId/entries');
             if(subPhaseEntries.isNotEmpty){
               contentWidgets.add(pw.Text('  ملاحظات وصور المهمة:', style: regularStyle.copyWith(fontWeight: pw.FontWeight.bold), textDirection: pw.TextDirection.rtl));
