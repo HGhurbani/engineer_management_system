@@ -697,6 +697,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         route: '/admin/attendance',
       ),
       _ManagementItem(
+        title: 'تقرير الحضور',
+        subtitle: 'عرض تقرير يومي شامل',
+        icon: Icons.assignment_rounded,
+        color: const Color(0xFF4C51BF),
+        route: '/admin/attendance_report',
+      ),
+      _ManagementItem(
         title: 'الجداول اليومية', // أو "تقويم المهام"
         subtitle: 'إدارة جداول ومهام المهندسين',
         icon: Icons.calendar_today_rounded, // أيقونة مناسبة
