@@ -676,13 +676,6 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         route: '/admin/clients',
       ),
       _ManagementItem(
-        title: 'إدارة الموظفين',
-        subtitle: 'عرض وإدارة الموظفين',
-        icon: Icons.badge_rounded,
-        color: AppConstants.primaryColor,
-        route: '/admin/employees',
-      ),
-      _ManagementItem(
         title: 'عرض المشاريع',
         subtitle: 'متابعة جميع المشاريع',
         icon: Icons.work_rounded,
@@ -695,13 +688,6 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         icon: Icons.access_time_filled_rounded,
         color: const Color(0xFF8B5CF6),
         route: '/admin/attendance',
-      ),
-      _ManagementItem(
-        title: 'تقرير الحضور',
-        subtitle: 'عرض تقرير يومي شامل',
-        icon: Icons.assignment_rounded,
-        color: const Color(0xFF4C51BF),
-        route: '/admin/attendance_report',
       ),
       _ManagementItem(
         title: 'الجداول اليومية', // أو "تقويم المهام"

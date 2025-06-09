@@ -1,7 +1,6 @@
 // lib/main.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:engineer_management_system/pages/admin/admin_attendance_page.dart';
-import 'package:engineer_management_system/pages/admin/admin_attendance_report_page.dart';
 import 'package:engineer_management_system/pages/notifications_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -15,7 +14,6 @@ import 'package:engineer_management_system/pages/engineer/engineer_home.dart';
 import 'package:engineer_management_system/pages/client/client_home.dart';
 import 'package:engineer_management_system/pages/admin/admin_engineers_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_clients_page.dart';
-import 'package:engineer_management_system/pages/admin/admin_employees_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_projects_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_project_details_page.dart';
 import 'package:engineer_management_system/pages/engineer/project_details_page.dart';
@@ -98,7 +96,6 @@ class MyApp extends StatelessWidget {
         '/client': (context) => const ClientHome(),
         '/admin/engineers': (context) => const AdminEngineersPage(),
         '/admin/clients': (context) => const AdminClientsPage(),
-        '/admin/employees': (context) => const AdminEmployeesPage(),
         '/admin/projects': (context) => const AdminProjectsPage(),
         '/admin/projectDetails': (context) {
           final projectId = ModalRoute.of(context)!.settings.arguments as String;
@@ -111,7 +108,6 @@ class MyApp extends StatelessWidget {
         '/admin/daily_schedule': (context) => const AdminDailySchedulePage(),
         '/admin/settings': (context) => const AdminSettingsPage(),
         '/admin/attendance': (context) => const AdminAttendancePage(),
-        '/admin/attendance_report': (context) => const AdminAttendanceReportPage(),
         '/notifications': (context) => const NotificationsPage(),
         // New route for requesting parts
         '/engineer/request_part': (context) {
