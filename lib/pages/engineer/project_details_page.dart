@@ -804,7 +804,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       icon: const Icon(Icons.html, color: Colors.orange),
                       tooltip: 'تقرير HTML',
                       onPressed: () {
-                        _generateHtmlPdf(phaseId, phaseName, isTestSection: false, isSubPhase: false);
+                        _generateHtmlReport(phaseId, phaseName, isTestSection: false, isSubPhase: false);
                       },
                     ),
                   ],
@@ -882,7 +882,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                           icon: const Icon(Icons.html, color: Colors.orange, size: 20),
                                           tooltip: 'تقرير HTML',
                                           onPressed: () {
-                                            _generateHtmlPdf(subPhaseId, subPhaseName, isTestSection: false, isSubPhase: true);
+                                            _generateHtmlReport(subPhaseId, subPhaseName, isTestSection: false, isSubPhase: true);
                                           },
                                         ),
                                       ],
@@ -1012,7 +1012,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                             icon: const Icon(Icons.html, color: Colors.orange),
                             tooltip: 'تقرير HTML',
                             onPressed: () {
-                              _generateHtmlPdf(
+                              _generateHtmlReport(
                                   testId,
                                   testName,
                                   isTestSection: true,
@@ -2453,7 +2453,29 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
   }
 
-  Future<void> _generateHtmlPdf(
+  Future<void> _saveOrShareHtml(String htmlContent, String fileName, String subject, String text) async {
+    final bytes = Uint8List.fromList(utf8.encode(htmlContent));
+    if (kIsWeb) {
+      final blob = html.Blob([bytes], 'text/html');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute("download", fileName)
+        ..click();
+      html.Url.revokeObjectUrl(url);
+    } else {
+      final outputDir = await getTemporaryDirectory();
+      final filePath = "${outputDir.path}/$fileName";
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+      Share.shareXFiles(
+        [XFile(filePath)],
+        subject: subject,
+        text: text,
+      );
+    }
+  }
+
+  Future<void> _generateHtmlReport(
       String phaseOrTestId,
       String name, {
         required bool isTestSection,
@@ -2590,16 +2612,14 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     buffer.writeln('</body></html>');
 
     try {
-      final pdfBytes = await Printing.convertHtml(format: PdfPageFormat.a4, html: buffer.toString());
-
       final sanitizedName = name.replaceAll(RegExp(r'[^\w\s]+'),'').replaceAll(' ', '_');
-      final fileName = "${sanitizedName}_report_${DateTime.now().millisecondsSinceEpoch}.pdf";
+      final fileName = "${sanitizedName}_report_${DateTime.now().millisecondsSinceEpoch}.html";
 
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, "تم إنشاء التقرير بنجاح.", isError: false);
 
-      await _saveOrSharePdf(
-        pdfBytes,
+      await _saveOrShareHtml(
+        buffer.toString(),
         fileName,
         'تقرير مشروع: $projectName - $name',
         'الرجاء الإطلاع على تقرير ${isTestSection ? "الاختبار" : "المرحلة"}: $name لمشروع $projectName.'
@@ -2607,7 +2627,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     } catch (e) {
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, "فشل إنشاء أو مشاركة التقرير: $e", isError: true);
-      print('Error generating HTML PDF: $e');
+      print('Error generating HTML report: $e');
     }
   }
 
