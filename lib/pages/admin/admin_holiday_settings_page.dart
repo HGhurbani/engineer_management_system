@@ -16,6 +16,7 @@ class AdminHolidaySettingsPage extends StatefulWidget {
 class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
   final Set<int> _selectedWeeklyHolidays = {};
   final List<Holiday> _specialHolidays = [];
+  final TextEditingController _holidayNameController = TextEditingController();
 
   final Map<int, String> _weekDays = {
     DateTime.saturday: 'السبت',
@@ -28,11 +29,18 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
   };
 
   bool _isLoading = true;
+  bool _isSaving = false; // New state for save operation
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+  }
+
+  @override
+  void dispose() {
+    _holidayNameController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSettings() async {
@@ -60,11 +68,8 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
             return Holiday.fromMap(d);
           } else if (d is Holiday) {
             return d;
-          } else if (d is String) {
-            final parsed = DateTime.tryParse(d);
-            return parsed != null ? Holiday(name: 'عطلة', date: parsed) : null;
           }
-          return null;
+          return null; // Handle potential malformed data gracefully
         })
             .whereType<Holiday>()
             .toList();
@@ -74,12 +79,14 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
               ? saudiOfficialHolidays(DateTime.now().year)
               : loaded);
       } else {
+        // If no settings exist, initialize with Saudi official holidays
         _specialHolidays
           ..clear()
           ..addAll(saudiOfficialHolidays(DateTime.now().year));
       }
     } catch (e) {
-      _showFeedbackSnackBar(context, 'فشل تحميل الإعدادات: $e', isError: true);
+      debugPrint('Error loading settings: $e'); // For debugging
+      _showFeedbackSnackBar('فشل تحميل الإعدادات. يرجى المحاولة مرة أخرى.', isError: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -91,7 +98,7 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
 
   Future<void> _saveSettings() async {
     setState(() {
-      _isLoading = true;
+      _isSaving = true; // Set saving state
     });
     try {
       await FirebaseFirestore.instance.collection('settings').doc('app_settings').set(
@@ -104,13 +111,14 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
         },
         SetOptions(merge: true),
       );
-      _showFeedbackSnackBar(context, 'تم حفظ الإعدادات بنجاح!', isError: false);
+      _showFeedbackSnackBar('تم حفظ الإعدادات بنجاح!');
     } catch (e) {
-      _showFeedbackSnackBar(context, 'فشل حفظ الإعدادات: $e', isError: true);
+      debugPrint('Error saving settings: $e'); // For debugging
+      _showFeedbackSnackBar('فشل حفظ الإعدادات. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.', isError: true);
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isSaving = false; // Reset saving state
         });
       }
     }
@@ -120,11 +128,18 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('أيام العطل الأسبوعية',
-            style: TextStyle(fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+        const Text(
+          'أيام العطل الأسبوعية',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppConstants.textPrimary,
+            fontSize: 18,
+          ),
+        ),
         const SizedBox(height: AppConstants.paddingSmall),
         Wrap(
-          spacing: 8,
+          spacing: AppConstants.paddingSmall,
+          runSpacing: AppConstants.paddingSmall,
           children: _weekDays.entries.map((entry) {
             final isSelected = _selectedWeeklyHolidays.contains(entry.key);
             return FilterChip(
@@ -139,7 +154,7 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
                   }
                 });
               },
-              selectedColor: AppConstants.primaryLight,
+              selectedColor: AppConstants.primaryColor, // Use primary color for selected
               backgroundColor: AppConstants.cardColor,
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : AppConstants.textPrimary,
@@ -148,8 +163,8 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
                 side: BorderSide(
-                  color: isSelected ? AppConstants.primaryColor : AppConstants.textSecondary.withOpacity(0.4),
-                  width: 1.5,
+                  color: isSelected ? AppConstants.primaryColor : AppConstants.dividerColor,
+                  width: 1.0,
                 ),
               ),
               checkmarkColor: Colors.white,
@@ -164,71 +179,181 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('العطل الرسمية',
-            style: TextStyle(fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+        const Text(
+          'العطل الرسمية',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppConstants.textPrimary,
+            fontSize: 18,
+          ),
+        ),
         const SizedBox(height: AppConstants.paddingSmall),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        _specialHolidays.isEmpty
+            ? Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingMedium),
+          child: Text(
+            'لا توجد عطل رسمية مضافة حاليًا. يمكنك إضافة عطل جديدة باستخدام الزر أدناه.',
+            style: TextStyle(color: AppConstants.textSecondary.withOpacity(0.7)),
+            textAlign: TextAlign.center,
+          ),
+        )
+            : Wrap(
+          spacing: AppConstants.paddingSmall,
+          runSpacing: AppConstants.paddingSmall,
           children: _specialHolidays.map((holiday) {
             final label = '${holiday.name} - '
                 '${DateFormat('yyyy-MM-dd').format(holiday.date)}';
-            return InputChip(
+            return Chip(
               label: Text(label),
               onDeleted: () => _confirmDeleteHoliday(holiday),
-              deleteIconColor: AppConstants.errorColor,
+              deleteIcon: const Icon(Icons.cancel, size: 18, color: AppConstants.errorColor),
               backgroundColor: AppConstants.backgroundColor,
               labelStyle: const TextStyle(color: AppConstants.textPrimary, fontWeight: FontWeight.w500),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
                 side: BorderSide(color: AppConstants.dividerColor, width: 1.0),
               ),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // Compact chip size
             );
           }).toList(),
         ),
         const SizedBox(height: AppConstants.paddingMedium),
-        ElevatedButton.icon(
-          onPressed: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: DateTime.now(),
-              firstDate: DateTime(2020),
-              lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
-              builder: (context, child) {
-                return Theme(
-                  data: ThemeData.light().copyWith(
-                    colorScheme: const ColorScheme.light(
-                      primary: AppConstants.primaryColor,
-                      onPrimary: Colors.white,
-                      surface: Colors.white,
-                      onSurface: AppConstants.textPrimary,
-                    ),
-                    textButtonTheme: TextButtonThemeData(
-                      style: TextButton.styleFrom(foregroundColor: AppConstants.primaryColor),
-                    ),
-                  ),
-                  child: child!,
-                );
-              },
-            );
-            if (picked != null) {
-              setState(() {
-                if (!_specialHolidays.any((h) => h.date.year == picked.year && h.date.month == picked.month && h.date.day == picked.day)) {
-                  _specialHolidays.add(Holiday(name: 'عطلة', date: picked));
-                }
-              });
-            }
-          },
-          icon: const Icon(Icons.add, color: Colors.white),
-          label: const Text('إضافة تاريخ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppConstants.primaryColor,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall)),
-            padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingMedium, vertical: AppConstants.paddingSmall),
-            elevation: 2,
+        Center(
+          child: ElevatedButton.icon(
+            onPressed: _showAddHolidayDialog,
+            icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+            label: const Text('إضافة عطلة جديدة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppConstants.primaryColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall)),
+              padding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingMedium, vertical: AppConstants.paddingSmall),
+              elevation: 3, // Slightly increased elevation
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _showAddHolidayDialog() async {
+    DateTime? selectedDate;
+    _holidayNameController.clear(); // Clear previous input
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: ui.TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+          ),
+          title: const Text(
+            'إضافة عطلة جديدة',
+            style: TextStyle(fontWeight: FontWeight.bold, color: AppConstants.textPrimary),
+          ),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                TextField(
+                  controller: _holidayNameController,
+                  decoration: InputDecoration(
+                    labelText: 'اسم العطلة (اختياري)',
+                    hintText: 'مثل: اليوم الوطني',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+                      borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
+                    ),
+                  ),
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                ),
+                const SizedBox(height: AppConstants.paddingMedium),
+                ListTile(
+                  title: Text(
+                    selectedDate == null
+                        ? 'اختر تاريخ العطلة'
+                        : 'التاريخ المختار: ${DateFormat('yyyy-MM-dd').format(selectedDate!)}',
+                    style: const TextStyle(color: AppConstants.textPrimary),
+                  ),
+                  trailing: const Icon(Icons.calendar_today, color: AppConstants.primaryColor),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                      builder: (context, child) {
+                        return Theme(
+                          data: ThemeData.light().copyWith(
+                            colorScheme: const ColorScheme.light(
+                              primary: AppConstants.primaryColor,
+                              onPrimary: Colors.white,
+                              surface: Colors.white,
+                              onSurface: AppConstants.textPrimary,
+                            ),
+                            textButtonTheme: TextButtonThemeData(
+                              style: TextButton.styleFrom(foregroundColor: AppConstants.primaryColor),
+                            ),
+                          ),
+                          child: child!,
+                        );
+                      },
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        selectedDate = picked;
+                        // To update the dialog's date display immediately
+                        (context as Element).markNeedsBuild();
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(foregroundColor: AppConstants.textSecondary),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (selectedDate != null) {
+                  setState(() {
+                    final newHolidayName = _holidayNameController.text.trim().isNotEmpty
+                        ? _holidayNameController.text.trim()
+                        : 'عطلة'; // Default name if empty
+                    if (!_specialHolidays.any((h) =>
+                    h.date.year == selectedDate!.year &&
+                        h.date.month == selectedDate!.month &&
+                        h.date.day == selectedDate!.day)) {
+                      _specialHolidays.add(Holiday(name: newHolidayName, date: selectedDate!));
+                      _specialHolidays.sort((a, b) => a.date.compareTo(b.date)); // Keep sorted
+                    } else {
+                      _showFeedbackSnackBar('هذا التاريخ مضاف بالفعل كعطلة.', isError: true);
+                    }
+                  });
+                  Navigator.of(context).pop();
+                } else {
+                  _showFeedbackSnackBar('يرجى اختيار تاريخ للعطلة.', isError: true);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+                ),
+              ),
+              child: const Text('إضافة'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -283,10 +408,11 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
       setState(() {
         _specialHolidays.remove(holiday);
       });
+      _showFeedbackSnackBar('تم حذف العطلة بنجاح.');
     }
   }
 
-  void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError}) {
+  void _showFeedbackSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -308,6 +434,14 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
             borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
         margin: const EdgeInsets.all(AppConstants.paddingMedium),
         duration: const Duration(seconds: 3),
+        // Optional: Add action to dismiss manually
+        action: SnackBarAction(
+          label: 'إغلاق',
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+          textColor: Colors.white.withOpacity(0.8),
+        ),
       ),
     );
   }
@@ -360,8 +494,8 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Card(
-                elevation: 4, // Slightly increased elevation for better presence
-                shadowColor: AppConstants.primaryColor.withOpacity(0.15), // Stronger shadow
+                elevation: 6, // Increased elevation for better presence
+                shadowColor: AppConstants.primaryColor.withOpacity(0.2), // Stronger shadow
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppConstants.borderRadius),
                 ),
@@ -372,10 +506,10 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
                     children: [
                       Row(
                         children: const [
-                          Icon(Icons.event_available, color: AppConstants.primaryColor, size: 28),
+                          Icon(Icons.settings_outlined, color: AppConstants.primaryColor, size: 28), // Changed icon
                           SizedBox(width: AppConstants.paddingSmall),
                           Text(
-                            'إعدادات العطل',
+                            'تعديل إعدادات العطل', // More descriptive title
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -386,20 +520,20 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
                       ),
                       const Divider(height: AppConstants.paddingLarge, thickness: 0.5),
                       _buildWeeklyHolidaysSection(),
-                      const SizedBox(height: AppConstants.itemSpacing * 1.5), // Increased spacing
+                      const SizedBox(height: AppConstants.itemSpacing * 2), // Increased spacing
                       _buildSpecialHolidaysSection(),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: AppConstants.paddingXLarge), // More spacing before button
+              const SizedBox(height: AppConstants.paddingXLarge),
               Center(
                 child: ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _saveSettings,
-                  icon: _isLoading
+                  onPressed: _isSaving ? null : _saveSettings, // Use _isSaving
+                  icon: _isSaving
                       ? const SizedBox.shrink()
                       : const Icon(Icons.save_alt_rounded, color: Colors.white),
-                  label: _isLoading
+                  label: _isSaving
                       ? const SizedBox(
                     width: 24,
                     height: 24,
@@ -415,12 +549,12 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppConstants.primaryColor,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: AppConstants.paddingXLarge, // Wider padding
+                        horizontal: AppConstants.paddingXLarge,
                         vertical: AppConstants.paddingMedium),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.borderRadius), // Slightly more rounded
+                      borderRadius: BorderRadius.circular(AppConstants.borderRadius),
                     ),
-                    elevation: AppConstants.elevatedShadow[0].blurRadius, // Deeper shadow
+                    elevation: 8, // Deeper shadow for save button
                   ),
                 ),
               ),
