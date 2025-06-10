@@ -430,7 +430,14 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
 
       final weekly = List<int>.from(settings['weeklyHolidays'] ?? []);
       final special = (settings['specialHolidays'] as List<dynamic>? ?? [])
-          .map((d) => DateTime.tryParse(d as String))
+          .map((d) {
+            if (d is Map<String, dynamic>) {
+              return DateTime.tryParse(d['date'] ?? '');
+            } else if (d is String) {
+              return DateTime.tryParse(d);
+            }
+            return null;
+          })
           .whereType<DateTime>()
           .toList();
       final bool isHoliday =

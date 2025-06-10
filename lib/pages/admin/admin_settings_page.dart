@@ -4,6 +4,7 @@ import 'package:engineer_management_system/theme/app_constants.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../utils/saudi_holidays.dart';
+import '../../models/holiday.dart';
 import 'dart:ui' as ui; // For TextDirection
 
 
@@ -22,7 +23,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   final Set<int> _selectedWeeklyHolidays = {};
-  final List<DateTime> _specialHolidays = [];
+  final List<Holiday> _specialHolidays = [];
 
   // Controllers for adding new admin
   final TextEditingController _adminNameController = TextEditingController();
@@ -80,8 +81,16 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
           ..clear()
           ..addAll(List<int>.from(data['weeklyHolidays'] ?? []));
         final loaded = (data['specialHolidays'] as List<dynamic>? ?? [])
-            .map((d) => DateTime.tryParse(d as String))
-            .whereType<DateTime>()
+            .map((d) {
+              if (d is Map<String, dynamic>) {
+                return Holiday.fromMap(d);
+              } else if (d is String) {
+                final parsed = DateTime.tryParse(d);
+                return parsed != null ? Holiday(name: 'عطلة', date: parsed) : null;
+              }
+              return null;
+            })
+            .whereType<Holiday>()
             .toList();
         _specialHolidays
           ..clear()
@@ -98,7 +107,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
           'workEndTime': '16:30',
           'weeklyHolidays': [],
           'specialHolidays': saudiOfficialHolidays(DateTime.now().year)
-              .map((d) => DateFormat('yyyy-MM-dd').format(d))
+              .map((h) => h.toMap())
               .toList(),
           'lastUpdated': FieldValue.serverTimestamp(),
         });
@@ -142,7 +151,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
           'workEndTime': endTime,
           'weeklyHolidays': _selectedWeeklyHolidays.toList(),
           'specialHolidays': _specialHolidays
-              .map((d) => DateFormat('yyyy-MM-dd').format(d))
+              .map((h) => h.toMap())
               .toList(),
           'lastUpdated': FieldValue.serverTimestamp(),
         },
@@ -287,15 +296,12 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         const SizedBox(height: AppConstants.paddingSmall),
         Wrap(
           spacing: 8,
-          children: _specialHolidays.map((date) {
-            final label = DateFormat('yyyy-MM-dd').format(date);
+          children: _specialHolidays.map((holiday) {
+            final label = '${holiday.name} - '
+                '${DateFormat('yyyy-MM-dd').format(holiday.date)}';
             return InputChip(
               label: Text(label),
-              onDeleted: () {
-                setState(() {
-                  _specialHolidays.remove(date);
-                });
-              },
+              onDeleted: () => _confirmDeleteHoliday(holiday),
             );
           }).toList(),
         ),
@@ -310,8 +316,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
             );
             if (picked != null) {
               setState(() {
-                if (!_specialHolidays.any((d) => d.year == picked.year && d.month == picked.month && d.day == picked.day)) {
-                  _specialHolidays.add(picked);
+                if (!_specialHolidays.any((h) => h.date.year == picked.year && h.date.month == picked.month && h.date.day == picked.day)) {
+                  _specialHolidays.add(Holiday(name: 'عطلة', date: picked));
                 }
               });
             }
@@ -322,6 +328,38 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _confirmDeleteHoliday(Holiday holiday) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+        ),
+        title: const Text('تأكيد الحذف'),
+        content: Text('هل تريد حذف \u200E${holiday.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppConstants.errorColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      setState(() {
+        _specialHolidays.remove(holiday);
+      });
+    }
   }
 
   Future<void> _showAddAdminDialog() async {
