@@ -77,13 +77,20 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         _engineerHourlyRateController.text = (data['engineerHourlyRate'] ?? 50.0).toString();
         _workStartTimeController.text = data['workStartTime'] ?? '06:30';
         _workEndTimeController.text = data['workEndTime'] ?? '16:30';
+        final weeklyData = data['weeklyHolidays'];
+        final weeklyList = (weeklyData is List ? weeklyData : [])
+            .map((e) => e is int ? e : int.tryParse(e.toString()))
+            .whereType<int>()
+            .toList();
         _selectedWeeklyHolidays
           ..clear()
-          ..addAll(List<int>.from(data['weeklyHolidays'] ?? []));
+          ..addAll(weeklyList);
         final loaded = (data['specialHolidays'] as List<dynamic>? ?? [])
             .map((d) {
               if (d is Map<String, dynamic>) {
                 return Holiday.fromMap(d);
+              } else if (d is Holiday) {
+                return d;
               } else if (d is String) {
                 final parsed = DateTime.tryParse(d);
                 return parsed != null ? Holiday(name: 'عطلة', date: parsed) : null;

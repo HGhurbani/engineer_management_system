@@ -46,13 +46,20 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
           .get();
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
+        final weeklyData = data['weeklyHolidays'];
+        final weeklyList = (weeklyData is List ? weeklyData : [])
+            .map((e) => e is int ? e : int.tryParse(e.toString()))
+            .whereType<int>()
+            .toList();
         _selectedWeeklyHolidays
           ..clear()
-          ..addAll(List<int>.from(data['weeklyHolidays'] ?? []));
+          ..addAll(weeklyList);
         final loaded = (data['specialHolidays'] as List<dynamic>? ?? [])
             .map((d) {
               if (d is Map<String, dynamic>) {
                 return Holiday.fromMap(d);
+              } else if (d is Holiday) {
+                return d;
               } else if (d is String) {
                 final parsed = DateTime.tryParse(d);
                 return parsed != null ? Holiday(name: 'عطلة', date: parsed) : null;
