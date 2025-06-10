@@ -1043,21 +1043,21 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     Text('تاريخ الطلب: $formattedDate', style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
                   ],
                 ),
-                trailing: (_currentUserRole == 'admin')
-                    ? PopupMenuButton<String>(
-                        onSelected: (val) {
-                          if (val == 'edit') {
-                            _showEditPartRequestDialog(requestDoc);
-                          } else if (val == 'delete') {
-                            _deletePartRequest(requestDoc.id);
-                          }
-                        },
-                        itemBuilder: (context) => const [
-                          PopupMenuItem(value: 'edit', child: Text('تعديل')),
-                          PopupMenuItem(value: 'delete', child: Text('حذف')),
-                        ],
-                      )
-                    : null,
+                // trailing: (_currentUserRole == 'admin')
+                //     ? PopupMenuButton<String>(
+                //         onSelected: (val) {
+                //           if (val == 'edit') {
+                //             _showEditPartRequestDialog(requestDoc);
+                //           } else if (val == 'delete') {
+                //             _deletePartRequest(requestDoc.id);
+                //           }
+                //         },
+                //         itemBuilder: (context) => const [
+                //           PopupMenuItem(value: 'edit', child: Text('تعديل')),
+                //           PopupMenuItem(value: 'delete', child: Text('حذف')),
+                //         ],
+                //       )
+                //     : null,
               ),
             );
           },

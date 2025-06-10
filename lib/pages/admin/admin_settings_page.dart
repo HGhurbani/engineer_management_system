@@ -1,4 +1,5 @@
 // lib/pages/admin/admin_settings_page.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -186,10 +187,12 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.number,
     String? Function(String?)? validator,
+    bool obscureText = false, // ✅ أضف هذا السطر
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      obscureText: obscureText, // ✅ استخدم الباراميتر هنا
       decoration: InputDecoration(
         labelText: labelText,
         labelStyle: const TextStyle(color: AppConstants.textSecondary),
@@ -218,16 +221,17 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         if (value == null || value.isEmpty) {
           return 'هذا الحقل مطلوب.';
         }
-        if (double.tryParse(value) == null) {
+        if (keyboardType == TextInputType.number && double.tryParse(value) == null) {
           return 'الرجاء إدخال رقم صالح.';
         }
-        if (double.parse(value) <= 0) {
+        if (keyboardType == TextInputType.number && double.parse(value) <= 0) {
           return 'القيمة يجب أن تكون أكبر من صفر.';
         }
         return validator?.call(value);
       },
     );
   }
+
 
   Widget _buildTimeField({
     required TextEditingController controller,
@@ -378,7 +382,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setStateDialog) {
           return Directionality(
-            textDirection: TextDirection.rtl,
+            textDirection: ui.TextDirection.rtl,
             child: AlertDialog(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppConstants.borderRadius),
