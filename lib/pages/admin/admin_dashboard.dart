@@ -347,7 +347,9 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
           icon: const Icon(Icons.more_vert, color: Colors.white),
           onSelected: (value) {
             switch (value) {
-
+              case 'change_password':
+                Navigator.pushNamed(context, '/admin/change_password');
+                break;
               case 'settings':
                 Navigator.pushNamed(context, '/admin/settings');
                 break;
@@ -357,7 +359,16 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             }
           },
           itemBuilder: (context) => [
-
+            const PopupMenuItem(
+              value: 'change_password',
+              child: Row(
+                children: [
+                  Icon(Icons.lock_reset, color: AppConstants.primaryColor),
+                  SizedBox(width: 8),
+                  Text('تغيير كلمة المرور'),
+                ],
+              ),
+            ),
             const PopupMenuItem(
               value: 'settings',
               child: Row(

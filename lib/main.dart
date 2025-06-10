@@ -23,6 +23,7 @@ import 'package:engineer_management_system/pages/admin/admin_settings_page.dart'
 import 'package:engineer_management_system/pages/engineer/request_part_page.dart';
 import 'package:engineer_management_system/pages/engineer/meeting_logs_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_meeting_logs_page.dart';
+import 'package:engineer_management_system/pages/common/change_password_page.dart';
 
 // --- ADDITION START ---
 import 'package:engineer_management_system/pages/admin/admin_evaluations_page.dart'; // استيراد صفحة التقييم الجديدة
@@ -113,6 +114,9 @@ class MyApp extends StatelessWidget {
         '/admin/attendance': (context) => const AdminAttendancePage(),
         '/admin/attendance_report': (context) => const AdminAttendanceReportPage(),
         '/notifications': (context) => const NotificationsPage(),
+        '/admin/change_password': (context) => const ChangePasswordPage(role: 'admin'),
+        '/engineer/change_password': (context) => const ChangePasswordPage(role: 'engineer'),
+        '/client/change_password': (context) => const ChangePasswordPage(role: 'client'),
         // New route for requesting parts
         '/engineer/request_part': (context) {
           final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;

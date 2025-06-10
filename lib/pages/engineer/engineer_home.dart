@@ -939,10 +939,40 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
           ],
         ),
         // --- ADDITION END ---
-        IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.white),
-          tooltip: 'تسجيل الخروج',
-          onPressed: _logout,
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert, color: Colors.white),
+          onSelected: (value) {
+            switch (value) {
+              case 'change_password':
+                Navigator.pushNamed(context, '/engineer/change_password');
+                break;
+              case 'logout':
+                _logout();
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'change_password',
+              child: Row(
+                children: [
+                  Icon(Icons.lock_reset, color: AppConstants.primaryColor),
+                  SizedBox(width: 8),
+                  Text('تغيير كلمة المرور'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'logout',
+              child: Row(
+                children: [
+                  Icon(Icons.logout, color: AppConstants.errorColor),
+                  SizedBox(width: 8),
+                  Text('تسجيل الخروج', style: TextStyle(color: AppConstants.errorColor)),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
       bottom: TabBar(
