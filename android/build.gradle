@@ -25,8 +25,8 @@ subprojects {
 }
 
 // Ensure all plugins and modules compile with the same SDK level
-subprojects {
-    afterEvaluate { Project project ->
+gradle.projectsEvaluated {
+    subprojects { Project project ->
         if (project.hasProperty('android')) {
             project.android.compileSdkVersion = 34
         }
