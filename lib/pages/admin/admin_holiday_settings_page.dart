@@ -359,15 +359,15 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Card(
-                elevation: 4, // Slightly increased elevation for better presence
-                shadowColor: AppConstants.primaryColor.withOpacity(0.15), // Stronger shadow
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+              Container(
+                padding: const EdgeInsets.all(AppConstants.paddingLarge),
+                decoration: BoxDecoration(
+                  color: AppConstants.cardColor,
+                  borderRadius:
+                      BorderRadius.circular(AppConstants.borderRadius),
+                  boxShadow: AppConstants.cardShadow,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppConstants.paddingLarge),
-                  child: Column(
+                child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
