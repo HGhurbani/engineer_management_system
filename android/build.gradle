@@ -24,6 +24,15 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android.compileSdkVersion = 35
+            project.android.defaultConfig.targetSdkVersion = 35
+        }
+    }
+}
+
 
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
