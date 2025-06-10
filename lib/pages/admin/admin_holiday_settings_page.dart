@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import '../../utils/saudi_holidays.dart';
 import 'dart:ui' as ui;
 
 class AdminHolidaySettingsPage extends StatefulWidget {
@@ -47,10 +48,19 @@ class _AdminHolidaySettingsPageState extends State<AdminHolidaySettingsPage> {
         _selectedWeeklyHolidays
           ..clear()
           ..addAll(List<int>.from(data['weeklyHolidays'] ?? []));
+        final loaded = (data['specialHolidays'] as List<dynamic>? ?? [])
+            .map((d) => DateTime.tryParse(d as String))
+            .whereType<DateTime>()
+            .toList();
         _specialHolidays
           ..clear()
-          ..addAll((data['specialHolidays'] as List<dynamic>? ?? [])
-              .map((d) => DateTime.tryParse(d as String) ?? DateTime.now()));
+          ..addAll(loaded.isEmpty
+              ? saudiOfficialHolidays(DateTime.now().year)
+              : loaded);
+      } else {
+        _specialHolidays
+          ..clear()
+          ..addAll(saudiOfficialHolidays(DateTime.now().year));
       }
     } catch (e) {
       _showFeedbackSnackBar(context, 'فشل تحميل الإعدادات: $e', isError: true);
