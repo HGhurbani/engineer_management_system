@@ -72,8 +72,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
   // --- Font for PDF ---
   pw.Font? _arabicFont; // To store the loaded font for PDF
-  static const String platformLogoBase64 =
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8AAAgMBAyeVNt8AAAAASUVORK5CYII=';
 
   static const List<Map<String, dynamic>> predefinedPhasesStructure = [
     // ... (Your existing predefinedPhasesStructure - no changes here) ...
@@ -1969,8 +1967,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final pdf = pw.Document();
     final List<pw.Widget> contentWidgets = [];
 
-    final pw.MemoryImage platformLogo =
-        pw.MemoryImage(base64Decode(platformLogoBase64));
 
     final pw.TextStyle regularStyle = pw.TextStyle(font: _arabicFont, fontSize: 11);
     final pw.TextStyle boldStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 12);
@@ -1988,7 +1984,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
         pw.Text(LoginConstants.appName, style: headerStyle, textDirection: pw.TextDirection.rtl),
-        pw.Image(platformLogo, width: 40, height: 40),
       ],
     ));
     contentWidgets.add(pw.SizedBox(height: 8));
