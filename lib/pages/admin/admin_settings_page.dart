@@ -48,20 +48,20 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
 
       if (settingsDoc.exists) {
         Map<String, dynamic> data = settingsDoc.data() as Map<String, dynamic>;
-        _defaultWorkingHoursController.text = (data['defaultWorkingHours'] ?? 8.0).toString();
+        _defaultWorkingHoursController.text = (data['defaultWorkingHours'] ?? 10.0).toString();
         _engineerHourlyRateController.text = (data['engineerHourlyRate'] ?? 50.0).toString();
-        _workStartTimeController.text = data['workStartTime'] ?? '09:00';
-        _workEndTimeController.text = data['workEndTime'] ?? '17:00';
+        _workStartTimeController.text = data['workStartTime'] ?? '06:30';
+        _workEndTimeController.text = data['workEndTime'] ?? '16:30';
       } else {
-        _defaultWorkingHoursController.text = '8.0';
+        _defaultWorkingHoursController.text = '10.0';
         _engineerHourlyRateController.text = '50.0';
-        _workStartTimeController.text = '09:00';
-        _workEndTimeController.text = '17:00';
+        _workStartTimeController.text = '06:30';
+        _workEndTimeController.text = '16:30';
         await FirebaseFirestore.instance.collection('settings').doc('app_settings').set({
-          'defaultWorkingHours': 8.0,
+          'defaultWorkingHours': 10.0,
           'engineerHourlyRate': 50.0,
-          'workStartTime': '09:00',
-          'workEndTime': '17:00',
+          'workStartTime': '06:30',
+          'workEndTime': '16:30',
           'lastUpdated': FieldValue.serverTimestamp(),
         });
       }

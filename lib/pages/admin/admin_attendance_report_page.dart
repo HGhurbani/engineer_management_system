@@ -17,7 +17,7 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = true;
   Map<String, Map<String, dynamic>> _userSummaries = {};
-  double _defaultWorkingHours = 8.0;
+  double _defaultWorkingHours = 10.0;
   double _hourlyRate = 50.0;
 
   late AnimationController _fadeController;
@@ -80,7 +80,7 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
           .get();
       if (settingsDoc.exists) {
         Map<String, dynamic> data = settingsDoc.data() as Map<String, dynamic>;
-        _defaultWorkingHours = (data['defaultWorkingHours'] ?? 8.0).toDouble();
+        _defaultWorkingHours = (data['defaultWorkingHours'] ?? 10.0).toDouble();
         _hourlyRate = (data['engineerHourlyRate'] ?? 50.0).toDouble();
       }
     } catch (e) {
