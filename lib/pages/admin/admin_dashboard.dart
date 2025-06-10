@@ -25,6 +25,7 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   // Statistics variables
   int _engineerCount = 0;
   int _clientCount = 0;
+  int _adminCount = 0;
   int _activeProjectCount = 0;
   int _totalRevenueCount = 0;
   bool _isLoadingStats = true;
@@ -144,6 +145,11 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
             .count()
             .get(),
         FirebaseFirestore.instance
+            .collection('users')
+            .where('role', isEqualTo: 'admin')
+            .count()
+            .get(),
+        FirebaseFirestore.instance
             .collection('projects')
             .where('status', isEqualTo: 'نشط')
             .count()
@@ -155,7 +161,8 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       setState(() {
         _engineerCount = (results[0] as AggregateQuerySnapshot).count!;
         _clientCount = (results[1] as AggregateQuerySnapshot).count!;
-        _activeProjectCount = (results[2] as AggregateQuerySnapshot).count!;
+        _adminCount = (results[2] as AggregateQuerySnapshot).count!;
+        _activeProjectCount = (results[3] as AggregateQuerySnapshot).count!;
         _totalRevenueCount = 450000; // Mock data - replace with actual calculation
         _isLoadingStats = false;
       });
@@ -590,18 +597,35 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   Widget _buildStatsGrid() {
     return Column(
       children: [
-        // Projects Overview
-        _buildStatCard(
-          _StatData(
-            icon: Icons.work_rounded,
-            value: _activeProjectCount.toString(),
-            label: 'مشروع نشط',
-            color: AppConstants.warningColor,
-            isPositive: true,
-          ),
-          isFullWidth: true, // Make this card span full width
+        // Projects and Admins
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                _StatData(
+                  icon: Icons.work_rounded,
+                  value: _activeProjectCount.toString(),
+                  label: 'مشروع نشط',
+                  color: AppConstants.warningColor,
+                  isPositive: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppConstants.paddingMedium),
+            Expanded(
+              child: _buildStatCard(
+                _StatData(
+                  icon: Icons.admin_panel_settings_rounded,
+                  value: _adminCount.toString(),
+                  label: 'مسؤول',
+                  color: AppConstants.infoColor,
+                  isPositive: true,
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: AppConstants.paddingMedium), // Spacing between rows
+        const SizedBox(height: AppConstants.paddingMedium),
         // Engineers and Clients
         Row(
           children: [

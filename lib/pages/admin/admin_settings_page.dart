@@ -23,6 +23,11 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
   final Set<int> _selectedWeeklyHolidays = {};
   final List<DateTime> _specialHolidays = [];
 
+  // Controllers for adding new admin
+  final TextEditingController _adminNameController = TextEditingController();
+  final TextEditingController _adminEmailController = TextEditingController();
+  final TextEditingController _adminPasswordController = TextEditingController();
+
   final Map<int, String> _weekDays = {
     DateTime.saturday: 'السبت',
     DateTime.sunday: 'الأحد',
@@ -47,6 +52,9 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     _engineerHourlyRateController.dispose();
     _workStartTimeController.dispose();
     _workEndTimeController.dispose();
+    _adminNameController.dispose();
+    _adminEmailController.dispose();
+    _adminPasswordController.dispose();
     super.dispose();
   }
 
@@ -307,6 +315,149 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     );
   }
 
+  Future<void> _showAddAdminDialog() async {
+    final formKey = GlobalKey<FormState>();
+    bool isLoading = false;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+              ),
+              title: const Text(
+                'إضافة مسؤول جديد',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.textPrimary,
+                  fontSize: 22,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildStyledTextField(
+                        controller: _adminNameController,
+                        labelText: 'الاسم الكامل',
+                        icon: Icons.person_outline,
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      _buildStyledTextField(
+                        controller: _adminEmailController,
+                        labelText: 'البريد الإلكتروني',
+                        icon: Icons.email_outlined,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) {
+                          if (value != null &&
+                              !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                            return 'صيغة بريد إلكتروني غير صحيحة.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      _buildStyledTextField(
+                        controller: _adminPasswordController,
+                        labelText: 'كلمة المرور',
+                        icon: Icons.lock_outline,
+                        obscureText: true,
+                        validator: (value) {
+                          if (value != null && value.length < 6) {
+                            return 'يجب أن تكون كلمة المرور 6 أحرف على الأقل.';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actionsAlignment: MainAxisAlignment.center,
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('إلغاء',
+                      style: TextStyle(color: AppConstants.textSecondary)),
+                ),
+                const SizedBox(width: AppConstants.itemSpacing / 2),
+                ElevatedButton.icon(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          setStateDialog(() => isLoading = true);
+                          try {
+                            final userCred = await FirebaseAuth.instance
+                                .createUserWithEmailAndPassword(
+                              email: _adminEmailController.text.trim(),
+                              password: _adminPasswordController.text.trim(),
+                            );
+
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(userCred.user!.uid)
+                                .set({
+                              'uid': userCred.user!.uid,
+                              'email': _adminEmailController.text.trim(),
+                              'name': _adminNameController.text.trim(),
+                              'role': 'admin',
+                              'createdAt': FieldValue.serverTimestamp(),
+                            });
+
+                            Navigator.pop(dialogContext);
+                            _showFeedbackSnackBar(
+                                context, 'تم إضافة المسؤول بنجاح.',
+                                isError: false);
+                          } on FirebaseAuthException catch (e) {
+                            _showFeedbackSnackBar(
+                                context, _getFirebaseErrorMessage(e.code),
+                                isError: true);
+                            Navigator.pop(dialogContext);
+                          } catch (e) {
+                            _showFeedbackSnackBar(
+                                context, 'فشل الإضافة: $e',
+                                isError: true);
+                            Navigator.pop(dialogContext);
+                          }
+                        },
+                  icon: isLoading
+                      ? const SizedBox.shrink()
+                      : const Icon(Icons.admin_panel_settings_rounded,
+                          color: Colors.white),
+                  label: isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white)),
+                        )
+                      : const Text('إضافة المسؤول',
+                          style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.infoColor,
+                    shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.borderRadius / 2)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -319,6 +470,19 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         margin: const EdgeInsets.all(AppConstants.paddingMedium),
       ),
     );
+  }
+
+  String _getFirebaseErrorMessage(String errorCode) {
+    switch (errorCode) {
+      case 'email-already-in-use':
+        return 'البريد الإلكتروني مستخدم بالفعل.';
+      case 'invalid-email':
+        return 'صيغة البريد الإلكتروني غير صحيحة.';
+      case 'weak-password':
+        return 'كلمة المرور ضعيفة جداً.';
+      default:
+        return 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.';
+    }
   }
 
   PreferredSizeWidget _buildAppBar() {
@@ -438,6 +602,32 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                           vertical: AppConstants.paddingMedium),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+                      ),
+                      elevation: AppConstants.cardShadow[0].blurRadius,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppConstants.paddingLarge),
+                Center(
+                  child: ElevatedButton.icon(
+                    onPressed: _showAddAdminDialog,
+                    icon: const Icon(Icons.admin_panel_settings_rounded,
+                        color: Colors.white),
+                    label: const Text(
+                      'إضافة آدمن',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConstants.infoColor,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppConstants.paddingLarge,
+                          vertical: AppConstants.paddingMedium),
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.borderRadius / 1.5),
                       ),
                       elevation: AppConstants.cardShadow[0].blurRadius,
                     ),
