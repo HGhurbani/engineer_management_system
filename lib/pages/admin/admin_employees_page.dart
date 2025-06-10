@@ -229,6 +229,126 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
     }
   }
 
+  Future<void> _showEditEmployeeEngineerDialog(
+      QueryDocumentSnapshot employeeDoc) async {
+    String? selectedEngineerId =
+        (employeeDoc.data() as Map<String, dynamic>)['engineerId'];
+    bool isLoading = false;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+              ),
+              title: const Text(
+                'تعديل المهندس المشرف',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.textPrimary,
+                  fontSize: 22,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: _buildStyledDropdown(
+                  hint: 'اختر المهندس المسؤول',
+                  value: selectedEngineerId,
+                  items: _availableEngineers.map((doc) {
+                    final user = doc.data() as Map<String, dynamic>;
+                    return DropdownMenuItem<String>(
+                      value: doc.id,
+                      child: Text(user['name'] ?? 'مهندس غير مسمى'),
+                    );
+                  }).toList(),
+                  onChanged: (value) =>
+                      setDialogState(() => selectedEngineerId = value),
+                  icon: Icons.supervisor_account_outlined,
+                  validator: (value) =>
+                      value == null ? 'الرجاء اختيار المهندس المسؤول' : null,
+                ),
+              ),
+              actionsAlignment: MainAxisAlignment.center,
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('إلغاء',
+                      style: TextStyle(color: AppConstants.textSecondary)),
+                ),
+                const SizedBox(width: AppConstants.itemSpacing / 2),
+                ElevatedButton.icon(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          if (selectedEngineerId == null) {
+                            _showFeedbackSnackBar(dialogContext,
+                                'الرجاء اختيار المهندس المسؤول.',
+                                isError: true);
+                            return;
+                          }
+
+                          setDialogState(() => isLoading = true);
+
+                          try {
+                            final selectedEngineerDoc = _availableEngineers
+                                .firstWhere((e) => e.id == selectedEngineerId);
+                            final engineerName =
+                                (selectedEngineerDoc.data()
+                                        as Map<String, dynamic>)['name'] ??
+                                    'غير معروف';
+
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(employeeDoc.id)
+                                .update({
+                              'engineerId': selectedEngineerId,
+                              'engineerName': engineerName,
+                            });
+
+                            Navigator.pop(dialogContext);
+                            _showFeedbackSnackBar(context,
+                                'تم تحديث المهندس المسؤول.',
+                                isError: false);
+                          } catch (e) {
+                            _showFeedbackSnackBar(
+                                context, 'فشل التحديث: $e',
+                                isError: true);
+                            Navigator.pop(dialogContext);
+                          }
+                        },
+                  icon: isLoading
+                      ? const SizedBox.shrink()
+                      : const Icon(Icons.save_alt_rounded, color: Colors.white),
+                  label: isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white)),
+                        )
+                      : const Text('حفظ التعديل',
+                          style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.primaryColor,
+                    shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.borderRadius / 2)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -332,6 +452,12 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined,
+                      color: AppConstants.primaryColor, size: 26),
+                  onPressed: () => _showEditEmployeeEngineerDialog(emp),
+                  tooltip: 'تعديل المهندس المشرف',
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline_rounded, color: AppConstants.deleteColor, size: 26),
