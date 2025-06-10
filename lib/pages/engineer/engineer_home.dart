@@ -422,7 +422,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
           .doc('app_settings')
           .get();
       final settings = settingsDoc.data() as Map<String, dynamic>? ?? {};
-      final startString = settings['workStartTime'] ?? '09:00';
+        final startString = settings['workStartTime'] ?? '06:30';
       final parts = startString.split(':');
       final now = DateTime.now();
       final startDate = DateTime(now.year, now.month, now.day,

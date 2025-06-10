@@ -24,7 +24,7 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
   String? _selectedUserId;
   List<DocumentSnapshot> _engineers = [];
   List<DocumentSnapshot> _employees = [];
-  double _defaultWorkingHours = 8.0;
+  double _defaultWorkingHours = 10.0;
   double _engineerHourlyRate = 50.0;
   bool _isLoadingFilters = true;
 
@@ -95,7 +95,7 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
         Map<String, dynamic> data = settingsDoc.data() as Map<String, dynamic>;
         if (mounted) {
           setState(() {
-            _defaultWorkingHours = (data['defaultWorkingHours'] ?? 8.0).toDouble();
+              _defaultWorkingHours = (data['defaultWorkingHours'] ?? 10.0).toDouble();
             _engineerHourlyRate = (data['engineerHourlyRate'] ?? 50.0).toDouble();
           });
         }
