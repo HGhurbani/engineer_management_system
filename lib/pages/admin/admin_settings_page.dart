@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'dart:ui' as ui; // For TextDirection
 
 
 class AdminSettingsPage extends StatefulWidget {
@@ -344,7 +345,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppConstants.backgroundColor,
         appBar: _buildAppBar(),
