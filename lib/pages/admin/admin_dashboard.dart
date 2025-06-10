@@ -742,6 +742,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         color: AppConstants.textSecondary,
         route: '/admin/settings',
       ),
+      _ManagementItem(
+        title: 'إعدادات العطل',
+        subtitle: 'تعديل أيام الإجازات',
+        icon: Icons.event_available,
+        color: const Color(0xFF2DD4BF),
+        route: '/admin/holiday_settings',
+      ),
     ];
 
     return GridView.builder(
