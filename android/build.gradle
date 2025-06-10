@@ -24,6 +24,15 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// Ensure all plugins and modules compile with the same SDK level
+subprojects {
+    afterEvaluate { Project project ->
+        if (project.hasProperty('android')) {
+            project.android.compileSdkVersion = 34
+        }
+    }
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
