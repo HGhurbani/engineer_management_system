@@ -20,6 +20,7 @@ import 'package:engineer_management_system/pages/admin/admin_projects_page.dart'
 import 'package:engineer_management_system/pages/admin/admin_project_details_page.dart';
 import 'package:engineer_management_system/pages/engineer/project_details_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_settings_page.dart';
+import 'package:engineer_management_system/pages/admin/admin_holiday_settings_page.dart';
 import 'package:engineer_management_system/pages/engineer/request_part_page.dart';
 import 'package:engineer_management_system/pages/engineer/meeting_logs_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_meeting_logs_page.dart';
@@ -111,6 +112,7 @@ class MyApp extends StatelessWidget {
         },
         '/admin/daily_schedule': (context) => const AdminDailySchedulePage(),
         '/admin/settings': (context) => const AdminSettingsPage(),
+        '/admin/holiday_settings': (context) => const AdminHolidaySettingsPage(),
         '/admin/attendance': (context) => const AdminAttendancePage(),
         '/admin/attendance_report': (context) => const AdminAttendanceReportPage(),
         '/notifications': (context) => const NotificationsPage(),
