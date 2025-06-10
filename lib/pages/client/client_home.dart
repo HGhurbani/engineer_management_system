@@ -291,7 +291,7 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
     _tabController = TabController(length: 3, vsync: this);
     if (_currentClientUid == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _logout();
+        _logout(showConfirmation: false);
       });
     } else {
       _fetchClientData();
@@ -340,7 +340,12 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _logout() async {
+  Future<void> _logout({bool showConfirmation = true}) async {
+    if (showConfirmation) {
+      final bool? confirmed = await _showLogoutConfirmationDialog();
+      if (confirmed != true) return;
+    }
+
     try {
       await FirebaseAuth.instance.signOut();
       if (mounted) {
@@ -350,6 +355,77 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
     } catch (e) {
       if (mounted) _showFeedbackSnackBar(context, 'فشل تسجيل الخروج: $e', isError: true);
     }
+  }
+
+  Future<bool?> _showLogoutConfirmationDialog() async {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return Directionality(
+          textDirection: ui.TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+            ),
+            title: const Text(
+              'تأكيد تسجيل الخروج',
+              style: TextStyle(
+                color: AppConstants.textPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+            content: const Text(
+              'هل أنت متأكد من رغبتك في تسجيل الخروج من حسابك؟',
+              style: TextStyle(color: AppConstants.textSecondary, fontSize: 16),
+            ),
+            actionsAlignment: MainAxisAlignment.spaceEvenly,
+            actions: <Widget>[
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppConstants.paddingMedium,
+                    vertical: AppConstants.paddingSmall,
+                  ),
+                ),
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(
+                    color: AppConstants.textSecondary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(dialogContext).pop(false);
+                },
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppConstants.errorColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppConstants.borderRadius * 2),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppConstants.paddingMedium,
+                    vertical: AppConstants.paddingSmall,
+                  ),
+                ),
+                child: const Text(
+                  'تسجيل الخروج',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                onPressed: () {
+                  Navigator.of(dialogContext).pop(true);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError}) {
