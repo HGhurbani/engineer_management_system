@@ -422,11 +422,41 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
           .doc('app_settings')
           .get();
       final settings = settingsDoc.data() as Map<String, dynamic>? ?? {};
-        final startString = settings['workStartTime'] ?? '06:30';
+      final startString = settings['workStartTime'] ?? '06:30';
       final parts = startString.split(':');
       final now = DateTime.now();
       final startDate = DateTime(now.year, now.month, now.day,
           int.parse(parts[0]), int.parse(parts[1]));
+
+      final weekly = List<int>.from(settings['weeklyHolidays'] ?? []);
+      final special = (settings['specialHolidays'] as List<dynamic>? ?? [])
+          .map((d) => DateTime.tryParse(d as String))
+          .whereType<DateTime>()
+          .toList();
+      final bool isHoliday =
+          weekly.contains(now.weekday) ||
+          special.any((d) => d.year == now.year && d.month == now.month && d.day == now.day);
+
+      if (isHoliday) {
+        final bool? proceed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('تنبيه'),
+            content: const Text('اليوم إجازة، هل تريد حسابه وقتًا إضافيًا؟'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('إلغاء'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('موافق'),
+              ),
+            ],
+          ),
+        );
+        if (proceed != true) return;
+      }
 
       final assignments = await FirebaseFirestore.instance
           .collection('projects')
@@ -441,12 +471,14 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
           'projectId': projectId,
           'type': 'check_in',
           'timestamp': Timestamp.fromDate(startDate),
+          'overtime': isHoliday,
         });
         await FirebaseFirestore.instance.collection('attendance').add({
           'userId': empId,
           'projectId': projectId,
           'type': 'check_out',
           'timestamp': FieldValue.serverTimestamp(),
+          'overtime': isHoliday,
         });
       }
 

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 
 class AdminSettingsPage extends StatefulWidget {
@@ -17,6 +18,19 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
   final TextEditingController _workStartTimeController = TextEditingController();
   final TextEditingController _workEndTimeController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  final Set<int> _selectedWeeklyHolidays = {};
+  final List<DateTime> _specialHolidays = [];
+
+  final Map<int, String> _weekDays = {
+    DateTime.saturday: 'السبت',
+    DateTime.sunday: 'الأحد',
+    DateTime.monday: 'الاثنين',
+    DateTime.tuesday: 'الثلاثاء',
+    DateTime.wednesday: 'الأربعاء',
+    DateTime.thursday: 'الخميس',
+    DateTime.friday: 'الجمعة',
+  };
 
   bool _isLoading = true; // Start with loading true
 
@@ -52,6 +66,13 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         _engineerHourlyRateController.text = (data['engineerHourlyRate'] ?? 50.0).toString();
         _workStartTimeController.text = data['workStartTime'] ?? '06:30';
         _workEndTimeController.text = data['workEndTime'] ?? '16:30';
+        _selectedWeeklyHolidays
+          ..clear()
+          ..addAll(List<int>.from(data['weeklyHolidays'] ?? []));
+        _specialHolidays
+          ..clear()
+          ..addAll((data['specialHolidays'] as List<dynamic>? ?? [])
+              .map((d) => DateTime.tryParse(d as String) ?? DateTime.now()));
       } else {
         _defaultWorkingHoursController.text = '10.0';
         _engineerHourlyRateController.text = '50.0';
@@ -62,6 +83,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
           'engineerHourlyRate': 50.0,
           'workStartTime': '06:30',
           'workEndTime': '16:30',
+          'weeklyHolidays': [],
+          'specialHolidays': [],
           'lastUpdated': FieldValue.serverTimestamp(),
         });
       }
@@ -99,6 +122,10 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
           'engineerHourlyRate': engineerHourlyRate,
           'workStartTime': startTime,
           'workEndTime': endTime,
+          'weeklyHolidays': _selectedWeeklyHolidays.toList(),
+          'specialHolidays': _specialHolidays
+              .map((d) => DateFormat('yyyy-MM-dd').format(d))
+              .toList(),
           'lastUpdated': FieldValue.serverTimestamp(),
         },
         SetOptions(merge: true),
@@ -203,6 +230,82 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     );
   }
 
+  Widget _buildWeeklyHolidaysSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('أيام العطل الأسبوعية',
+            style: TextStyle(fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+        const SizedBox(height: AppConstants.paddingSmall),
+        Wrap(
+          spacing: 8,
+          children: _weekDays.entries.map((entry) {
+            return FilterChip(
+              label: Text(entry.value),
+              selected: _selectedWeeklyHolidays.contains(entry.key),
+              onSelected: (selected) {
+                setState(() {
+                  if (selected) {
+                    _selectedWeeklyHolidays.add(entry.key);
+                  } else {
+                    _selectedWeeklyHolidays.remove(entry.key);
+                  }
+                });
+              },
+              selectedColor: AppConstants.primaryLight,
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSpecialHolidaysSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('العطل الرسمية',
+            style: TextStyle(fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+        const SizedBox(height: AppConstants.paddingSmall),
+        Wrap(
+          spacing: 8,
+          children: _specialHolidays.map((date) {
+            final label = DateFormat('yyyy-MM-dd').format(date);
+            return InputChip(
+              label: Text(label),
+              onDeleted: () {
+                setState(() {
+                  _specialHolidays.remove(date);
+                });
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: AppConstants.paddingSmall),
+        ElevatedButton.icon(
+          onPressed: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: DateTime.now(),
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+            );
+            if (picked != null) {
+              setState(() {
+                if (!_specialHolidays.any((d) => d.year == picked.year && d.month == picked.month && d.day == picked.day)) {
+                  _specialHolidays.add(picked);
+                }
+              });
+            }
+          },
+          icon: const Icon(Icons.add, color: Colors.white),
+          label: const Text('إضافة تاريخ', style: TextStyle(color: Colors.white)),
+          style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+        ),
+      ],
+    );
+  }
+
   void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -303,6 +406,10 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                           labelText: 'سعر الساعة للمهندس (بالريال السعودي)',
                           icon: Icons.price_change_outlined,
                         ),
+                        const SizedBox(height: AppConstants.itemSpacing),
+                        _buildWeeklyHolidaysSection(),
+                        const SizedBox(height: AppConstants.itemSpacing),
+                        _buildSpecialHolidaysSection(),
                       ],
                     ),
                   ),
