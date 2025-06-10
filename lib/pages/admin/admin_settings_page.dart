@@ -89,6 +89,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
             .map((d) {
               if (d is Map<String, dynamic>) {
                 return Holiday.fromMap(d);
+              } else if (d is Holiday) {
+                return d;
               } else if (d is String) {
                 final parsed = DateTime.tryParse(d);
                 return parsed != null ? Holiday(name: 'عطلة', date: parsed) : null;

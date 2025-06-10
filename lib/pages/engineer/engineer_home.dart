@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
 import '../../main.dart';
 import 'meeting_logs_page.dart';
+import '../../models/holiday.dart';
 
 
 class EngineerHome extends StatefulWidget {
@@ -428,11 +429,17 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
       final startDate = DateTime(now.year, now.month, now.day,
           int.parse(parts[0]), int.parse(parts[1]));
 
-      final weekly = List<int>.from(settings['weeklyHolidays'] ?? []);
+      final weeklyData = settings['weeklyHolidays'];
+      final weekly = (weeklyData is List ? weeklyData : [])
+          .map((e) => e is int ? e : int.tryParse(e.toString()))
+          .whereType<int>()
+          .toList();
       final special = (settings['specialHolidays'] as List<dynamic>? ?? [])
           .map((d) {
             if (d is Map<String, dynamic>) {
               return DateTime.tryParse(d['date'] ?? '');
+            } else if (d is Holiday) {
+              return d.date;
             } else if (d is String) {
               return DateTime.tryParse(d);
             }
