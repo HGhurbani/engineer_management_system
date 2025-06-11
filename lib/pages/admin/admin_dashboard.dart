@@ -4,7 +4,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
-import 'package:engineer_management_system/theme/theme_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -349,22 +348,6 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
                 ),
               )
           ],
-        ),
-        IconButton(
-          icon: Icon(
-            themeProvider.value == ThemeMode.dark
-                ? Icons.light_mode
-                : Icons.dark_mode,
-            color: Colors.white,
-          ),
-          tooltip: themeProvider.value == ThemeMode.dark
-              ? 'الوضع الفاتح'
-              : 'الوضع المظلم',
-          onPressed: () {
-            setState(() {
-              themeProvider.toggle();
-            });
-          },
         ),
         // --- ADDITION END ---
         PopupMenuButton<String>(
