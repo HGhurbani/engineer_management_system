@@ -529,39 +529,39 @@ class _LoginPageState extends State<LoginPage> {
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent, padding: const EdgeInsets.symmetric(vertical: 17), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)), minimumSize: const Size(double.infinity, 50)),
                         ),
                       ),
-                      const SizedBox(height: LoginConstants.spacing * 0.75),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildRoleLoginButton(
-                              label: 'دخول كمسؤول',
-                              icon: Icons.admin_panel_settings_rounded,
-                              onPressed: _loginAsAdmin,
-                              color1: LoginConstants.adminButtonColor1,
-                              color2: LoginConstants.adminButtonColor2,
-                            ),
-                          ),
-                          const SizedBox(width: LoginConstants.spacing / 2),
-                          Expanded(
-                            child: _buildRoleLoginButton(
-                              label: 'دخول كمهندس',
-                              icon: Icons.engineering_rounded,
-                              onPressed: _loginAsEngineer,
-                              color1: LoginConstants.engineerButtonColor1,
-                              color2: LoginConstants.engineerButtonColor2,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: LoginConstants.spacing / 2), // Added spacing before the new button
-                      // New Client Login Button
-                      _buildRoleLoginButton(
-                        label: 'دخول كعميل',
-                        icon: Icons.person_rounded, // Example icon for client
-                        onPressed: _loginAsClient,
-                        color1: LoginConstants.clientButtonColor1, // Using new client button colors
-                        color2: LoginConstants.clientButtonColor2,
-                      ),
+                      // const SizedBox(height: LoginConstants.spacing * 0.75),
+                      // Row(
+                      //   children: [
+                      //     Expanded(
+                      //       child: _buildRoleLoginButton(
+                      //         label: 'دخول كمسؤول',
+                      //         icon: Icons.admin_panel_settings_rounded,
+                      //         onPressed: _loginAsAdmin,
+                      //         color1: LoginConstants.adminButtonColor1,
+                      //         color2: LoginConstants.adminButtonColor2,
+                      //       ),
+                      //     ),
+                      //     const SizedBox(width: LoginConstants.spacing / 2),
+                      //     Expanded(
+                      //       child: _buildRoleLoginButton(
+                      //         label: 'دخول كمهندس',
+                      //         icon: Icons.engineering_rounded,
+                      //         onPressed: _loginAsEngineer,
+                      //         color1: LoginConstants.engineerButtonColor1,
+                      //         color2: LoginConstants.engineerButtonColor2,
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ),
+                      // const SizedBox(height: LoginConstants.spacing / 2), // Added spacing before the new button
+                      // // New Client Login Button
+                      // _buildRoleLoginButton(
+                      //   label: 'دخول كعميل',
+                      //   icon: Icons.person_rounded, // Example icon for client
+                      //   onPressed: _loginAsClient,
+                      //   color1: LoginConstants.clientButtonColor1, // Using new client button colors
+                      //   color2: LoginConstants.clientButtonColor2,
+                      // ),
                       // const SizedBox(height: LoginConstants.spacing * 0.75), // Adjusted spacing for register button
                       // // Register Button
                       // TextButton.icon(

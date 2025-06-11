@@ -12,8 +12,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter/services.dart' show rootBundle;
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import '../../html_stub.dart'
-    if (dart.library.html) 'dart:html' as html;
+import 'package:engineer_management_system/html_stub.dart'
+if (dart.library.html) 'dart:html' as html;
 
 // استيراد النماذج والإعدادات ومربع الحوار
 import '../../models/evaluation_models.dart'; // تم تحديث هذا الملف

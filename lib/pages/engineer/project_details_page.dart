@@ -14,7 +14,7 @@ import 'dart:ui' as ui; // For TextDirection
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:share_plus/share_plus.dart';
-import '../../html_stub.dart'
+import 'package:engineer_management_system/html_stub.dart'
     if (dart.library.html) 'dart:html' as html;
 
 // --- PDF and Path Provider Imports ---
@@ -60,7 +60,7 @@ class AppConstants {
     BoxShadow(
         color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 4)),
   ];
-  static const String UPLOAD_URL = 'https://mobileapp.alfatehestates.com/images_upload/upload_image.php';
+  static const String UPLOAD_URL = 'https://bhbgroup.me/images_upload/upload_image.php';
 }
 class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProviderStateMixin {
   String? _currentEngineerUid;
