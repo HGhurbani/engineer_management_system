@@ -8,6 +8,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
+import 'package:engineer_management_system/theme/theme_provider.dart';
 import 'firebase_options.dart';
 import 'package:engineer_management_system/pages/admin/admin_daily_schedule_page.dart'; // افترض هذا المسار
 import 'package:engineer_management_system/pages/auth/login_page.dart';
@@ -67,73 +68,85 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Engineer Management System',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: AppConstants.primaryColor),
-        useMaterial3: true,
-        fontFamily: 'Tajawal',
-        appBarTheme: const AppBarTheme(
-          color: AppConstants.primaryDark,
-          iconTheme: IconThemeData(color: Colors.white),
-          titleTextStyle: TextStyle(
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeProvider,
+      builder: (context, mode, _) {
+        return MaterialApp(
+          title: 'Engineer Management System',
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(seedColor: AppConstants.primaryColor),
+            useMaterial3: true,
             fontFamily: 'Tajawal',
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+            appBarTheme: const AppBarTheme(
+              color: AppConstants.primaryDark,
+              iconTheme: IconThemeData(color: Colors.white),
+              titleTextStyle: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            textTheme: const TextTheme(
+              bodyLarge: TextStyle(fontFamily: 'Tajawal', fontSize: 16.0),
+              bodyMedium: TextStyle(fontFamily: 'Tajawal', fontSize: 14.0),
+              displayLarge: TextStyle(fontFamily: 'Tajawal', fontSize: 32.0, fontWeight: FontWeight.bold),
+            ),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                textStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+              ),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                textStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w500),
+              ),
+            ),
           ),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(fontFamily: 'Tajawal', fontSize: 16.0),
-          bodyMedium: TextStyle(fontFamily: 'Tajawal', fontSize: 14.0),
-          displayLarge: TextStyle(fontFamily: 'Tajawal', fontSize: 32.0, fontWeight: FontWeight.bold),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-                textStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)
-            )
-        ),
-        textButtonTheme: TextButtonThemeData(
-            style: TextButton.styleFrom(
-                textStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w500)
-            )
-        ),
-      ),
-      darkTheme: ThemeData.dark().copyWith(
-        colorScheme: ColorScheme.fromSeed(
-            seedColor: AppConstants.primaryColor,
-            brightness: Brightness.dark),
-        useMaterial3: true,
-        fontFamily: 'Tajawal',
-        appBarTheme: const AppBarTheme(
-          color: AppConstants.primaryDark,
-          iconTheme: IconThemeData(color: Colors.white),
-          titleTextStyle: TextStyle(
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppConstants.primaryColor,
+              brightness: Brightness.dark,
+            ),
+            useMaterial3: true,
             fontFamily: 'Tajawal',
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+            appBarTheme: const AppBarTheme(
+              color: AppConstants.primaryDark,
+              iconTheme: IconThemeData(color: Colors.white),
+              titleTextStyle: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            textTheme: const TextTheme(
+              bodyLarge: TextStyle(fontFamily: 'Tajawal', fontSize: 16.0),
+              bodyMedium: TextStyle(fontFamily: 'Tajawal', fontSize: 14.0),
+              displayLarge: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 32.0,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                textStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+              ),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                textStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w500),
+              ),
+            ),
           ),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(fontFamily: 'Tajawal', fontSize: 16.0),
-          bodyMedium: TextStyle(fontFamily: 'Tajawal', fontSize: 14.0),
-          displayLarge:
-              TextStyle(fontFamily: 'Tajawal', fontSize: 32.0, fontWeight: FontWeight.bold),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-                textStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold))),
-        textButtonTheme: TextButtonThemeData(
-            style: TextButton.styleFrom(
-                textStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w500))),
-      ),
-      themeMode: ThemeMode.system,
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const AuthWrapper(),
-        '/login': (context) => const LoginPage(),
-        '/admin': (context) => const AdminDashboard(),
+          themeMode: mode,
+          initialRoute: '/',
+          routes: {
+            '/': (context) => const AuthWrapper(),
+            '/login': (context) => const LoginPage(),
+            '/admin': (context) => const AdminDashboard(),
         '/engineer': (context) => const EngineerHome(),
         '/client': (context) => const ClientHome(),
         '/admin/engineers': (context) => const AdminEngineersPage(),
@@ -183,6 +196,8 @@ class MyApp extends StatelessWidget {
       },
 
       debugShowCheckedModeBanner: false,
+        );
+      },
     );
   }
 }
