@@ -24,17 +24,6 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-subprojects { project ->
-    project.plugins.withId('com.android.application') {
-        project.android.compileSdkVersion = 35
-        project.android.defaultConfig.targetSdkVersion = 35
-    }
-    project.plugins.withId('com.android.library') {
-        project.android.compileSdkVersion = 35
-        project.android.defaultConfig.targetSdkVersion = 35
-    }
-}
-
 
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
