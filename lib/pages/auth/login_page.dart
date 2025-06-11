@@ -15,6 +15,11 @@ class LoginConstants {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+  static const LinearGradient primaryGradient1 = LinearGradient(
+    colors: [AppConstants.surfaceColor, AppConstants.surfaceColor],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   static const LinearGradient backgroundGradient = LinearGradient(
     colors: [Color(0xFFF8FAFF), Color(0xFFEFF6FF)],
@@ -481,7 +486,7 @@ class _LoginPageState extends State<LoginPage> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          gradient: LoginConstants.primaryGradient,
+                          gradient: LoginConstants.primaryGradient1,
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
