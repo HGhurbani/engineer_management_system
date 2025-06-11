@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:engineer_management_system/theme/app_constants.dart';
 import 'dart:ui' as ui;
 
 class AdminMeetingLogsPage extends StatefulWidget {
@@ -61,7 +62,7 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
           fontSize: 20,
         ),
       ),
-      backgroundColor: const Color(0xFF2563EB),
+      backgroundColor: AppConstants.primaryDark,
       centerTitle: true,
       elevation: 0,
       flexibleSpace: Container(
@@ -69,7 +70,7 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+            colors: [AppConstants.primaryColor, AppConstants.primaryDark],
           ),
         ),
       ),
@@ -158,19 +159,19 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
             Icon(
               icon,
               size: 16,
-              color: isSelected ? Colors.white : const Color(0xFF2563EB),
+              color: isSelected ? Colors.white : AppConstants.primaryDark,
             ),
             const SizedBox(width: 4),
             Text(label),
           ],
         ),
         labelStyle: TextStyle(
-          color: isSelected ? Colors.white : const Color(0xFF2563EB),
+          color: isSelected ? Colors.white : AppConstants.primaryDark,
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
         backgroundColor: Colors.white,
-        selectedColor: const Color(0xFF2563EB),
+        selectedColor: AppConstants.primaryDark,
         checkmarkColor: Colors.white,
         elevation: isSelected ? 4 : 1,
         onSelected: (selected) {
@@ -332,12 +333,12 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
       decoration: BoxDecoration(
         color: isClient
             ? const Color(0xFF10B981).withOpacity(0.1)
-            : const Color(0xFF2563EB).withOpacity(0.1),
+            : AppConstants.primaryDark.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(
         isClient ? Icons.people : Icons.business,
-        color: isClient ? const Color(0xFF10B981) : const Color(0xFF2563EB),
+        color: isClient ? const Color(0xFF10B981) : AppConstants.primaryDark,
         size: 20,
       ),
     );
@@ -350,17 +351,17 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
       decoration: BoxDecoration(
         color: isClient
             ? const Color(0xFF10B981).withOpacity(0.1)
-            : const Color(0xFF2563EB).withOpacity(0.1),
+            : AppConstants.primaryDark.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isClient ? const Color(0xFF10B981) : const Color(0xFF2563EB),
+          color: isClient ? const Color(0xFF10B981) : AppConstants.primaryDark,
           width: 1,
         ),
       ),
       child: Text(
         isClient ? 'عميل' : 'موظفين',
         style: TextStyle(
-          color: isClient ? const Color(0xFF10B981) : const Color(0xFF2563EB),
+          color: isClient ? const Color(0xFF10B981) : AppConstants.primaryDark,
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
@@ -397,7 +398,7 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(color: Color(0xFF2563EB)),
+          CircularProgressIndicator(color: AppConstants.primaryDark),
           SizedBox(height: 16),
           Text(
             'جاري تحميل المحاضر...',
@@ -425,7 +426,7 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
             icon: const Icon(Icons.refresh),
             label: const Text('إعادة المحاولة'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2563EB),
+              backgroundColor: AppConstants.primaryDark,
               foregroundColor: Colors.white,
             ),
           ),
