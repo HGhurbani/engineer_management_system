@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// A simple [ValueNotifier]-based theme controller.
 class ThemeProvider extends ValueNotifier<ThemeMode> {
-  ThemeProvider() : super(ThemeMode.system);
+  ThemeProvider() : super(ThemeMode.dark);
 
   /// Toggle between dark and light themes.
   void toggle() {
