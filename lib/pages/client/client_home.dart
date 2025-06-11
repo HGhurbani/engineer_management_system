@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
+import 'package:engineer_management_system/theme/theme_provider.dart';
 import 'package:intl/intl.dart'; // For date formatting
 import 'dart:ui' as ui; // For TextDirection
 
@@ -567,6 +568,22 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
                 ),
               )
           ],
+        ),
+        IconButton(
+          icon: Icon(
+            themeProvider.value == ThemeMode.dark
+                ? Icons.light_mode
+                : Icons.dark_mode,
+            color: Colors.white,
+          ),
+          tooltip: themeProvider.value == ThemeMode.dark
+              ? 'الوضع الفاتح'
+              : 'الوضع المظلم',
+          onPressed: () {
+            setState(() {
+              themeProvider.toggle();
+            });
+          },
         ),
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert, color: Colors.white),
