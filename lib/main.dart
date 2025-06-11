@@ -99,6 +99,36 @@ class MyApp extends StatelessWidget {
             )
         ),
       ),
+      darkTheme: ThemeData.dark().copyWith(
+        colorScheme: ColorScheme.fromSeed(
+            seedColor: AppConstants.primaryColor,
+            brightness: Brightness.dark),
+        useMaterial3: true,
+        fontFamily: 'Tajawal',
+        appBarTheme: const AppBarTheme(
+          color: AppConstants.primaryDark,
+          iconTheme: IconThemeData(color: Colors.white),
+          titleTextStyle: TextStyle(
+            fontFamily: 'Tajawal',
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(fontFamily: 'Tajawal', fontSize: 16.0),
+          bodyMedium: TextStyle(fontFamily: 'Tajawal', fontSize: 14.0),
+          displayLarge:
+              TextStyle(fontFamily: 'Tajawal', fontSize: 32.0, fontWeight: FontWeight.bold),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+                textStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold))),
+        textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+                textStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w500))),
+      ),
+      themeMode: ThemeMode.system,
       initialRoute: '/',
       routes: {
         '/': (context) => const AuthWrapper(),
