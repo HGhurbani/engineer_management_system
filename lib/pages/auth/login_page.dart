@@ -480,8 +480,23 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(gradient: LoginConstants.primaryGradient, shape: BoxShape.circle, boxShadow: [BoxShadow(color: AppConstants.primaryColor.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))]),
-                        child: const Icon(Icons.engineering_rounded, size: 60, color: Colors.white),
+                        decoration: BoxDecoration(
+                          gradient: LoginConstants.primaryGradient,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppConstants.primaryColor.withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Image.asset(
+                          'assets/images/app_logo.png',
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.contain,
+                        ),
                       ),
                       const SizedBox(height: LoginConstants.spacing),
                       const Text(LoginConstants.appName, textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),

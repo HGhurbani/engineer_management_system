@@ -40,8 +40,8 @@ class ProjectDetailsPage extends StatefulWidget {
   State<ProjectDetailsPage> createState() => _ProjectDetailsPageState();
 }
 class AppConstants {
-  static const Color primaryColor = Color(0xFF2563EB);
-  static const Color primaryLight = Color(0xFF3B82F6);
+  static const Color primaryColor = Color(0xFFE9C12C);
+  static const Color primaryLight = Color(0xFFF3D660);
   static const Color successColor = Color(0xFF10B981);
   static const Color warningColor = Color(0xFFF59E0B);
   static const Color errorColor = Color(0xFFEF4444);
