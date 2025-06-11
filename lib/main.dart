@@ -19,7 +19,9 @@ import 'package:engineer_management_system/pages/admin/admin_clients_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_employees_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_projects_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_project_details_page.dart';
-import 'package:engineer_management_system/pages/engineer/project_details_page.dart';
+// Import only ProjectDetailsPage to avoid exposing its internal AppConstants
+import 'package:engineer_management_system/pages/engineer/project_details_page.dart'
+    show ProjectDetailsPage;
 import 'package:engineer_management_system/pages/admin/admin_settings_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_holiday_settings_page.dart';
 import 'package:engineer_management_system/pages/engineer/request_part_page.dart';
