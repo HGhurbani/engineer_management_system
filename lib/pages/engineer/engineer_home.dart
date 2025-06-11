@@ -11,7 +11,6 @@ import 'package:signature/signature.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
 import '../../main.dart';
-import 'package:engineer_management_system/theme/theme_provider.dart';
 import 'meeting_logs_page.dart';
 import '../../models/holiday.dart';
 
@@ -985,22 +984,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
               )
           ],
         ),
-        IconButton(
-          icon: Icon(
-            themeProvider.value == ThemeMode.dark
-                ? Icons.light_mode
-                : Icons.dark_mode,
-            color: Colors.white,
-          ),
-          tooltip: themeProvider.value == ThemeMode.dark
-              ? 'الوضع الفاتح'
-              : 'الوضع المظلم',
-          onPressed: () {
-            setState(() {
-              themeProvider.toggle();
-            });
-          },
-        ),
+        
         // --- ADDITION END ---
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert, color: Colors.white),
