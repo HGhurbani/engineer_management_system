@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
 import 'dart:ui' as ui;
@@ -47,7 +48,7 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
             Expanded(child: _buildMeetingsList()),
           ],
         ),
-        // floatingActionButton: _buildFloatingActionButton(),
+        floatingActionButton: _buildFloatingActionButton(),
       ),
     );
   }
@@ -477,19 +478,126 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
     );
   }
 
-  // Widget _buildFloatingActionButton() {
-  //   return FloatingActionButton.extended(
-  //     onPressed: () {
-  //       // إضافة محضر جديد
-  //     },
-  //     backgroundColor: const Color(0xFF2563EB),
-  //     icon: const Icon(Icons.add, color: Colors.white),
-  //     label: const Text(
-  //       'محضر جديد',
-  //       style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-  //     ),
-  //   );
-  // }
+  Widget _buildFloatingActionButton() {
+    return FloatingActionButton.extended(
+      onPressed: _showAddMeetingDialog,
+      backgroundColor: const Color(0xFF2563EB),
+      icon: const Icon(Icons.add, color: Colors.white),
+      label: const Text(
+        'محضر جديد',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Future<void> _showAddMeetingDialog() async {
+    final titleController = TextEditingController();
+    final descController = TextEditingController();
+    String? type;
+    final formKey = GlobalKey<FormState>();
+    bool isLoading = false;
+
+    final currentAdmin = FirebaseAuth.instance.currentUser;
+    String adminName = 'المسؤول';
+    if (currentAdmin != null) {
+      try {
+        final adminDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentAdmin.uid)
+            .get();
+        if (adminDoc.exists) {
+          adminName = (adminDoc.data() as Map<String, dynamic>)['name'] ?? 'المسؤول';
+        }
+      } catch (_) {}
+    }
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return Directionality(
+              textDirection: ui.TextDirection.rtl,
+              child: AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                title: const Text(
+                  'إضافة محضر جديد',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                content: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: titleController,
+                        decoration: const InputDecoration(labelText: 'العنوان'),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'يرجى إدخال العنوان' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: descController,
+                        decoration: const InputDecoration(labelText: 'الوصف'),
+                        maxLines: 3,
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: type,
+                        decoration: const InputDecoration(labelText: 'نوع الاجتماع'),
+                        items: const [
+                          DropdownMenuItem(value: 'client', child: Text('مع العميل')),
+                          DropdownMenuItem(value: 'employee', child: Text('مع الموظفين')),
+                        ],
+                        onChanged: (val) => setStateDialog(() => type = val),
+                        validator: (val) => val == null ? 'اختر نوع الاجتماع' : null,
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('إلغاء'),
+                  ),
+                  ElevatedButton(
+                    onPressed: isLoading
+                        ? null
+                        : () async {
+                            if (!formKey.currentState!.validate()) return;
+                            setStateDialog(() => isLoading = true);
+                            try {
+                              await FirebaseFirestore.instance.collection('meeting_logs').add({
+                                'adminId': currentAdmin?.uid,
+                                'adminName': adminName,
+                                'title': titleController.text.trim(),
+                                'description': descController.text.trim(),
+                                'type': type,
+                                'date': Timestamp.now(),
+                                'createdAt': FieldValue.serverTimestamp(),
+                              });
+                              Navigator.pop(context);
+                            } finally {
+                              setStateDialog(() => isLoading = false);
+                            }
+                          },
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('إضافة'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   void _showFilterDialog() {
     showDialog(
@@ -577,6 +685,8 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
                         _buildDetailRow('الوصف', data['description'] ?? 'بدون وصف'),
                         _buildDetailRow('النوع',
                             data['type'] == 'client' ? 'اجتماع عملاء' : 'اجتماع موظفين'),
+                        if (data['adminName'] != null)
+                          _buildDetailRow('أضيف بواسطة', data['adminName']),
                         if (data['date'] != null)
                           _buildDetailRow('التاريخ',
                               (data['date'] as Timestamp).toDate().toString().split(' ')[0]),
