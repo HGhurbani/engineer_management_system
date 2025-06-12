@@ -14,6 +14,7 @@ class AdminEmployeesPage extends StatefulWidget {
 }
 
 class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
+  final List<String> _positions = ['فني كهرباء', 'فني سباكة', 'عامل', 'مساعد'];
 
   @override
   void initState() {
@@ -26,6 +27,7 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
     final passwordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     bool isLoading = false;
+    String? selectedPosition;
 
     await showDialog(
       context: context,
@@ -85,6 +87,32 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                         },
                         isRequired: false,
                       ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      DropdownButtonFormField<String>(
+                        value: selectedPosition,
+                        decoration: InputDecoration(
+                          labelText: 'المهنة',
+                          prefixIcon: const Icon(Icons.work_outline_rounded,
+                              color: AppConstants.primaryColor),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                                AppConstants.borderRadius / 1.5),
+                          ),
+                        ),
+                        items: _positions
+                            .map((pos) => DropdownMenuItem(
+                                  value: pos,
+                                  child: Text(pos),
+                                ))
+                            .toList(),
+                        onChanged: (val) => setDialogState(() => selectedPosition = val),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'الرجاء اختيار المهنة';
+                          }
+                          return null;
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -116,10 +144,11 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                               await FirebaseFirestore.instance
                                   .collection('users')
                                   .doc(userCred.user!.uid)
-                                  .set({
+                                .set({
                                 'uid': userCred.user!.uid,
                                 'email': emailController.text.trim(),
                                 'name': nameController.text.trim(),
+                                'position': selectedPosition,
                                 'role': 'employee',
                                 'createdAt': FieldValue.serverTimestamp(),
                               });
@@ -128,6 +157,7 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                                   .collection('users')
                                   .add({
                                 'name': nameController.text.trim(),
+                                'position': selectedPosition,
                                 'role': 'employee',
                                 'createdAt': FieldValue.serverTimestamp(),
                               });
@@ -226,6 +256,32 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                         isRequired: false,
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
+                      DropdownButtonFormField<String>(
+                        value: selectedPosition,
+                        decoration: InputDecoration(
+                          labelText: 'المهنة',
+                          prefixIcon: const Icon(Icons.work_outline_rounded,
+                              color: AppConstants.primaryColor),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                                AppConstants.borderRadius / 1.5),
+                          ),
+                        ),
+                        items: _positions
+                            .map((pos) => DropdownMenuItem(
+                                  value: pos,
+                                  child: Text(pos),
+                                ))
+                            .toList(),
+                        onChanged: (val) => setDialogState(() => selectedPosition = val),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'الرجاء اختيار المهنة';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
                       const Text(
                         'ملاحظة: لتغيير كلمة المرور الخاصة بالمصادقة يجب استخدام وحدة تحكم Firebase.',
                         style: TextStyle(
@@ -258,6 +314,7 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                                 .update({
                               'name': nameController.text.trim(),
                               'email': emailController.text.trim(),
+                              'position': selectedPosition,
                             });
                             Navigator.pop(dialogContext);
                             _showFeedbackSnackBar(
@@ -400,6 +457,7 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
         final data = emp.data() as Map<String, dynamic>;
         final name = data['name'] ?? 'اسم غير متوفر';
         final email = data['email'] ?? 'بريد غير متوفر';
+        final position = data['position'] ?? 'غير محدد';
         final uid = emp.id;
 
         return Card(
@@ -429,6 +487,12 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                       const SizedBox(height: 4),
                       Text(
                         email,
+                        style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        position,
                         style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary),
                         overflow: TextOverflow.ellipsis,
                       ),
