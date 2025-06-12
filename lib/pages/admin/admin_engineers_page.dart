@@ -395,6 +395,7 @@ class _AdminEngineersPageState extends State<AdminEngineersPage> {
     TextInputType keyboardType = TextInputType.text,
     bool obscureText = false,
     String? Function(String?)? validator,
+    bool isRequired = true,
   }) {
     return TextFormField(
       controller: controller,
@@ -413,10 +414,10 @@ class _AdminEngineersPageState extends State<AdminEngineersPage> {
         ),
       ),
       validator: (value) {
-        if (value == null || value.isEmpty) {
+        if (isRequired && (value == null || value.isEmpty)) {
           return 'هذا الحقل مطلوب.';
         }
-        if (validator != null) {
+        if (validator != null && value != null && value.isNotEmpty) {
           return validator(value);
         }
         return null;

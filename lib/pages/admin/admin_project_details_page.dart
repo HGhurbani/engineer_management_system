@@ -401,18 +401,11 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           _projectDataSnapshot = projectDoc;
         });
 
-        final List<dynamic> assignedEngineersRaw = projectData?['assignedEngineers'] as List<dynamic>? ?? [];
-        final List<String> engineerIds = assignedEngineersRaw.map((e) => Map<String, dynamic>.from(e)['uid'].toString()).toList();
-        if (engineerIds.isNotEmpty) {
-          final empSnap = await FirebaseFirestore.instance
-              .collection('users')
-              .where('role', isEqualTo: 'employee')
-              .where('engineerId', whereIn: engineerIds.length > 10 ? engineerIds.sublist(0,10) : engineerIds)
-              .get();
-          if (mounted) setState(() => _projectEmployees = empSnap.docs);
-        } else {
-          if (mounted) setState(() => _projectEmployees = []);
-        }
+        final empSnap = await FirebaseFirestore.instance
+            .collection('users')
+            .where('role', isEqualTo: 'employee')
+            .get();
+        if (mounted) setState(() => _projectEmployees = empSnap.docs);
 
         final partSnap = await FirebaseFirestore.instance
             .collection('partRequests')

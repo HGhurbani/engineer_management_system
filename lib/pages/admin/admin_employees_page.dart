@@ -14,38 +14,16 @@ class AdminEmployeesPage extends StatefulWidget {
 }
 
 class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
-  List<QueryDocumentSnapshot> _availableEngineers = [];
 
   @override
   void initState() {
     super.initState();
-    _loadAvailableEngineers(); //
-  }
-
-  Future<void> _loadAvailableEngineers() async { //
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('role', isEqualTo: 'engineer')
-          .orderBy('name')
-          .get();
-      if (mounted) {
-        setState(() {
-          _availableEngineers = snapshot.docs;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        _showFeedbackSnackBar(context, 'فشل تحميل قائمة المهندسين: $e', isError: true);
-      }
-    }
   }
 
   Future<void> _showAddEmployeeDialog() async { //
     final nameController = TextEditingController();
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
-    String? selectedEngineerId;
     final formKey = GlobalKey<FormState>();
     bool isLoading = false;
 
@@ -91,6 +69,7 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                           }
                           return null;
                         },
+                        isRequired: false,
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
                       _buildStyledTextField(
@@ -104,21 +83,7 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                           }
                           return null;
                         },
-                      ),
-                      const SizedBox(height: AppConstants.itemSpacing),
-                      _buildStyledDropdown(
-                        hint: 'اختر المهندس المسؤول',
-                        value: selectedEngineerId,
-                        items: _availableEngineers.map((doc) {
-                          final user = doc.data() as Map<String, dynamic>;
-                          return DropdownMenuItem<String>(
-                            value: doc.id,
-                            child: Text(user['name'] ?? 'مهندس غير مسمى'),
-                          );
-                        }).toList(),
-                        onChanged: (value) => setDialogState(() => selectedEngineerId = value),
-                        icon: Icons.supervisor_account_outlined,
-                        validator: (value) => value == null ? 'الرجاء اختيار المهندس المسؤول' : null,
+                        isRequired: false,
                       ),
                     ],
                   ),
@@ -132,44 +97,56 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                 ),
                 const SizedBox(width: AppConstants.itemSpacing / 2),
                 ElevatedButton.icon(
-                  onPressed: isLoading ? null : () async {
-                    if (!formKey.currentState!.validate()) return;
-                    if (selectedEngineerId == null) { //
-                      _showFeedbackSnackBar(dialogContext, 'الرجاء اختيار المهندس المسؤول.', isError: true);
-                      return;
-                    }
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
 
-                    setDialogState(() => isLoading = true);
+                          setDialogState(() => isLoading = true);
 
-                    try {
-                      final selectedEngineerDoc = _availableEngineers.firstWhere((e) => e.id == selectedEngineerId); //
-                      final engineerName = (selectedEngineerDoc.data() as Map<String, dynamic>)['name'] ?? 'غير معروف'; //
+                          try {
+                            if (emailController.text.trim().isNotEmpty &&
+                                passwordController.text.trim().isNotEmpty) {
+                              final userCred = await FirebaseAuth.instance
+                                  .createUserWithEmailAndPassword(
+                                email: emailController.text.trim(),
+                                password: passwordController.text.trim(),
+                              );
 
-                      final userCred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-                        email: emailController.text.trim(),
-                        password: passwordController.text.trim(),
-                      );
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(userCred.user!.uid)
+                                  .set({
+                                'uid': userCred.user!.uid,
+                                'email': emailController.text.trim(),
+                                'name': nameController.text.trim(),
+                                'role': 'employee',
+                                'createdAt': FieldValue.serverTimestamp(),
+                              });
+                            } else {
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .add({
+                                'name': nameController.text.trim(),
+                                'role': 'employee',
+                                'createdAt': FieldValue.serverTimestamp(),
+                              });
+                            }
 
-                      await FirebaseFirestore.instance.collection('users').doc(userCred.user!.uid).set({
-                        'uid': userCred.user!.uid,
-                        'email': emailController.text.trim(),
-                        'name': nameController.text.trim(),
-                        'role': 'employee', //
-                        'engineerId': selectedEngineerId, //
-                        'engineerName': engineerName, //
-                        'createdAt': FieldValue.serverTimestamp(),
-                      });
-
-                      Navigator.pop(dialogContext);
-                      _showFeedbackSnackBar(context, 'تم إضافة الموظف بنجاح.', isError: false);
-                    } on FirebaseAuthException catch (e) {
-                      _showFeedbackSnackBar(context, _getFirebaseErrorMessage(e.code), isError: true);
-                      Navigator.pop(dialogContext);
-                    } catch (e) {
-                      _showFeedbackSnackBar(context, 'فشل الإضافة: $e', isError: true);
-                      Navigator.pop(dialogContext);
-                    }
-                  },
+                            Navigator.pop(dialogContext);
+                            _showFeedbackSnackBar(context, 'تم إضافة الموظف بنجاح.',
+                                isError: false);
+                          } on FirebaseAuthException catch (e) {
+                            _showFeedbackSnackBar(context,
+                                _getFirebaseErrorMessage(e.code),
+                                isError: true);
+                            Navigator.pop(dialogContext);
+                          } catch (e) {
+                            _showFeedbackSnackBar(context, 'فشل الإضافة: $e',
+                                isError: true);
+                            Navigator.pop(dialogContext);
+                          }
+                        },
                   icon: isLoading
                       ? const SizedBox.shrink()
                       : const Icon(Icons.person_add_alt_1_rounded, color: Colors.white),
@@ -229,125 +206,6 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
     }
   }
 
-  Future<void> _showEditEmployeeEngineerDialog(
-      QueryDocumentSnapshot employeeDoc) async {
-    String? selectedEngineerId =
-        (employeeDoc.data() as Map<String, dynamic>)['engineerId'];
-    bool isLoading = false;
-
-    await showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return Directionality(
-            textDirection: TextDirection.rtl,
-            child: AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-              ),
-              title: const Text(
-                'تعديل المهندس المشرف',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppConstants.textPrimary,
-                  fontSize: 22,
-                ),
-              ),
-              content: SingleChildScrollView(
-                child: _buildStyledDropdown(
-                  hint: 'اختر المهندس المسؤول',
-                  value: selectedEngineerId,
-                  items: _availableEngineers.map((doc) {
-                    final user = doc.data() as Map<String, dynamic>;
-                    return DropdownMenuItem<String>(
-                      value: doc.id,
-                      child: Text(user['name'] ?? 'مهندس غير مسمى'),
-                    );
-                  }).toList(),
-                  onChanged: (value) =>
-                      setDialogState(() => selectedEngineerId = value),
-                  icon: Icons.supervisor_account_outlined,
-                  validator: (value) =>
-                      value == null ? 'الرجاء اختيار المهندس المسؤول' : null,
-                ),
-              ),
-              actionsAlignment: MainAxisAlignment.center,
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('إلغاء',
-                      style: TextStyle(color: AppConstants.textSecondary)),
-                ),
-                const SizedBox(width: AppConstants.itemSpacing / 2),
-                ElevatedButton.icon(
-                  onPressed: isLoading
-                      ? null
-                      : () async {
-                          if (selectedEngineerId == null) {
-                            _showFeedbackSnackBar(dialogContext,
-                                'الرجاء اختيار المهندس المسؤول.',
-                                isError: true);
-                            return;
-                          }
-
-                          setDialogState(() => isLoading = true);
-
-                          try {
-                            final selectedEngineerDoc = _availableEngineers
-                                .firstWhere((e) => e.id == selectedEngineerId);
-                            final engineerName =
-                                (selectedEngineerDoc.data()
-                                        as Map<String, dynamic>)['name'] ??
-                                    'غير معروف';
-
-                            await FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(employeeDoc.id)
-                                .update({
-                              'engineerId': selectedEngineerId,
-                              'engineerName': engineerName,
-                            });
-
-                            Navigator.pop(dialogContext);
-                            _showFeedbackSnackBar(context,
-                                'تم تحديث المهندس المسؤول.',
-                                isError: false);
-                          } catch (e) {
-                            _showFeedbackSnackBar(
-                                context, 'فشل التحديث: $e',
-                                isError: true);
-                            Navigator.pop(dialogContext);
-                          }
-                        },
-                  icon: isLoading
-                      ? const SizedBox.shrink()
-                      : const Icon(Icons.save_alt_rounded, color: Colors.white),
-                  label: isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white)),
-                        )
-                      : const Text('حفظ التعديل',
-                          style: TextStyle(color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConstants.primaryColor,
-                    shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppConstants.borderRadius / 2)),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -411,7 +269,6 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
         final data = emp.data() as Map<String, dynamic>;
         final name = data['name'] ?? 'اسم غير متوفر';
         final email = data['email'] ?? 'بريد غير متوفر';
-        final engineerName = data['engineerName'] ?? 'غير محدد'; //
         final uid = emp.id;
 
         return Card(
@@ -444,20 +301,8 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                         style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'تحت إشراف: $engineerName', //
-                        style: TextStyle(fontSize: 13, color: AppConstants.textSecondary.withOpacity(0.8), fontStyle: FontStyle.italic),
-                        overflow: TextOverflow.ellipsis,
-                      ),
                     ],
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined,
-                      color: AppConstants.primaryColor, size: 26),
-                  onPressed: () => _showEditEmployeeEngineerDialog(emp),
-                  tooltip: 'تعديل المهندس المشرف',
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline_rounded, color: AppConstants.deleteColor, size: 26),
@@ -525,6 +370,7 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
     TextInputType keyboardType = TextInputType.text,
     bool obscureText = false,
     String? Function(String?)? validator,
+    bool isRequired = true,
   }) {
     return TextFormField(
       controller: controller,
@@ -543,40 +389,17 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
         ),
       ),
       validator: (value) {
-        if (value == null || value.isEmpty) return 'هذا الحقل مطلوب.';
-        return validator?.call(value);
+        if (isRequired && (value == null || value.isEmpty)) {
+          return 'هذا الحقل مطلوب.';
+        }
+        if (validator != null && value != null && value.isNotEmpty) {
+          return validator(value);
+        }
+        return null;
       },
     );
   }
 
-  Widget _buildStyledDropdown<T>({
-    required String hint,
-    required T? value,
-    required List<DropdownMenuItem<T>> items,
-    required ValueChanged<T?> onChanged,
-    required IconData icon,
-    String? Function(T?)? validator,
-  }) {
-    return DropdownButtonFormField<T>(
-      value: value,
-      items: items,
-      onChanged: onChanged,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: hint,
-        prefixIcon: Icon(icon, color: AppConstants.primaryColor),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.textSecondary, width: 1.5),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-          borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
-        ),
-      ),
-      isExpanded: true,
-    );
-  }
 
   void _showFeedbackSnackBar(BuildContext context, String message, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(

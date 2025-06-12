@@ -446,7 +446,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final employeesSnap = await FirebaseFirestore.instance
         .collection('users')
         .where('role', isEqualTo: 'employee')
-        .where('engineerId', isEqualTo: _currentEngineerUid)
         .get();
     final employees = employeesSnap.docs;
     if (employees.isEmpty) {
