@@ -169,6 +169,137 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
     );
   }
 
+  // Dialog for editing an employee
+  Future<void> _showEditEmployeeDialog(DocumentSnapshot employeeDoc) async {
+    final employeeData = employeeDoc.data() as Map<String, dynamic>;
+    final String currentUid = employeeDoc.id;
+
+    final nameController =
+        TextEditingController(text: employeeData['name'] ?? '');
+    final emailController =
+        TextEditingController(text: employeeData['email'] ?? '');
+
+    final formKey = GlobalKey<FormState>();
+    bool isLoading = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: !isLoading,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+              title: const Text('تعديل بيانات الموظف',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppConstants.textPrimary,
+                      fontSize: 22)),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildStyledTextField(
+                        controller: nameController,
+                        labelText: 'الاسم الكامل للموظف',
+                        icon: Icons.person_outline_rounded,
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      _buildStyledTextField(
+                        controller: emailController,
+                        labelText: 'البريد الإلكتروني',
+                        icon: Icons.email_outlined,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) {
+                          if (value != null &&
+                              value.isNotEmpty &&
+                              !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                            return 'صيغة بريد إلكتروني غير صحيحة.';
+                          }
+                          return null;
+                        },
+                        isRequired: false,
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      const Text(
+                        'ملاحظة: لتغيير كلمة المرور الخاصة بالمصادقة يجب استخدام وحدة تحكم Firebase.',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: AppConstants.textSecondary,
+                            fontStyle: FontStyle.italic),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actionsAlignment: MainAxisAlignment.center,
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('إلغاء',
+                      style: TextStyle(color: AppConstants.textSecondary)),
+                ),
+                const SizedBox(width: AppConstants.itemSpacing / 2),
+                ElevatedButton.icon(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          setDialogState(() => isLoading = true);
+                          try {
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(currentUid)
+                                .update({
+                              'name': nameController.text.trim(),
+                              'email': emailController.text.trim(),
+                            });
+                            Navigator.pop(dialogContext);
+                            _showFeedbackSnackBar(
+                                context, 'تم تحديث بيانات الموظف بنجاح.',
+                                isError: false);
+                          } catch (e) {
+                            _showFeedbackSnackBar(
+                                dialogContext, 'فشل تحديث البيانات: $e',
+                                isError: true);
+                          } finally {
+                            if (mounted) setDialogState(() => isLoading = false);
+                          }
+                        },
+                  icon: isLoading
+                      ? const SizedBox.shrink()
+                      : const Icon(Icons.save_alt_rounded, color: Colors.white),
+                  label: isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white)),
+                        )
+                      : const Text('حفظ التعديلات',
+                          style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.primaryColor,
+                    shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.borderRadius / 2)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _deleteEmployee(String uid, String email) async { //
     bool? confirm = await showDialog(
       context: context,
@@ -303,6 +434,11 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, color: AppConstants.infoColor, size: 26),
+                  onPressed: () => _showEditEmployeeDialog(emp),
+                  tooltip: 'تعديل الموظف',
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline_rounded, color: AppConstants.deleteColor, size: 26),
