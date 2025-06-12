@@ -77,6 +77,7 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
+    final phoneController = TextEditingController();
     String? selectedClientType = 'individual'; // Default client type
     final formKey = GlobalKey<FormState>();
     bool isLoading = false;
@@ -119,12 +120,26 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                         icon: Icons.email_outlined,
                         keyboardType: TextInputType.emailAddress,
                         validator: (value) {
-                          if (value == null || value.isEmpty) return 'الرجاء إدخال البريد الإلكتروني.';
-                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                          if (value != null && value.isNotEmpty && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
                             return 'صيغة بريد إلكتروني غير صحيحة.';
                           }
                           return null;
                         },
+                        isRequired: false,
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      _buildStyledTextField(
+                        controller: phoneController,
+                        labelText: 'رقم الهاتف',
+                        icon: Icons.phone,
+                        keyboardType: TextInputType.phone,
+                        validator: (value) {
+                          if (value != null && value.isNotEmpty && !RegExp(r'^\d{7,}$').hasMatch(value)) {
+                            return 'رقم هاتف غير صالح';
+                          }
+                          return null;
+                        },
+                        isRequired: false,
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
                       _buildStyledTextField(
@@ -133,12 +148,12 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                         icon: Icons.lock_outline,
                         obscureText: true,
                         validator: (value) {
-                          if (value == null || value.isEmpty) return 'الرجاء إدخال كلمة المرور.';
-                          if (value.length < 6) {
+                          if (value != null && value.isNotEmpty && value.length < 6) {
                             return 'يجب أن تكون كلمة المرور 6 أحرف على الأقل.';
                           }
                           return null;
                         },
+                        isRequired: false,
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
                       // Client Type Dropdown
@@ -171,37 +186,60 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                 ),
                 const SizedBox(width: AppConstants.itemSpacing / 2),
                 ElevatedButton.icon(
-                  onPressed: isLoading ? null : () async {
-                    if (!formKey.currentState!.validate()) return;
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
 
-                    setDialogState(() => isLoading = true);
+                          setDialogState(() => isLoading = true);
 
-                    try {
-                      UserCredential userCred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-                        email: emailController.text.trim(),
-                        password: passwordController.text.trim(),
-                      );
+                          try {
+                            if (emailController.text.trim().isNotEmpty &&
+                                passwordController.text.trim().isNotEmpty) {
+                              UserCredential userCred = await FirebaseAuth.instance
+                                  .createUserWithEmailAndPassword(
+                                email: emailController.text.trim(),
+                                password: passwordController.text.trim(),
+                              );
 
-                      await FirebaseFirestore.instance.collection('users').doc(userCred.user!.uid).set({
-                        'uid': userCred.user!.uid,
-                        'email': emailController.text.trim(),
-                        'name': nameController.text.trim(),
-                        'role': 'client',
-                        'clientType': selectedClientType, // Save client type
-                        'createdAt': FieldValue.serverTimestamp(),
-                      });
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(userCred.user!.uid)
+                                  .set({
+                                'uid': userCred.user!.uid,
+                                'email': emailController.text.trim(),
+                                'phone': phoneController.text.trim(),
+                                'name': nameController.text.trim(),
+                                'role': 'client',
+                                'clientType': selectedClientType,
+                                'createdAt': FieldValue.serverTimestamp(),
+                              });
+                            } else {
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .add({
+                                'name': nameController.text.trim(),
+                                'phone': phoneController.text.trim(),
+                                'role': 'client',
+                                'clientType': selectedClientType,
+                                'createdAt': FieldValue.serverTimestamp(),
+                              });
+                            }
 
-                      Navigator.pop(dialogContext); // Close dialog
-                      _showFeedbackSnackBar(context, 'تم إضافة العميل بنجاح.', isError: false);
-                    } on FirebaseAuthException catch (e) {
-                      _showFeedbackSnackBar(dialogContext, _getFirebaseErrorMessage(e.code), isError: true);
-                      // Keep dialog open on Firebase Auth error to allow correction
-                    } catch (e) {
-                      _showFeedbackSnackBar(dialogContext, 'فشل الإضافة: $e', isError: true);
-                    } finally {
-                      if(mounted) setDialogState(() => isLoading = false);
-                    }
-                  },
+                            Navigator.pop(dialogContext);
+                            _showFeedbackSnackBar(context, 'تم إضافة العميل بنجاح.',
+                                isError: false);
+                          } on FirebaseAuthException catch (e) {
+                            _showFeedbackSnackBar(dialogContext,
+                                _getFirebaseErrorMessage(e.code),
+                                isError: true);
+                          } catch (e) {
+                            _showFeedbackSnackBar(dialogContext, 'فشل الإضافة: $e',
+                                isError: true);
+                          } finally {
+                            if (mounted) setDialogState(() => isLoading = false);
+                          }
+                        },
                   icon: isLoading
                       ? const SizedBox.shrink()
                       : const Icon(Icons.person_add_alt_1, color: Colors.white),
@@ -237,6 +275,7 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
 
     final nameController = TextEditingController(text: clientData['name'] ?? '');
     final emailController = TextEditingController(text: clientData['email'] ?? '');
+    final phoneController = TextEditingController(text: clientData['phone'] ?? '');
     // Password is not edited here for security reasons.
     String? selectedClientType = clientData['clientType'] ?? 'individual';
 
@@ -271,12 +310,26 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                           icon: Icons.email_outlined,
                           keyboardType: TextInputType.emailAddress,
                           validator: (value) {
-                            if (value == null || value.isEmpty) return 'الرجاء إدخال البريد الإلكتروني.';
-                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                            if (value != null && value.isNotEmpty && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
                               return 'صيغة بريد إلكتروني غير صحيحة.';
                             }
                             return null;
                           },
+                          isRequired: false,
+                        ),
+                        const SizedBox(height: AppConstants.itemSpacing),
+                        _buildStyledTextField(
+                          controller: phoneController,
+                          labelText: 'رقم الهاتف',
+                          icon: Icons.phone,
+                          keyboardType: TextInputType.phone,
+                          validator: (value) {
+                            if (value != null && value.isNotEmpty && !RegExp(r'^\d{7,}$').hasMatch(value)) {
+                              return 'رقم هاتف غير صالح';
+                            }
+                            return null;
+                          },
+                          isRequired: false,
                         ),
                         const SizedBox(height: AppConstants.itemSpacing),
                         _buildStyledDropdown<String>(
@@ -319,7 +372,8 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                       try {
                         await FirebaseFirestore.instance.collection('users').doc(currentUid).update({
                           'name': nameController.text.trim(),
-                          'email': emailController.text.trim(), // Updates Firestore email
+                          'email': emailController.text.trim(),
+                          'phone': phoneController.text.trim(),
                           'clientType': selectedClientType,
                           // 'updatedAt': FieldValue.serverTimestamp(), // Optional: track updates
                         });
@@ -559,6 +613,7 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     TextInputType keyboardType = TextInputType.text,
     bool obscureText = false,
     String? Function(String?)? validator,
+    bool isRequired = true,
   }) {
     return TextFormField(
       controller: controller,
@@ -593,10 +648,10 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
         contentPadding: const EdgeInsets.symmetric(vertical: AppConstants.paddingMedium -2, horizontal: AppConstants.paddingSmall),
       ),
       validator: (value) {
-        if (value == null || value.isEmpty) {
+        if (isRequired && (value == null || value.isEmpty)) {
           return 'هذا الحقل مطلوب.';
         }
-        if (validator != null) {
+        if (validator != null && value != null && value.isNotEmpty) {
           return validator(value);
         }
         return null;
