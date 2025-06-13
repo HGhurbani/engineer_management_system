@@ -641,7 +641,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     // We handle this by conditionally showing the row.
 
     return Card(
-      elevation: AppConstants.cardShadow[0].blurRadius,
+      elevation: AppConstants.cardShadow.isNotEmpty
+          ? AppConstants.cardShadow.first.blurRadius
+          : 0,
       shadowColor: AppConstants.primaryColor.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
       margin: const EdgeInsets.only(bottom: AppConstants.paddingLarge, left: AppConstants.paddingSmall, right: AppConstants.paddingSmall, top: AppConstants.paddingSmall),

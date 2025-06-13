@@ -473,7 +473,10 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
     return Padding(
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       child: Card(
-        elevation: AppConstants.cardShadow[0].blurRadius + 2, // ظل أوضح للبطاقة
+        elevation: (AppConstants.cardShadow.isNotEmpty
+                ? AppConstants.cardShadow.first.blurRadius
+                : 0) +
+            2, // ظل أوضح للبطاقة
         shadowColor: AppConstants.primaryColor.withOpacity(0.15), // ظل أقوى
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
@@ -756,7 +759,10 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
     }
 
     return Card(
-      elevation: AppConstants.cardShadow[0].blurRadius + 2,
+      elevation: (AppConstants.cardShadow.isNotEmpty
+              ? AppConstants.cardShadow.first.blurRadius
+              : 0) +
+          2,
       // ظل أوضح
       shadowColor: color.withOpacity(0.3),
       // ظل أقوى
@@ -819,7 +825,9 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
   Widget _buildCriteriaScoresCard(Map<String, double> criteriaScores) {
     return Card(
-      elevation: AppConstants.cardShadow[0].blurRadius,
+      elevation: AppConstants.cardShadow.isNotEmpty
+          ? AppConstants.cardShadow.first.blurRadius
+          : 0,
       shadowColor: AppConstants.primaryColor.withOpacity(0.1),
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
@@ -888,7 +896,9 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
   Widget _buildRawMetricsCard(Map<String, dynamic> rawMetrics) {
     return Card(
-      elevation: AppConstants.cardShadow[0].blurRadius,
+      elevation: AppConstants.cardShadow.isNotEmpty
+          ? AppConstants.cardShadow.first.blurRadius
+          : 0,
       shadowColor: AppConstants.primaryColor.withOpacity(0.1),
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
@@ -983,7 +993,9 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
         }
 
         return Card(
-          elevation: AppConstants.cardShadow[0].blurRadius,
+          elevation: AppConstants.cardShadow.isNotEmpty
+              ? AppConstants.cardShadow.first.blurRadius
+              : 0,
           shadowColor: AppConstants.primaryColor.withOpacity(0.1),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppConstants.borderRadius)),

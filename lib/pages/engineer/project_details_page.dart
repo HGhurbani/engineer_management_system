@@ -1279,7 +1279,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
 
     return Card(
-      elevation: AppConstants.cardShadow[0].blurRadius,
+      elevation: AppConstants.cardShadow.isNotEmpty
+          ? AppConstants.cardShadow.first.blurRadius
+          : 0,
       shadowColor: AppConstants.primaryColor.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
       margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium, left:AppConstants.paddingSmall, right: AppConstants.paddingSmall, top:AppConstants.paddingSmall ),

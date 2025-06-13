@@ -1182,7 +1182,9 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
 
   Widget _buildAttendanceStatusCard() {
     return Card(
-      elevation: AppConstants.cardShadow[0].blurRadius,
+      elevation: AppConstants.cardShadow.isNotEmpty
+          ? AppConstants.cardShadow.first.blurRadius
+          : 0,
       shadowColor: AppConstants.primaryColor.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
       child: Padding(
@@ -1247,7 +1249,9 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
 
   Widget _buildTodayAttendanceSection() {
     return Card(
-      elevation: AppConstants.cardShadow[0].blurRadius,
+      elevation: AppConstants.cardShadow.isNotEmpty
+          ? AppConstants.cardShadow.first.blurRadius
+          : 0,
       shadowColor: AppConstants.primaryColor.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
       child: Column(
