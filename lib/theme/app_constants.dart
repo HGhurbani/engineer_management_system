@@ -44,4 +44,8 @@ class AppConstants {
 
   // Misc
   static const Color dividerColor = Color(0xFFEEEEEE);
+
+  // File upload
+  static const String uploadUrl =
+      'https://bhbgroup.me/images_upload/upload_image.php';
 }

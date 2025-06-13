@@ -10,6 +10,19 @@ import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:image/image.dart' as img;
+import 'package:printing/printing.dart';
+import 'package:engineer_management_system/html_stub.dart'
+    if (dart.library.html) 'dart:html' as html;
 // import 'package:url_launcher/url_launcher.dart'; // Not used directly for notifications
 // import 'package:share_plus/share_plus.dart'; // Not used directly for notifications
 import 'dart:ui' as ui;
@@ -51,6 +64,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
   String? _clientTypeKeyFromFirestore;
   String? _clientTypeDisplayString;
+  pw.Font? _arabicFont;
 
   // ... (predefinedPhasesStructure and finalCommissioningTests remain the same) ...
   static const List<Map<String, dynamic>> predefinedPhasesStructure = [
@@ -315,6 +329,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   void initState() {
     super.initState();
     _tabController = TabController(length: 6, vsync: this);
+    _loadArabicFont();
     _fetchInitialData();
   }
 
@@ -568,7 +583,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         IconButton(
           icon: const Icon(Icons.today, color: Colors.white),
           tooltip: 'تقرير اليوم',
-          onPressed: _showDailyReportDialog,
+          onPressed: _generateDailyReportPdf,
         ),
       ],
       bottom: TabBar(
@@ -1329,21 +1344,48 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     if (picked.path == null) return;
     final file = File(picked.path!);
     try {
-      final ref = FirebaseStorage.instance
-          .ref('project_attachments/${widget.projectId}/${DateTime.now().millisecondsSinceEpoch}_${picked.name}');
-      await ref.putFile(file);
-      final url = await ref.getDownloadURL();
-      await FirebaseFirestore.instance
-          .collection('projects')
-          .doc(widget.projectId)
-          .collection('attachments')
-          .add({
-        'fileName': picked.name,
-        'fileUrl': url,
-        'uploaderUid': FirebaseAuth.instance.currentUser?.uid,
-        'uploaderName': _currentAdminName ?? 'مسؤول',
-        'uploadedAt': FieldValue.serverTimestamp(),
-      });
+      var request =
+          http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
+      if (kIsWeb) {
+        final bytes = await file.readAsBytes();
+        request.files.add(http.MultipartFile.fromBytes(
+          'image',
+          bytes,
+          filename: picked.name,
+          contentType: MediaType.parse(picked.mimeType ?? 'application/octet-stream'),
+        ));
+      } else {
+        request.files.add(await http.MultipartFile.fromPath(
+          'image',
+          file.path,
+          contentType: MediaType.parse(picked.mimeType ?? 'application/octet-stream'),
+        ));
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        var responseData = json.decode(response.body);
+        if (responseData['status'] == 'success' && responseData['url'] != null) {
+          final url = responseData['url'];
+          await FirebaseFirestore.instance
+              .collection('projects')
+              .doc(widget.projectId)
+              .collection('attachments')
+              .add({
+            'fileName': picked.name,
+            'fileUrl': url,
+            'uploaderUid': FirebaseAuth.instance.currentUser?.uid,
+            'uploaderName': _currentAdminName ?? 'مسؤول',
+            'uploadedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          throw Exception(responseData['message'] ?? 'فشل رفع المرفق من السيرفر.');
+        }
+      } else {
+        throw Exception('خطأ في الاتصال بالسيرفر: ${response.statusCode}');
+      }
     } catch (e) {
       if (mounted) {
         _showFeedbackSnackBar(context, 'فشل رفع المرفق: $e', isError: true);
@@ -1388,16 +1430,21 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     );
   }
 
-  Future<void> _showDailyReportDialog() async {
+  Future<void> _generateDailyReportPdf() async {
     DateTime now = DateTime.now();
     DateTime start = DateTime(now.year, now.month, now.day);
     DateTime end = start.add(const Duration(days: 1));
-    int entriesCount = 0;
-    int testsCount = 0;
-    int requestsCount = 0;
+
+    final List<Map<String, dynamic>> dayEntries = [];
+    final List<Map<String, dynamic>> dayTests = [];
+    final List<Map<String, dynamic>> dayRequests = [];
+    final Set<String> imageUrls = {};
+
     try {
       for (var phase in predefinedPhasesStructure) {
         final phaseId = phase['id'];
+        final phaseName = phase['name'];
+
         final snap = await FirebaseFirestore.instance
             .collection('projects')
             .doc(widget.projectId)
@@ -1406,10 +1453,22 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             .collection('entries')
             .where('timestamp', isGreaterThanOrEqualTo: start)
             .where('timestamp', isLessThan: end)
+            .orderBy('timestamp')
             .get();
-        entriesCount += snap.docs.length;
+        for (var doc in snap.docs) {
+          final data = doc.data();
+          final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          imageUrls.addAll(imgs);
+          dayEntries.add({
+            ...data,
+            'phaseName': phaseName,
+            'subPhaseName': null,
+          });
+        }
+
         for (var sub in phase['subPhases']) {
           final subId = sub['id'];
+          final subName = sub['name'];
           final subSnap = await FirebaseFirestore.instance
               .collection('projects')
               .doc(widget.projectId)
@@ -1418,10 +1477,32 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
               .collection('entries')
               .where('timestamp', isGreaterThanOrEqualTo: start)
               .where('timestamp', isLessThan: end)
+              .orderBy('timestamp')
               .get();
-          entriesCount += subSnap.docs.length;
+          for (var doc in subSnap.docs) {
+            final data = doc.data();
+            final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            imageUrls.addAll(imgs);
+            dayEntries.add({
+              ...data,
+              'phaseName': phaseName,
+              'subPhaseName': subName,
+            });
+          }
         }
       }
+
+      final Map<String, Map<String, String>> testInfo = {};
+      for (var section in finalCommissioningTests) {
+        final sectionName = section['section_name'] as String;
+        for (var t in section['tests'] as List) {
+          testInfo[(t as Map)['id']] = {
+            'name': t['name'] as String,
+            'section': sectionName,
+          };
+        }
+      }
+
       final testsSnap = await FirebaseFirestore.instance
           .collection('projects')
           .doc(widget.projectId)
@@ -1429,30 +1510,256 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
           .where('lastUpdatedAt', isLessThan: end)
           .get();
-      testsCount = testsSnap.docs.length;
+
+      for (var doc in testsSnap.docs) {
+        final data = doc.data();
+        final info = testInfo[doc.id];
+        final imgUrl = data['imageUrl'] as String?;
+        if (imgUrl != null) imageUrls.add(imgUrl);
+        dayTests.add({
+          ...data,
+          'testId': doc.id,
+          'testName': info?['name'] ?? doc.id,
+          'sectionName': info?['section'] ?? '',
+        });
+      }
+
       final reqSnap = await FirebaseFirestore.instance
           .collection('partRequests')
           .where('projectId', isEqualTo: widget.projectId)
           .where('requestedAt', isGreaterThanOrEqualTo: start)
           .where('requestedAt', isLessThan: end)
           .get();
-      requestsCount = reqSnap.docs.length;
-    } catch (e) {}
+      for (var doc in reqSnap.docs) {
+        dayRequests.add(doc.data());
+      }
+    } catch (e) {
+      print('Error preparing daily report details: $e');
+    }
 
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: ui.TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('تقرير اليوم'),
-          content: Text('عدد الملاحظات المسجلة اليوم: $entriesCount\n'
-              'عدد الاختبارات المحدثة اليوم: $testsCount\n'
-              'عدد طلبات المواد اليوم: $requestsCount'),
-          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إغلاق'))],
+    if (_arabicFont == null) {
+      await _loadArabicFont();
+      if (_arabicFont == null) {
+        _showFeedbackSnackBar(context, 'فشل تحميل الخط العربي. لا يمكن إنشاء PDF.', isError: true);
+        return;
+      }
+    }
+
+    _showLoadingDialog(context, 'جاري إنشاء التقرير...');
+
+    final fetchedImages = await _fetchImagesForUrls(imageUrls.toList());
+
+    final pdf = pw.Document();
+    final pw.TextStyle regularStyle = pw.TextStyle(font: _arabicFont, fontSize: 12);
+    final pw.TextStyle headerStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16);
+    final pw.TextStyle smallGrey = pw.TextStyle(font: _arabicFont, fontSize: 10, color: PdfColors.grey600);
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          textDirection: pw.TextDirection.rtl,
+          theme: pw.ThemeData.withFont(base: _arabicFont),
+          margin: const pw.EdgeInsets.all(30),
+        ),
+        build: (context) {
+          final widgets = <pw.Widget>[];
+          widgets.add(pw.Header(level: 0, child: pw.Text('التقرير اليومي', style: headerStyle)));
+          widgets.add(pw.Text('التاريخ: ${DateFormat('yyyy/MM/dd HH:mm', 'ar').format(now)}', style: regularStyle));
+          widgets.add(pw.SizedBox(height: 10));
+          widgets.add(pw.Text('عدد الملاحظات المسجلة: ${dayEntries.length}', style: regularStyle));
+          widgets.add(pw.Text('عدد الاختبارات المحدثة: ${dayTests.length}', style: regularStyle));
+          widgets.add(pw.Text('عدد طلبات المواد: ${dayRequests.length}', style: regularStyle));
+          widgets.add(pw.SizedBox(height: 20));
+
+          widgets.add(pw.Text('الملاحظات والصور:', style: headerStyle));
+          if (dayEntries.isEmpty) {
+            widgets.add(pw.Text('لا توجد ملاحظات مسجلة اليوم.', style: regularStyle));
+          } else {
+            for (var entry in dayEntries) {
+              final note = entry['note'] ?? '';
+              final engineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
+              final ts = (entry['timestamp'] as Timestamp?)?.toDate();
+              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
+              final phaseName = entry['phaseName'] ?? '';
+              final subName = entry['subPhaseName'];
+              widgets.add(pw.Container(
+                margin: const pw.EdgeInsets.symmetric(vertical: 4),
+                child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+                  pw.Text(subName != null ? '$phaseName > $subName' : phaseName,
+                      style: pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold)),
+                  if (note.toString().isNotEmpty) pw.Text('ملاحظة: $note', style: regularStyle),
+                  for (var url in (entry['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [])
+                    if (fetchedImages.containsKey(url))
+                      pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                          child: pw.Image(fetchedImages[url]!, width: 150, height: 100, fit: pw.BoxFit.contain)),
+                  pw.Text('بواسطة: $engineer - $dateStr', style: smallGrey),
+                ]),
+              ));
+            }
+          }
+
+          widgets.add(pw.SizedBox(height: 10));
+          widgets.add(pw.Text('الاختبارات:', style: headerStyle));
+          if (dayTests.isEmpty) {
+            widgets.add(pw.Text('لا توجد اختبارات محدثة اليوم.', style: regularStyle));
+          } else {
+            for (var test in dayTests) {
+              final note = test['note'] ?? '';
+              final engineer = test['lastUpdatedByName'] ?? 'مهندس';
+              final ts = (test['lastUpdatedAt'] as Timestamp?)?.toDate();
+              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
+              final section = test['sectionName'] ?? '';
+              final name = test['testName'] ?? '';
+              widgets.add(pw.Container(
+                  margin: const pw.EdgeInsets.symmetric(vertical: 4),
+                  child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+                    pw.Text('$section - $name', style: pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold)),
+                    if (note.toString().isNotEmpty) pw.Text('الملاحظات: $note', style: regularStyle),
+                    if (test['imageUrl'] != null && fetchedImages.containsKey(test['imageUrl']))
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                        child: pw.Image(fetchedImages[test['imageUrl']]!, width: 150, height: 100, fit: pw.BoxFit.contain),
+                      ),
+                    pw.Text('بواسطة: $engineer - $dateStr', style: smallGrey),
+                  ])));
+            }
+          }
+
+          widgets.add(pw.SizedBox(height: 10));
+          widgets.add(pw.Text('طلبات المواد:', style: headerStyle));
+          if (dayRequests.isEmpty) {
+            widgets.add(pw.Text('لا توجد طلبات مواد اليوم.', style: regularStyle));
+          } else {
+            for (var pr in dayRequests) {
+              final name = pr['partName'] ?? '';
+              final qty = pr['quantity']?.toString() ?? '1';
+              final status = pr['status'] ?? '';
+              final eng = pr['engineerName'] ?? '';
+              final ts = (pr['requestedAt'] as Timestamp?)?.toDate();
+              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
+              widgets.add(pw.Bullet(
+                  text: '$name - الكمية: $qty - $status - $eng - $dateStr',
+                  textDirection: pw.TextDirection.rtl,
+                  style: regularStyle));
+            }
+          }
+
+          widgets.add(pw.SizedBox(height: 20));
+          widgets.add(pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.red, width: 1.5),
+              borderRadius: pw.BorderRadius.circular(5),
+            ),
+            child: pw.Text(
+              'ملاحظة هامة: في حال مضى 24 ساعة يعتبر هذا التقرير مكتمل وغير قابل للتعديل.',
+              style: pw.TextStyle(font: _arabicFont, color: PdfColors.red, fontWeight: pw.FontWeight.bold, fontSize: 10),
+              textDirection: pw.TextDirection.rtl,
+              textAlign: pw.TextAlign.center,
+            ),
+          ));
+
+          return widgets;
+        },
+        footer: (context) => pw.Container(
+          alignment: pw.Alignment.center,
+          margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
+          child: pw.Text('صفحة ${context.pageNumber} من ${context.pagesCount}', style: smallGrey),
         ),
       ),
     );
+
+    try {
+      final pdfBytes = await pdf.save();
+      final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
+
+      _hideLoadingDialog(context);
+      _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
+
+      await _saveOrSharePdf(
+        pdfBytes,
+        fileName,
+        'التقرير اليومي',
+        'يرجى الإطلاع على التقرير اليومي للمشروع.',
+      );
+    } catch (e) {
+      _hideLoadingDialog(context);
+      _showFeedbackSnackBar(context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
+      print('Error generating daily report PDF: $e');
+    }
+  }
+
+  Future<void> _loadArabicFont() async {
+    try {
+      final fontData = await rootBundle.load('assets/fonts/Tajawal-Regular.ttf');
+      _arabicFont = pw.Font.ttf(fontData);
+    } catch (e) {
+      print('Error loading Arabic font: $e');
+    }
+  }
+
+  void _showLoadingDialog(BuildContext context, String message) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(color: AppConstants.primaryColor),
+              const SizedBox(width: 20),
+              Text(message, style: const TextStyle(fontFamily: 'NotoSansArabic')),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _hideLoadingDialog(BuildContext context) {
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+  }
+
+  Future<Map<String, pw.MemoryImage>> _fetchImagesForUrls(List<String> urls) async {
+    final Map<String, pw.MemoryImage> fetched = {};
+    for (final url in urls) {
+      if (fetched.containsKey(url)) continue;
+      try {
+        final response = await http.get(Uri.parse(url));
+        final contentType = response.headers['content-type'] ?? '';
+        if (response.statusCode == 200 && contentType.startsWith('image/')) {
+          final decoded = img.decodeImage(response.bodyBytes);
+          if (decoded != null) {
+            fetched[url] = pw.MemoryImage(response.bodyBytes);
+          }
+        }
+      } catch (e) {
+        print('Error fetching image from URL $url: $e');
+      }
+    }
+    return fetched;
+  }
+
+  Future<void> _saveOrSharePdf(Uint8List pdfBytes, String fileName, String subject, String text) async {
+    if (kIsWeb) {
+      final blob = html.Blob([pdfBytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', fileName)
+        ..click();
+      html.Url.revokeObjectUrl(url);
+    } else {
+      final dir = await getTemporaryDirectory();
+      final path = '${dir.path}/$fileName';
+      final file = File(path);
+      await file.writeAsBytes(pdfBytes);
+      await Share.shareXFiles([XFile(path)], subject: subject, text: text);
+    }
   }
 
   Widget _buildEmptyState(String message, {IconData icon = Icons.info_outline}) {
