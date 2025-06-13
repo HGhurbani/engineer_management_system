@@ -639,58 +639,107 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
   Future<void> _showAddAttachmentDialog() async {
     if (!mounted) return;
-    final result = await FilePicker.platform.pickFiles();
+    final result = await FilePicker.platform.pickFiles(allowMultiple: true);
     if (result == null || result.files.isEmpty) return;
-    final picked = result.files.first;
-    if (picked.path == null) return;
-    final file = File(picked.path!);
-    final mimeType = lookupMimeType(picked.path!) ?? 'application/octet-stream';
-    try {
-      var request =
-          http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
-      if (kIsWeb) {
-        final bytes = await file.readAsBytes();
-        request.files.add(http.MultipartFile.fromBytes(
-          'image',
-          bytes,
-          filename: picked.name,
-          contentType: MediaType.parse(mimeType),
-        ));
-      } else {
-        request.files.add(await http.MultipartFile.fromPath(
-          'image',
-          file.path,
-          contentType: MediaType.parse(mimeType),
-        ));
-      }
 
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
+    final pickedFiles =
+        result.files.where((f) => f.path != null).toList(growable: false);
+    if (pickedFiles.isEmpty) return;
 
-      if (response.statusCode == 200) {
-        var responseData = json.decode(response.body);
-        if (responseData['status'] == 'success' && responseData['url'] != null) {
-          final url = responseData['url'];
-          await FirebaseFirestore.instance
-              .collection('projects')
-              .doc(widget.projectId)
-              .collection('attachments')
-              .add({
-            'fileName': picked.name,
-            'fileUrl': url,
-            'uploaderUid': _currentEngineerUid,
-            'uploaderName': _currentEngineerName ?? 'مهندس',
-            'uploadedAt': FieldValue.serverTimestamp(),
-          });
-        } else {
-          throw Exception(responseData['message'] ?? 'فشل رفع المرفق من السيرفر.');
-        }
-      } else {
-        throw Exception('خطأ في الاتصال بالسيرفر: ${response.statusCode}');
-      }
-    } catch (e) {
-      _showFeedbackSnackBar(context, 'فشل رفع المرفق: $e', isError: true);
-    }
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) {
+          bool isLoading = false;
+          Future<void> upload() async {
+            setState(() => isLoading = true);
+            for (final picked in pickedFiles) {
+              final file = File(picked.path!);
+              final mimeType =
+                  lookupMimeType(picked.path!) ?? 'application/octet-stream';
+              try {
+                var request = http.MultipartRequest(
+                    'POST', Uri.parse(AppConstants.uploadUrl));
+                if (kIsWeb) {
+                  final bytes = await file.readAsBytes();
+                  request.files.add(http.MultipartFile.fromBytes(
+                    'image',
+                    bytes,
+                    filename: picked.name,
+                    contentType: MediaType.parse(mimeType),
+                  ));
+                } else {
+                  request.files.add(await http.MultipartFile.fromPath(
+                    'image',
+                    file.path,
+                    contentType: MediaType.parse(mimeType),
+                  ));
+                }
+
+                var streamedResponse = await request.send();
+                var response = await http.Response.fromStream(streamedResponse);
+
+                if (response.statusCode == 200) {
+                  var responseData = json.decode(response.body);
+                  if (responseData['status'] == 'success' &&
+                      responseData['url'] != null) {
+                    final url = responseData['url'];
+                    await FirebaseFirestore.instance
+                        .collection('projects')
+                        .doc(widget.projectId)
+                        .collection('attachments')
+                        .add({
+                      'fileName': picked.name,
+                      'fileUrl': url,
+                      'uploaderUid': _currentEngineerUid,
+                      'uploaderName': _currentEngineerName ?? 'مهندس',
+                      'uploadedAt': FieldValue.serverTimestamp(),
+                    });
+                  } else {
+                    throw Exception(
+                        responseData['message'] ?? 'فشل رفع المرفق من السيرفر.');
+                  }
+                } else {
+                  throw Exception(
+                      'خطأ في الاتصال بالسيرفر: ${response.statusCode}');
+                }
+              } catch (e) {
+                if (mounted) {
+                  _showFeedbackSnackBar(context, 'فشل رفع المرفق: $e',
+                      isError: true);
+                }
+              }
+            }
+            if (mounted) Navigator.pop(dialogContext);
+          }
+
+          return AlertDialog(
+            title: const Text('تأكيد رفع المرفقات'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView(
+                shrinkWrap: true,
+                children:
+                    pickedFiles.map((f) => ListTile(title: Text(f.name))).toList(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+                child: const Text('إلغاء'),
+              ),
+              ElevatedButton(
+                onPressed: isLoading ? null : upload,
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.primaryColor),
+                child:
+                    isLoading ? const CircularProgressIndicator() : const Text('رفع'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _showAddImportantNoteDialog() async {
