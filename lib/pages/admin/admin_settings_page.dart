@@ -661,7 +661,9 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
                       ),
-                      elevation: AppConstants.cardShadow[0].blurRadius,
+                      elevation: AppConstants.cardShadow.isNotEmpty
+                          ? AppConstants.cardShadow.first.blurRadius
+                          : 0,
                     ),
                   ),
                 ),
@@ -687,7 +689,9 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                         borderRadius:
                             BorderRadius.circular(AppConstants.borderRadius / 1.5),
                       ),
-                      elevation: AppConstants.cardShadow[0].blurRadius,
+                      elevation: AppConstants.cardShadow.isNotEmpty
+                          ? AppConstants.cardShadow.first.blurRadius
+                          : 0,
                     ),
                   ),
                 ),

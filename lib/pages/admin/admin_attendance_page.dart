@@ -251,7 +251,9 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
     return Padding(
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       child: Card(
-        elevation: AppConstants.cardShadow[0].blurRadius,
+        elevation: AppConstants.cardShadow.isNotEmpty
+            ? AppConstants.cardShadow.first.blurRadius
+            : 0,
         shadowColor: AppConstants.primaryColor.withOpacity(0.1),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
         child: Padding(
@@ -404,7 +406,9 @@ class _AdminAttendancePageState extends State<AdminAttendancePage> {
   Widget _buildDailySummaryCard(Map<String, dynamic> summary) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: AppConstants.paddingMedium, vertical: AppConstants.paddingSmall),
-      elevation: AppConstants.cardShadow[0].blurRadius,
+      elevation: AppConstants.cardShadow.isNotEmpty
+          ? AppConstants.cardShadow.first.blurRadius
+          : 0,
       shadowColor: AppConstants.primaryColor.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
       child: Padding(
