@@ -2,7 +2,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:engineer_management_system/theme/app_constants.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -1282,7 +1281,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       // If the global shadow list is empty we default to no elevation to avoid
       // hitting a RangeError when accessing the first element.
       elevation: AppConstants.cardShadow.isNotEmpty
-          ? AppConstants.cardShadow.first.blurRadius
+          ? AppConstants.cardShadow[0].blurRadius
           : 0,
       shadowColor: AppConstants.primaryColor.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
