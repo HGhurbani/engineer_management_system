@@ -46,7 +46,10 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    // There are four tabs in the engineer home page, so the controller
+    // length should match that count to avoid assertion errors when the
+    // page is built.
+    _tabController = TabController(length: 4, vsync: this);
     _fadeController = AnimationController(duration: const Duration(milliseconds: 700), vsync: this);
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut));
 
