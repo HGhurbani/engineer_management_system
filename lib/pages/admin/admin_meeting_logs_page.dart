@@ -481,7 +481,7 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
   Widget _buildFloatingActionButton() {
     return FloatingActionButton.extended(
       onPressed: _showAddMeetingDialog,
-      backgroundColor: const Color(0xFF2563EB),
+      backgroundColor: const Color(0xFF21206C),
       icon: const Icon(Icons.add, color: Colors.white),
       label: const Text(
         'محضر جديد',

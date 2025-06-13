@@ -349,11 +349,11 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                           icon: Icons.business_center_outlined,
                           validator: (value) => value == null ? 'الرجاء اختيار نوع العميل.' : null,
                         ),
-                        const SizedBox(height: AppConstants.itemSpacing),
-                        const Text(
-                          "ملاحظة: لتغيير كلمة المرور أو البريد الإلكتروني الخاص بالمصادقة، يجب إجراء ذلك من خلال وحدة تحكم Firebase أو طلب إعادة تعيين من المستخدم.",
-                          style: TextStyle(fontSize: 12, color: AppConstants.textSecondary, fontStyle: FontStyle.italic),
-                        ),
+                        // const SizedBox(height: AppConstants.itemSpacing),
+                        // const Text(
+                        //   "ملاحظة: لتغيير كلمة المرور أو البريد الإلكتروني الخاص بالمصادقة، يجب إجراء ذلك من خلال وحدة تحكم Firebase أو طلب إعادة تعيين من المستخدم.",
+                        //   style: TextStyle(fontSize: 12, color: AppConstants.textSecondary, fontStyle: FontStyle.italic),
+                        // ),
                       ],
                     ),
                   ),

@@ -250,14 +250,14 @@ class _AdminEngineersPageState extends State<AdminEngineersPage> {
                         },
                         isRequired: false,
                       ),
-                      const SizedBox(height: AppConstants.itemSpacing),
-                      const Text(
-                        'ملاحظة: لتغيير كلمة المرور الخاصة بالمصادقة يجب استخدام وحدة تحكم Firebase.',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: AppConstants.textSecondary,
-                            fontStyle: FontStyle.italic),
-                      ),
+                      // const SizedBox(height: AppConstants.itemSpacing),
+                      // const Text(
+                      //   'ملاحظة: لتغيير كلمة المرور الخاصة بالمصادقة يجب استخدام وحدة تحكم Firebase.',
+                      //   style: TextStyle(
+                      //       fontSize: 12,
+                      //       color: AppConstants.textSecondary,
+                      //       fontStyle: FontStyle.italic),
+                      // ),
                     ],
                   ),
                 ),

@@ -14,7 +14,7 @@ class AdminEmployeesPage extends StatefulWidget {
 }
 
 class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
-  final List<String> _positions = ['فني كهرباء', 'فني سباكة', 'عامل', 'مساعد'];
+  final List<String> _positions = ['فني كهرباء', 'فني سباكة', 'عامل', 'مساعد', 'فني'];
 
   @override
   void initState() {
@@ -208,6 +208,7 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
         TextEditingController(text: employeeData['name'] ?? '');
     final emailController =
         TextEditingController(text: employeeData['email'] ?? '');
+    String? selectedPosition = employeeData['position'];
 
     final formKey = GlobalKey<FormState>();
     bool isLoading = false;
@@ -281,14 +282,14 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: AppConstants.itemSpacing),
-                      const Text(
-                        'ملاحظة: لتغيير كلمة المرور الخاصة بالمصادقة يجب استخدام وحدة تحكم Firebase.',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: AppConstants.textSecondary,
-                            fontStyle: FontStyle.italic),
-                      ),
+                      // const SizedBox(height: AppConstants.itemSpacing),
+                      // const Text(
+                      //   'ملاحظة: لتغيير كلمة المرور الخاصة بالمصادقة يجب استخدام وحدة تحكم Firebase.',
+                      //   style: TextStyle(
+                      //       fontSize: 12,
+                      //       color: AppConstants.textSecondary,
+                      //       fontStyle: FontStyle.italic),
+                      // ),
                     ],
                   ),
                 ),
