@@ -820,6 +820,139 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
   }
 
+  Future<void> _generateDailyReportPdf() async {
+    DateTime now = DateTime.now();
+    DateTime start = DateTime(now.year, now.month, now.day);
+    DateTime end = start.add(const Duration(days: 1));
+
+    int entriesCount = 0;
+    int testsCount = 0;
+    int requestsCount = 0;
+
+    try {
+      for (var phase in predefinedPhasesStructure) {
+        final phaseId = phase['id'];
+        final snap = await FirebaseFirestore.instance
+            .collection('projects')
+            .doc(widget.projectId)
+            .collection('phases_status')
+            .doc(phaseId)
+            .collection('entries')
+            .where('timestamp', isGreaterThanOrEqualTo: start)
+            .where('timestamp', isLessThan: end)
+            .get();
+        entriesCount += snap.docs.length;
+
+        for (var sub in phase['subPhases']) {
+          final subId = sub['id'];
+          final subSnap = await FirebaseFirestore.instance
+              .collection('projects')
+              .doc(widget.projectId)
+              .collection('subphases_status')
+              .doc(subId)
+              .collection('entries')
+              .where('timestamp', isGreaterThanOrEqualTo: start)
+              .where('timestamp', isLessThan: end)
+              .get();
+          entriesCount += subSnap.docs.length;
+        }
+      }
+
+      final testsSnap = await FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .collection('tests_status')
+          .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
+          .where('lastUpdatedAt', isLessThan: end)
+          .get();
+      testsCount = testsSnap.docs.length;
+
+      final reqSnap = await FirebaseFirestore.instance
+          .collection('partRequests')
+          .where('projectId', isEqualTo: widget.projectId)
+          .where('requestedAt', isGreaterThanOrEqualTo: start)
+          .where('requestedAt', isLessThan: end)
+          .get();
+      requestsCount = reqSnap.docs.length;
+    } catch (e) {
+      print('Error preparing daily report counts: $e');
+    }
+
+    if (_arabicFont == null) {
+      await _loadArabicFont();
+      if (_arabicFont == null) {
+        _showFeedbackSnackBar(context, 'فشل تحميل الخط العربي. لا يمكن إنشاء PDF.', isError: true);
+        return;
+      }
+    }
+
+    _showLoadingDialog(context, 'جاري إنشاء التقرير...');
+
+    final pdf = pw.Document();
+    final pw.TextStyle regularStyle = pw.TextStyle(font: _arabicFont, fontSize: 12);
+    final pw.TextStyle headerStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16);
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          textDirection: pw.TextDirection.rtl,
+          theme: pw.ThemeData.withFont(base: _arabicFont),
+          margin: const pw.EdgeInsets.all(30),
+        ),
+        build: (context) => [
+          pw.Header(level: 0, child: pw.Text('التقرير اليومي', style: headerStyle)),
+          pw.Text('التاريخ: ${DateFormat('yyyy/MM/dd', 'ar').format(now)}', style: regularStyle),
+          pw.SizedBox(height: 10),
+          pw.Text('عدد الملاحظات المسجلة: $entriesCount', style: regularStyle),
+          pw.Text('عدد الاختبارات المحدثة: $testsCount', style: regularStyle),
+          pw.Text('عدد طلبات المواد: $requestsCount', style: regularStyle),
+          pw.SizedBox(height: 20),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.red, width: 1.5),
+              borderRadius: pw.BorderRadius.circular(5),
+            ),
+            child: pw.Text(
+              'ملاحظة هامة: في حال مضى 24 ساعة يعتبر هذا التقرير مكتمل وغير قابل للتعديل.',
+              style: pw.TextStyle(font: _arabicFont, color: PdfColors.red, fontWeight: pw.FontWeight.bold, fontSize: 10),
+              textDirection: pw.TextDirection.rtl,
+              textAlign: pw.TextAlign.center,
+            ),
+          ),
+        ],
+        footer: (context) => pw.Container(
+          alignment: pw.Alignment.center,
+          margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
+          child: pw.Text(
+            'صفحة ${context.pageNumber} من ${context.pagesCount}',
+            style: pw.TextStyle(font: _arabicFont, fontSize: 10, color: PdfColors.grey),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final pdfBytes = await pdf.save();
+      final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
+
+      _hideLoadingDialog(context);
+      _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
+
+      await _saveOrSharePdf(
+        pdfBytes,
+        fileName,
+        'التقرير اليومي',
+        'يرجى الإطلاع على التقرير اليومي للمشروع.',
+      );
+    } catch (e) {
+      _hideLoadingDialog(context);
+      _showFeedbackSnackBar(context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
+      print('Error generating daily report PDF: $e');
+    }
+  }
+
 
   Future<void> _fetchInitialData() async {
     // ... (no changes in this function)
@@ -929,7 +1062,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         IconButton(
           icon: const Icon(Icons.today, color: Colors.white),
           tooltip: 'تقرير اليوم',
-          onPressed: _showDailyReportDialog,
+          onPressed: _generateDailyReportPdf,
         ),
       ],
       bottom: TabBar(
@@ -2624,7 +2757,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             borderRadius: pw.BorderRadius.circular(5),
           ),
           child: pw.Text(
-            "ملاحظة هامة: هذا التقرير صالح لمدة 24 ساعة من التسليم للتعقيب عليها او الملاحظة.",
+            'ملاحظة هامة: في حال مضى 24 ساعة يعتبر هذا التقرير مكتمل وغير قابل للتعديل.',
             style: pw.TextStyle(font: _arabicFont, color: PdfColors.red, fontWeight: pw.FontWeight.bold, fontSize: 10),
             textDirection: pw.TextDirection.rtl,
             textAlign: pw.TextAlign.center,
