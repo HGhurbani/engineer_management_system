@@ -1279,6 +1279,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
 
     return Card(
+      // If the global shadow list is empty we default to no elevation to avoid
+      // hitting a RangeError when accessing the first element.
       elevation: AppConstants.cardShadow.isNotEmpty
           ? AppConstants.cardShadow.first.blurRadius
           : 0,
