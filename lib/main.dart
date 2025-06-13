@@ -4,6 +4,7 @@ import 'package:engineer_management_system/pages/admin/admin_attendance_page.dar
 import 'package:engineer_management_system/pages/admin/admin_attendance_report_page.dart';
 import 'package:engineer_management_system/pages/notifications_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -99,6 +100,16 @@ class MyApp extends StatelessWidget {
               ),
             ),
           ),
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('en'),
+            Locale('ar'),
+          ],
+          locale: const Locale('ar'),
           initialRoute: '/',
           routes: {
             '/': (context) => const AuthWrapper(),
