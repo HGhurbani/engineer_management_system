@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:io'; // For File
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:mime/mime.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'dart:ui' as ui; // For TextDirection
@@ -679,6 +680,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final picked = result.files.first;
     if (picked.path == null) return;
     final file = File(picked.path!);
+    final mimeType = lookupMimeType(picked.path!) ?? 'application/octet-stream';
     try {
       var request =
           http.MultipartRequest('POST', Uri.parse(AppConstants.UPLOAD_URL));
@@ -688,13 +690,13 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           'image',
           bytes,
           filename: picked.name,
-          contentType: MediaType.parse(picked.mimeType ?? 'application/octet-stream'),
+          contentType: MediaType.parse(mimeType),
         ));
       } else {
         request.files.add(await http.MultipartFile.fromPath(
           'image',
           file.path,
-          contentType: MediaType.parse(picked.mimeType ?? 'application/octet-stream'),
+          contentType: MediaType.parse(mimeType),
         ));
       }
 
