@@ -825,13 +825,16 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     DateTime start = DateTime(now.year, now.month, now.day);
     DateTime end = start.add(const Duration(days: 1));
 
-    int entriesCount = 0;
-    int testsCount = 0;
-    int requestsCount = 0;
+    final List<Map<String, dynamic>> dayEntries = [];
+    final List<Map<String, dynamic>> dayTests = [];
+    final List<Map<String, dynamic>> dayRequests = [];
+    final Set<String> imageUrls = {};
 
     try {
       for (var phase in predefinedPhasesStructure) {
         final phaseId = phase['id'];
+        final phaseName = phase['name'];
+
         final snap = await FirebaseFirestore.instance
             .collection('projects')
             .doc(widget.projectId)
@@ -840,11 +843,22 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             .collection('entries')
             .where('timestamp', isGreaterThanOrEqualTo: start)
             .where('timestamp', isLessThan: end)
+            .orderBy('timestamp')
             .get();
-        entriesCount += snap.docs.length;
+        for (var doc in snap.docs) {
+          final data = doc.data();
+          final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          imageUrls.addAll(imgs);
+          dayEntries.add({
+            ...data,
+            'phaseName': phaseName,
+            'subPhaseName': null,
+          });
+        }
 
         for (var sub in phase['subPhases']) {
           final subId = sub['id'];
+          final subName = sub['name'];
           final subSnap = await FirebaseFirestore.instance
               .collection('projects')
               .doc(widget.projectId)
@@ -853,8 +867,29 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               .collection('entries')
               .where('timestamp', isGreaterThanOrEqualTo: start)
               .where('timestamp', isLessThan: end)
+              .orderBy('timestamp')
               .get();
-          entriesCount += subSnap.docs.length;
+          for (var doc in subSnap.docs) {
+            final data = doc.data();
+            final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            imageUrls.addAll(imgs);
+            dayEntries.add({
+              ...data,
+              'phaseName': phaseName,
+              'subPhaseName': subName,
+            });
+          }
+        }
+      }
+
+      final Map<String, Map<String, String>> testInfo = {};
+      for (var section in finalCommissioningTests) {
+        final sectionName = section['section_name'] as String;
+        for (var t in section['tests'] as List) {
+          testInfo[(t as Map)['id']] = {
+            'name': t['name'] as String,
+            'section': sectionName,
+          };
         }
       }
 
@@ -865,7 +900,19 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
           .where('lastUpdatedAt', isLessThan: end)
           .get();
-      testsCount = testsSnap.docs.length;
+
+      for (var doc in testsSnap.docs) {
+        final data = doc.data();
+        final info = testInfo[doc.id];
+        final imgUrl = data['imageUrl'] as String?;
+        if (imgUrl != null) imageUrls.add(imgUrl);
+        dayTests.add({
+          ...data,
+          'testId': doc.id,
+          'testName': info?['name'] ?? doc.id,
+          'sectionName': info?['section'] ?? '',
+        });
+      }
 
       final reqSnap = await FirebaseFirestore.instance
           .collection('partRequests')
@@ -873,9 +920,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           .where('requestedAt', isGreaterThanOrEqualTo: start)
           .where('requestedAt', isLessThan: end)
           .get();
-      requestsCount = reqSnap.docs.length;
+      for (var doc in reqSnap.docs) {
+        dayRequests.add(doc.data());
+      }
     } catch (e) {
-      print('Error preparing daily report counts: $e');
+      print('Error preparing daily report details: $e');
     }
 
     if (_arabicFont == null) {
@@ -888,9 +937,12 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
     _showLoadingDialog(context, 'جاري إنشاء التقرير...');
 
+    final fetchedImages = await _fetchImagesForUrls(imageUrls.toList());
+
     final pdf = pw.Document();
     final pw.TextStyle regularStyle = pw.TextStyle(font: _arabicFont, fontSize: 12);
     final pw.TextStyle headerStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16);
+    final pw.TextStyle smallGrey = pw.TextStyle(font: _arabicFont, fontSize: 10, color: PdfColors.grey600);
 
     pdf.addPage(
       pw.MultiPage(
@@ -900,15 +952,98 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           theme: pw.ThemeData.withFont(base: _arabicFont),
           margin: const pw.EdgeInsets.all(30),
         ),
-        build: (context) => [
-          pw.Header(level: 0, child: pw.Text('التقرير اليومي', style: headerStyle)),
-          pw.Text('التاريخ: ${DateFormat('yyyy/MM/dd', 'ar').format(now)}', style: regularStyle),
-          pw.SizedBox(height: 10),
-          pw.Text('عدد الملاحظات المسجلة: $entriesCount', style: regularStyle),
-          pw.Text('عدد الاختبارات المحدثة: $testsCount', style: regularStyle),
-          pw.Text('عدد طلبات المواد: $requestsCount', style: regularStyle),
-          pw.SizedBox(height: 20),
-          pw.Container(
+        build: (context) {
+          final widgets = <pw.Widget>[];
+          widgets.add(pw.Header(level: 0, child: pw.Text('التقرير اليومي', style: headerStyle)));
+          widgets.add(pw.Text('التاريخ: ${DateFormat('yyyy/MM/dd HH:mm', 'ar').format(now)}', style: regularStyle));
+          widgets.add(pw.SizedBox(height: 10));
+          widgets.add(pw.Text('عدد الملاحظات المسجلة: ${dayEntries.length}', style: regularStyle));
+          widgets.add(pw.Text('عدد الاختبارات المحدثة: ${dayTests.length}', style: regularStyle));
+          widgets.add(pw.Text('عدد طلبات المواد: ${dayRequests.length}', style: regularStyle));
+          widgets.add(pw.SizedBox(height: 20));
+
+          // Entries details
+          widgets.add(pw.Text('الملاحظات والصور:', style: headerStyle));
+          if (dayEntries.isEmpty) {
+            widgets.add(pw.Text('لا توجد ملاحظات مسجلة اليوم.', style: regularStyle));
+          } else {
+            for (var entry in dayEntries) {
+              final note = entry['note'] ?? '';
+              final engineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
+              final ts = (entry['timestamp'] as Timestamp?)?.toDate();
+              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
+              final phaseName = entry['phaseName'] ?? '';
+              final subName = entry['subPhaseName'];
+              widgets.add(pw.Container(
+                margin: const pw.EdgeInsets.symmetric(vertical: 4),
+                child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text(subName != null ? '$phaseName > $subName' : phaseName,
+                          style: pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold)),
+                      if (note.toString().isNotEmpty)
+                        pw.Text('ملاحظة: $note', style: regularStyle),
+                      for (var url in (entry['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [])
+                        if (fetchedImages.containsKey(url))
+                          pw.Padding(
+                              padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                              child: pw.Image(fetchedImages[url]!, width: 150, height: 100, fit: pw.BoxFit.contain)),
+                      pw.Text('بواسطة: $engineer - $dateStr', style: smallGrey),
+                    ]),
+              ));
+            }
+          }
+
+          // Tests details
+          widgets.add(pw.SizedBox(height: 10));
+          widgets.add(pw.Text('الاختبارات:', style: headerStyle));
+          if (dayTests.isEmpty) {
+            widgets.add(pw.Text('لا توجد اختبارات محدثة اليوم.', style: regularStyle));
+          } else {
+            for (var test in dayTests) {
+              final note = test['note'] ?? '';
+              final engineer = test['lastUpdatedByName'] ?? 'مهندس';
+              final ts = (test['lastUpdatedAt'] as Timestamp?)?.toDate();
+              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
+              final section = test['sectionName'] ?? '';
+              final name = test['testName'] ?? '';
+              widgets.add(pw.Container(
+                  margin: const pw.EdgeInsets.symmetric(vertical: 4),
+                  child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+                    pw.Text('$section - $name', style: pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold)),
+                    if (note.toString().isNotEmpty) pw.Text('الملاحظات: $note', style: regularStyle),
+                    if (test['imageUrl'] != null && fetchedImages.containsKey(test['imageUrl']))
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                        child: pw.Image(fetchedImages[test['imageUrl']]!, width: 150, height: 100, fit: pw.BoxFit.contain),
+                      ),
+                    pw.Text('بواسطة: $engineer - $dateStr', style: smallGrey),
+                  ])));
+            }
+          }
+
+          // Part requests
+          widgets.add(pw.SizedBox(height: 10));
+          widgets.add(pw.Text('طلبات المواد:', style: headerStyle));
+          if (dayRequests.isEmpty) {
+            widgets.add(pw.Text('لا توجد طلبات مواد اليوم.', style: regularStyle));
+          } else {
+            for (var pr in dayRequests) {
+              final name = pr['partName'] ?? '';
+              final qty = pr['quantity']?.toString() ?? '1';
+              final status = pr['status'] ?? '';
+              final eng = pr['engineerName'] ?? '';
+              final ts = (pr['requestedAt'] as Timestamp?)?.toDate();
+              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
+              widgets.add(pw.Bullet(
+                  text: '$name - الكمية: $qty - $status - $eng - $dateStr',
+                  textDirection: pw.TextDirection.rtl,
+                  style: regularStyle));
+            }
+          }
+
+          widgets.add(pw.SizedBox(height: 20));
+          widgets.add(pw.Container(
             padding: const pw.EdgeInsets.all(8),
             decoration: pw.BoxDecoration(
               border: pw.Border.all(color: PdfColors.red, width: 1.5),
@@ -920,15 +1055,14 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               textDirection: pw.TextDirection.rtl,
               textAlign: pw.TextAlign.center,
             ),
-          ),
-        ],
+          ));
+
+          return widgets;
+        },
         footer: (context) => pw.Container(
           alignment: pw.Alignment.center,
           margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
-          child: pw.Text(
-            'صفحة ${context.pageNumber} من ${context.pagesCount}',
-            style: pw.TextStyle(font: _arabicFont, fontSize: 10, color: PdfColors.grey),
-          ),
+          child: pw.Text('صفحة ${context.pageNumber} من ${context.pagesCount}', style: smallGrey),
         ),
       ),
     );
@@ -2329,6 +2463,32 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       print('Error fetching part requests for PDF: $e');
     }
     return requests;
+  }
+
+  // Helper to fetch remote images for use in PDFs
+  Future<Map<String, pw.MemoryImage>> _fetchImagesForUrls(
+      List<String> urls) async {
+    final Map<String, pw.MemoryImage> fetched = {};
+    for (final url in urls) {
+      if (fetched.containsKey(url)) continue;
+      try {
+        final response = await http.get(Uri.parse(url));
+        final contentType = response.headers['content-type'] ?? '';
+        if (response.statusCode == 200 && contentType.startsWith('image/')) {
+          final decoded = img.decodeImage(response.bodyBytes);
+          if (decoded != null) {
+            fetched[url] = pw.MemoryImage(response.bodyBytes);
+          } else {
+            print('Invalid image bytes for URL $url');
+          }
+        } else {
+          print('Failed to load image from URL $url');
+        }
+      } catch (e) {
+        print('Error fetching image from URL $url: $e');
+      }
+    }
+    return fetched;
   }
 
 
