@@ -1346,7 +1346,10 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
 
   Future<void> _showAddAttachmentDialog() async {
-    final result = await FilePicker.platform.pickFiles(allowMultiple: true);
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.any,
+    );
     if (result == null || result.files.isEmpty) return;
 
     final pickedFiles =
