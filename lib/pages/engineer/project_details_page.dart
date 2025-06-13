@@ -1416,8 +1416,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                     subPhaseCompletedByUid = subStatusData['lastUpdatedByUid'] as String?;
                                   }
                                   bool canEngineerEditThisSubPhase = canEngineerEditThisPhase && !isSubPhaseCompletedByAnyEngineer;
-                                  bool canGeneratePdfForSubPhase = isSubPhaseCompletedByAnyEngineer && subPhaseCompletedByUid == _currentEngineerUid;
-
                                   Widget? subPhaseTrailingWidget;
                                   if (canEngineerEditThisSubPhase) {
                                     subPhaseTrailingWidget = Checkbox(
@@ -1427,21 +1425,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                         _updateSubPhaseCompletionStatus(phaseId, subPhaseId, subPhaseName, value ?? false);
                                       },
                                     );
-                                  } else if (canGeneratePdfForSubPhase) {
-                                    subPhaseTrailingWidget = Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.teal, size: 20),
-                                          tooltip: 'تقرير PDF للمرحلة الفرعية (خاص بك)',
-                                          onPressed: () {
-                                            _generateAndSharePdf(subPhaseId, subPhaseName, isTestSection: false, isSubPhase: true);
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  } else if (isSubPhaseCompletedByAnyEngineer) {
-                                    subPhaseTrailingWidget = Icon(Icons.picture_as_pdf_outlined, color: Colors.grey[400], size: 20);
                                   }
 
 
