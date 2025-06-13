@@ -680,21 +680,48 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     if (picked.path == null) return;
     final file = File(picked.path!);
     try {
-      final ref = FirebaseStorage.instance
-          .ref('project_attachments/${widget.projectId}/${DateTime.now().millisecondsSinceEpoch}_${picked.name}');
-      await ref.putFile(file);
-      final url = await ref.getDownloadURL();
-      await FirebaseFirestore.instance
-          .collection('projects')
-          .doc(widget.projectId)
-          .collection('attachments')
-          .add({
-        'fileName': picked.name,
-        'fileUrl': url,
-        'uploaderUid': _currentEngineerUid,
-        'uploaderName': _currentEngineerName ?? 'مهندس',
-        'uploadedAt': FieldValue.serverTimestamp(),
-      });
+      var request =
+          http.MultipartRequest('POST', Uri.parse(AppConstants.UPLOAD_URL));
+      if (kIsWeb) {
+        final bytes = await file.readAsBytes();
+        request.files.add(http.MultipartFile.fromBytes(
+          'image',
+          bytes,
+          filename: picked.name,
+          contentType: MediaType.parse(picked.mimeType ?? 'application/octet-stream'),
+        ));
+      } else {
+        request.files.add(await http.MultipartFile.fromPath(
+          'image',
+          file.path,
+          contentType: MediaType.parse(picked.mimeType ?? 'application/octet-stream'),
+        ));
+      }
+
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        var responseData = json.decode(response.body);
+        if (responseData['status'] == 'success' && responseData['url'] != null) {
+          final url = responseData['url'];
+          await FirebaseFirestore.instance
+              .collection('projects')
+              .doc(widget.projectId)
+              .collection('attachments')
+              .add({
+            'fileName': picked.name,
+            'fileUrl': url,
+            'uploaderUid': _currentEngineerUid,
+            'uploaderName': _currentEngineerName ?? 'مهندس',
+            'uploadedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          throw Exception(responseData['message'] ?? 'فشل رفع المرفق من السيرفر.');
+        }
+      } else {
+        throw Exception('خطأ في الاتصال بالسيرفر: ${response.statusCode}');
+      }
     } catch (e) {
       _showFeedbackSnackBar(context, 'فشل رفع المرفق: $e', isError: true);
     }
