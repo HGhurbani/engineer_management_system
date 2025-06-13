@@ -596,18 +596,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   Widget _buildImportantNotesTab() {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(AppConstants.paddingSmall),
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.note_add, color: Colors.white, size: 18),
-              label: const Text('إضافة ملاحظة', style: TextStyle(color: Colors.white)),
-              onPressed: _showAddImportantNoteDialog,
-              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
-            ),
-          ),
-        ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
@@ -825,17 +813,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
   }
 
-  Future<void> _selectReportRange() async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      locale: const Locale('ar'),
-    );
-    if (picked != null) {
-      await _generateDailyReportPdf(start: picked.start, end: picked.end.add(const Duration(days: 1)));
-    }
-  }
 
   Future<void> _generateDailyReportPdf({DateTime? start, DateTime? end}) async {
     DateTime now = DateTime.now();
@@ -850,54 +827,63 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final Set<String> imageUrls = {};
 
     try {
+      List<Future<void>> fetchTasks = [];
       for (var phase in predefinedPhasesStructure) {
         final phaseId = phase['id'];
         final phaseName = phase['name'];
 
-        final snap = await FirebaseFirestore.instance
-            .collection('projects')
-            .doc(widget.projectId)
-            .collection('phases_status')
-            .doc(phaseId)
-            .collection('entries')
-            .where('timestamp', isGreaterThanOrEqualTo: start)
-            .where('timestamp', isLessThan: end)
-            .orderBy('timestamp')
-            .get();
-        for (var doc in snap.docs) {
-          final data = doc.data();
-          final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-          imageUrls.addAll(imgs);
-          dayEntries.add({
-            ...data,
-            'phaseName': phaseName,
-            'subPhaseName': null,
-          });
-        }
-
-        for (var sub in phase['subPhases']) {
-          final subId = sub['id'];
-          final subName = sub['name'];
-          final subSnap = await FirebaseFirestore.instance
+        fetchTasks.add(
+          FirebaseFirestore.instance
               .collection('projects')
               .doc(widget.projectId)
-              .collection('subphases_status')
-              .doc(subId)
+              .collection('phases_status')
+              .doc(phaseId)
               .collection('entries')
               .where('timestamp', isGreaterThanOrEqualTo: start)
               .where('timestamp', isLessThan: end)
               .orderBy('timestamp')
-              .get();
-          for (var doc in subSnap.docs) {
-            final data = doc.data();
-            final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-            imageUrls.addAll(imgs);
-            dayEntries.add({
-              ...data,
-              'phaseName': phaseName,
-              'subPhaseName': subName,
-            });
-          }
+              .get()
+              .then((snap) {
+            for (var doc in snap.docs) {
+              final data = doc.data();
+              final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              imageUrls.addAll(imgs);
+              dayEntries.add({
+                ...data,
+                'phaseName': phaseName,
+                'subPhaseName': null,
+              });
+            }
+          }),
+        );
+
+        for (var sub in phase['subPhases']) {
+          final subId = sub['id'];
+          final subName = sub['name'];
+          fetchTasks.add(
+            FirebaseFirestore.instance
+                .collection('projects')
+                .doc(widget.projectId)
+                .collection('subphases_status')
+                .doc(subId)
+                .collection('entries')
+                .where('timestamp', isGreaterThanOrEqualTo: start)
+                .where('timestamp', isLessThan: end)
+                .orderBy('timestamp')
+                .get()
+                .then((subSnap) {
+              for (var doc in subSnap.docs) {
+                final data = doc.data();
+                final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                imageUrls.addAll(imgs);
+                dayEntries.add({
+                  ...data,
+                  'phaseName': phaseName,
+                  'subPhaseName': subName,
+                });
+              }
+            }),
+          );
         }
       }
 
@@ -912,36 +898,45 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         }
       }
 
-      final testsSnap = await FirebaseFirestore.instance
-          .collection('projects')
-          .doc(widget.projectId)
-          .collection('tests_status')
-          .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
-          .where('lastUpdatedAt', isLessThan: end)
-          .get();
+      fetchTasks.add(
+        FirebaseFirestore.instance
+            .collection('projects')
+            .doc(widget.projectId)
+            .collection('tests_status')
+            .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
+            .where('lastUpdatedAt', isLessThan: end)
+            .get()
+            .then((testsSnap) {
+          for (var doc in testsSnap.docs) {
+            final data = doc.data();
+            final info = testInfo[doc.id];
+            final imgUrl = data['imageUrl'] as String?;
+            if (imgUrl != null) imageUrls.add(imgUrl);
+            dayTests.add({
+              ...data,
+              'testId': doc.id,
+              'testName': info?['name'] ?? doc.id,
+              'sectionName': info?['section'] ?? '',
+            });
+          }
+        }),
+      );
 
-      for (var doc in testsSnap.docs) {
-        final data = doc.data();
-        final info = testInfo[doc.id];
-        final imgUrl = data['imageUrl'] as String?;
-        if (imgUrl != null) imageUrls.add(imgUrl);
-        dayTests.add({
-          ...data,
-          'testId': doc.id,
-          'testName': info?['name'] ?? doc.id,
-          'sectionName': info?['section'] ?? '',
-        });
-      }
+      fetchTasks.add(
+        FirebaseFirestore.instance
+            .collection('partRequests')
+            .where('projectId', isEqualTo: widget.projectId)
+            .where('requestedAt', isGreaterThanOrEqualTo: start)
+            .where('requestedAt', isLessThan: end)
+            .get()
+            .then((reqSnap) {
+          for (var doc in reqSnap.docs) {
+            dayRequests.add(doc.data());
+          }
+        }),
+      );
 
-      final reqSnap = await FirebaseFirestore.instance
-          .collection('partRequests')
-          .where('projectId', isEqualTo: widget.projectId)
-          .where('requestedAt', isGreaterThanOrEqualTo: start)
-          .where('requestedAt', isLessThan: end)
-          .get();
-      for (var doc in reqSnap.docs) {
-        dayRequests.add(doc.data());
-      }
+      await Future.wait(fetchTasks);
     } catch (e) {
       print('Error preparing daily report details: $e');
     }
@@ -1215,8 +1210,12 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       actions: [
         IconButton(
           icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
-          tooltip: 'تقرير PDF',
-          onPressed: _selectReportRange,
+          tooltip: 'تقرير اليوم',
+          onPressed: () {
+            final now = DateTime.now();
+            final start = DateTime(now.year, now.month, now.day);
+            _generateDailyReportPdf(start: start, end: start.add(const Duration(days: 1)));
+          },
         ),
       ],
       bottom: TabBar(
