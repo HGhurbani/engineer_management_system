@@ -1451,58 +1451,67 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     final Set<String> imageUrls = {};
 
     try {
+      List<Future<void>> fetchTasks = [];
       for (var phase in predefinedPhasesStructure) {
         final phaseId = phase['id'];
         final phaseName = phase['name'];
 
-        Query<Map<String, dynamic>> q = FirebaseFirestore.instance
-            .collection('projects')
-            .doc(widget.projectId)
-            .collection('phases_status')
-            .doc(phaseId)
-            .collection('entries');
-        if (useRange) {
-          q = q
-              .where('timestamp', isGreaterThanOrEqualTo: start)
-              .where('timestamp', isLessThan: end);
-        }
-        final snap = await q.orderBy('timestamp').get();
-        for (var doc in snap.docs) {
-          final data = doc.data();
-          final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-          imageUrls.addAll(imgs);
-          dayEntries.add({
-            ...data,
-            'phaseName': phaseName,
-            'subPhaseName': null,
-          });
-        }
+        fetchTasks.add(
+          (() async {
+            Query<Map<String, dynamic>> q = FirebaseFirestore.instance
+                .collection('projects')
+                .doc(widget.projectId)
+                .collection('phases_status')
+                .doc(phaseId)
+                .collection('entries');
+            if (useRange) {
+              q = q
+                  .where('timestamp', isGreaterThanOrEqualTo: start)
+                  .where('timestamp', isLessThan: end);
+            }
+            final snap = await q.orderBy('timestamp').get();
+            for (var doc in snap.docs) {
+              final data = doc.data();
+              final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              imageUrls.addAll(imgs);
+              dayEntries.add({
+                ...data,
+                'phaseName': phaseName,
+                'subPhaseName': null,
+              });
+            }
+          })(),
+        );
 
         for (var sub in phase['subPhases']) {
           final subId = sub['id'];
           final subName = sub['name'];
-          Query<Map<String, dynamic>> qSub = FirebaseFirestore.instance
-              .collection('projects')
-              .doc(widget.projectId)
-              .collection('subphases_status')
-              .doc(subId)
-              .collection('entries');
-          if (useRange) {
-            qSub = qSub
-                .where('timestamp', isGreaterThanOrEqualTo: start)
-                .where('timestamp', isLessThan: end);
-          }
-          final subSnap = await qSub.orderBy('timestamp').get();
-          for (var doc in subSnap.docs) {
-            final data = doc.data();
-            final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-            imageUrls.addAll(imgs);
-            dayEntries.add({
-              ...data,
-              'phaseName': phaseName,
-              'subPhaseName': subName,
-            });
-          }
+          fetchTasks.add(
+            (() async {
+              Query<Map<String, dynamic>> qSub = FirebaseFirestore.instance
+                  .collection('projects')
+                  .doc(widget.projectId)
+                  .collection('subphases_status')
+                  .doc(subId)
+                  .collection('entries');
+              if (useRange) {
+                qSub = qSub
+                    .where('timestamp', isGreaterThanOrEqualTo: start)
+                    .where('timestamp', isLessThan: end);
+              }
+              final subSnap = await qSub.orderBy('timestamp').get();
+              for (var doc in subSnap.docs) {
+                final data = doc.data();
+                final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                imageUrls.addAll(imgs);
+                dayEntries.add({
+                  ...data,
+                  'phaseName': phaseName,
+                  'subPhaseName': subName,
+                });
+              }
+            })(),
+          );
         }
       }
 
@@ -1517,42 +1526,51 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         }
       }
 
-      Query<Map<String, dynamic>> qTests = FirebaseFirestore.instance
-          .collection('projects')
-          .doc(widget.projectId)
-          .collection('tests_status');
-      if (useRange) {
-        qTests = qTests
-            .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
-            .where('lastUpdatedAt', isLessThan: end);
-      }
-      final testsSnap = await qTests.get();
+      fetchTasks.add(
+        (() async {
+          Query<Map<String, dynamic>> qTests = FirebaseFirestore.instance
+              .collection('projects')
+              .doc(widget.projectId)
+              .collection('tests_status');
+          if (useRange) {
+            qTests = qTests
+                .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
+                .where('lastUpdatedAt', isLessThan: end);
+          }
+          final testsSnap = await qTests.get();
+          for (var doc in testsSnap.docs) {
+            final data = doc.data();
+            final info = testInfo[doc.id];
+            final imgUrl = data['imageUrl'] as String?;
+            if (imgUrl != null) imageUrls.add(imgUrl);
+            dayTests.add({
+              ...data,
+              'testId': doc.id,
+              'testName': info?['name'] ?? doc.id,
+              'sectionName': info?['section'] ?? '',
+            });
+          }
+        })(),
+      );
 
-      for (var doc in testsSnap.docs) {
-        final data = doc.data();
-        final info = testInfo[doc.id];
-        final imgUrl = data['imageUrl'] as String?;
-        if (imgUrl != null) imageUrls.add(imgUrl);
-        dayTests.add({
-          ...data,
-          'testId': doc.id,
-          'testName': info?['name'] ?? doc.id,
-          'sectionName': info?['section'] ?? '',
-        });
-      }
+      fetchTasks.add(
+        (() async {
+          Query<Map<String, dynamic>> qReq = FirebaseFirestore.instance
+              .collection('partRequests')
+              .where('projectId', isEqualTo: widget.projectId);
+          if (useRange) {
+            qReq = qReq
+                .where('requestedAt', isGreaterThanOrEqualTo: start)
+                .where('requestedAt', isLessThan: end);
+          }
+          final reqSnap = await qReq.get();
+          for (var doc in reqSnap.docs) {
+            dayRequests.add(doc.data());
+          }
+        })(),
+      );
 
-      Query<Map<String, dynamic>> qReq = FirebaseFirestore.instance
-          .collection('partRequests')
-          .where('projectId', isEqualTo: widget.projectId);
-      if (useRange) {
-        qReq = qReq
-            .where('requestedAt', isGreaterThanOrEqualTo: start)
-            .where('requestedAt', isLessThan: end);
-      }
-      final reqSnap = await qReq.get();
-      for (var doc in reqSnap.docs) {
-        dayRequests.add(doc.data());
-      }
+      await Future.wait(fetchTasks);
     } catch (e) {
       print('Error preparing daily report details: $e');
     }
