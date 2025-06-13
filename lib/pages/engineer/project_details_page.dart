@@ -31,8 +31,8 @@ import 'package:printing/printing.dart';
 
 import '../../main.dart'; // Assuming helper functions are in main.dart
 import '../auth/login_page.dart' show LoginConstants;
+import '../../theme/app_constants.dart';
 
-// ... (AppConstants remains the same) ...
 
 
 class ProjectDetailsPage extends StatefulWidget {
@@ -41,29 +41,6 @@ class ProjectDetailsPage extends StatefulWidget {
 
   @override
   State<ProjectDetailsPage> createState() => _ProjectDetailsPageState();
-}
-class AppConstants {
-  static const Color primaryColor = Color(0xFF21206C);
-  static const Color primaryLight = Color(0xFFF3D660);
-  static const Color successColor = Color(0xFF10B981);
-  static const Color warningColor = Color(0xFFF59E0B);
-  static const Color errorColor = Color(0xFFEF4444);
-  static const Color infoColor = Color(0xFF3B82F6);
-  static const Color cardColor = Colors.white;
-  static const Color backgroundColor = Color(0xFFF8FAFC);
-  static const Color deleteColor = errorColor;
-  static const Color textPrimary = Color(0xFF1F2937);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const double paddingLarge = 24.0;
-  static const double paddingMedium = 16.0;
-  static const double paddingSmall = 8.0;
-  static const double borderRadius = 16.0;
-  static const double itemSpacing = 16.0;
-  static const List<BoxShadow> cardShadow = [
-    BoxShadow(
-        color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 4)),
-  ];
-  static const String UPLOAD_URL = 'https://bhbgroup.me/images_upload/upload_image.php';
 }
 class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProviderStateMixin {
   String? _currentEngineerUid;
@@ -682,7 +659,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final mimeType = lookupMimeType(picked.path!) ?? 'application/octet-stream';
     try {
       var request =
-          http.MultipartRequest('POST', Uri.parse(AppConstants.UPLOAD_URL));
+          http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
       if (kIsWeb) {
         final bytes = await file.readAsBytes();
         request.files.add(http.MultipartFile.fromBytes(
@@ -865,6 +842,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     start ??= DateTime(now.year, now.month, now.day);
     end ??= start.add(const Duration(days: 1));
 
+    _showLoadingDialog(context, 'جاري إنشاء التقرير...');
+
     final List<Map<String, dynamic>> dayEntries = [];
     final List<Map<String, dynamic>> dayTests = [];
     final List<Map<String, dynamic>> dayRequests = [];
@@ -970,12 +949,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     if (_arabicFont == null) {
       await _loadArabicFont();
       if (_arabicFont == null) {
+        _hideLoadingDialog(context);
         _showFeedbackSnackBar(context, 'فشل تحميل الخط العربي. لا يمكن إنشاء PDF.', isError: true);
         return;
       }
     }
-
-    _showLoadingDialog(context, 'جاري إنشاء التقرير...');
 
     final fetchedImages = await _fetchImagesForUrls(imageUrls.toList());
 
@@ -1872,7 +1850,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
                     if (pickedImageXFile != null) {
                       try {
-                        var request = http.MultipartRequest('POST', Uri.parse(AppConstants.UPLOAD_URL));
+                        var request = http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
                         if (kIsWeb) {
                           // Read bytes for web
                           final bytes = await pickedImageXFile!.readAsBytes();
@@ -2219,7 +2197,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       for (int i = 0; i < _selectedImagesInDialogStateful!.length; i++) {
                         final XFile imageFile = _selectedImagesInDialogStateful![i];
                         try {
-                          var request = http.MultipartRequest('POST', Uri.parse(AppConstants.UPLOAD_URL));
+                          var request = http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
                           if (kIsWeb) {
                             final bytes = await imageFile.readAsBytes();
                             request.files.add(http.MultipartFile.fromBytes(
