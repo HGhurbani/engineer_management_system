@@ -1,4 +1,4 @@
-// lib/pages/engineer/request_part_page.dart
+// lib/pages/engineer/request_material_page.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:engineer_management_system/pages/engineer/engineer_home.dart'; // For AppConstants
 import 'package:flutter/material.dart';
@@ -8,23 +8,23 @@ import 'dart:ui' as ui;
 import '../../main.dart';
 import '../../theme/app_constants.dart';
 
-class RequestPartPage extends StatefulWidget {
+class RequestMaterialPage extends StatefulWidget {
   final String engineerId;
   final String engineerName;
 
-  const RequestPartPage({
+  const RequestMaterialPage({
     super.key,
     required this.engineerId,
     required this.engineerName,
   });
 
   @override
-  State<RequestPartPage> createState() => _RequestPartPageState();
+  State<RequestMaterialPage> createState() => _RequestMaterialPageState();
 }
 
-class _RequestPartPageState extends State<RequestPartPage> {
+class _RequestMaterialPageState extends State<RequestMaterialPage> {
   final _formKey = GlobalKey<FormState>();
-  final _partNameController = TextEditingController();
+  final _materialNameController = TextEditingController();
   final _quantityController = TextEditingController();
 
   String? _selectedProjectId;
@@ -76,7 +76,7 @@ class _RequestPartPageState extends State<RequestPartPage> {
 
     try {
       await FirebaseFirestore.instance.collection('partRequests').add({
-        'partName': _partNameController.text.trim(),
+        'partName': _materialNameController.text.trim(),
         'quantity': int.tryParse(_quantityController.text.trim()) ?? 1,
         'projectId': _selectedProjectId,
         'projectName': _selectedProjectName,
@@ -90,16 +90,16 @@ class _RequestPartPageState extends State<RequestPartPage> {
       if (adminUids.isNotEmpty) {
         await sendNotificationsToMultiple(
           recipientUserIds: adminUids,
-          title: 'طلب قطعة جديد',
-          body: 'المهندس ${widget.engineerName} طلب قطعة "${_partNameController.text.trim()}" (الكمية: ${_quantityController.text.trim()}) لمشروع "${_selectedProjectName ?? 'غير محدد'}".',
+          title: 'طلب مواد جديد',
+          body: 'المهندس ${widget.engineerName} طلب مادة "${_materialNameController.text.trim()}" (الكمية: ${_quantityController.text.trim()}) لمشروع "${_selectedProjectName ?? 'غير محدد'}".',
           type: 'part_request_new',
           projectId: _selectedProjectId,
-          itemId: null, // لا يوجد itemId محدد لطلب القطعة بعد، يمكن تحديثه لاحقاً
+          itemId: null, // لا يوجد itemId محدد لطلب المواد بعد، يمكن تحديثه لاحقاً
           senderName: widget.engineerName,
         );
       }
       if (mounted) {
-        _showFeedbackSnackBar('تم إرسال طلب القطعة بنجاح.', isError: false);
+        _showFeedbackSnackBar('تم إرسال طلب المواد بنجاح.', isError: false);
         Navigator.pop(context);
       }
     } catch (e) {
@@ -128,7 +128,7 @@ class _RequestPartPageState extends State<RequestPartPage> {
 
   @override
   void dispose() {
-    _partNameController.dispose();
+    _materialNameController.dispose();
     _quantityController.dispose();
     super.dispose();
   }
@@ -139,7 +139,7 @@ class _RequestPartPageState extends State<RequestPartPage> {
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('طلب قطعة جديدة', style: TextStyle(color: Colors.white)),
+          title: const Text('طلب مواد جديد', style: TextStyle(color: Colors.white)),
           backgroundColor: AppConstants.primaryColor,
           iconTheme: const IconThemeData(color: Colors.white),
           flexibleSpace: Container(
@@ -161,15 +161,15 @@ class _RequestPartPageState extends State<RequestPartPage> {
             child: ListView(
               children: [
                 TextFormField(
-                  controller: _partNameController,
+                  controller: _materialNameController,
                   decoration: const InputDecoration(
-                    labelText: 'اسم القطعة المطلوبة',
+                    labelText: 'اسم المادة المطلوبة',
                     prefixIcon: Icon(Icons.settings_input_component_outlined, color: AppConstants.primaryColor),
                     border: OutlineInputBorder(),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'الرجاء إدخال اسم القطعة.';
+                      return 'الرجاء إدخال اسم المادة.';
                     }
                     return null;
                   },
@@ -198,7 +198,7 @@ class _RequestPartPageState extends State<RequestPartPage> {
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: AppConstants.paddingMedium),
                     child: Text(
-                      'لم يتم تعيينك على أي مشاريع حالياً لطلب قطع لها.',
+                      'لم يتم تعيينك على أي مشاريع حالياً لطلب مواد لها.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppConstants.textSecondary),
                     ),

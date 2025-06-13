@@ -190,14 +190,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
         if (_currentUserRole == 'admin') {
           // Admin navigates to projects page, where they can see part requests.
           Navigator.pushNamed(context, '/admin/projects'); // أو /admin/partRequests إذا كان هناك صفحة مخصصة
-          _showFeedbackSnackBar(context, 'يرجى مراجعة طلبات القطع للمشروع ذو الصلة.', isError: false, isInfo: true);
+          _showFeedbackSnackBar(context, 'يرجى مراجعة طلبات المواد للمشروع ذو الصلة.', isError: false, isInfo: true);
         }
         break;
 
       case 'part_request_status_update': // (إذا كان لديك منطق لتحديث حالة طلب القطعة)
         if (_currentUserRole == 'engineer') {
-          Navigator.pushNamed(context, '/engineer'); // المهندس يعود لصفحته الرئيسية حيث يمكنه رؤية طلبات القطع
-          _showFeedbackSnackBar(context, 'تم تحديث حالة طلب قطعة. يرجى مراجعة طلباتك.', isError: false, isInfo: true);
+          Navigator.pushNamed(context, '/engineer'); // المهندس يعود لصفحته الرئيسية حيث يمكنه رؤية طلبات المواد
+          _showFeedbackSnackBar(context, 'تم تحديث حالة طلب المواد. يرجى مراجعة طلباتك.', isError: false, isInfo: true);
         }
         break;
 

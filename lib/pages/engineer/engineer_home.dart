@@ -554,7 +554,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             controller: _tabController,
             children: [
               _buildMyProjectsTab(),
-              _buildPartRequestsTab(),
+              _buildMaterialRequestsTab(),
               _buildDailyScheduleTab(),
               _buildMeetingLogsTab(),
             ],
@@ -818,9 +818,9 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     }
   }
 
-  Widget _buildPartRequestsTab() {
+  Widget _buildMaterialRequestsTab() {
     if (_currentEngineerUid == null) {
-      return _buildErrorState('لا يمكن تحميل طلبات القطع بدون معرّف مهندس.');
+      return _buildErrorState('لا يمكن تحميل طلبات المواد بدون معرّف مهندس.');
     }
     return Scaffold(
       body: StreamBuilder<QuerySnapshot>(
@@ -834,10 +834,10 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
           }
           if (snapshot.hasError) {
-            return _buildErrorState('حدث خطأ في تحميل طلبات القطع: ${snapshot.error}');
+          return _buildErrorState('حدث خطأ في تحميل طلبات المواد: ${snapshot.error}');
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return _buildEmptyState('لا توجد طلبات قطع حالياً.', icon: Icons.list_alt_outlined);
+            return _buildEmptyState('لا توجد طلبات مواد حالياً.', icon: Icons.list_alt_outlined);
           }
 
           final requests = snapshot.data!.docs;
@@ -847,7 +847,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             itemBuilder: (context, index) {
               final requestDoc = requests[index];
               final data = requestDoc.data() as Map<String, dynamic>;
-              final partName = data['partName'] ?? 'قطعة غير مسماة';
+              final partName = data['partName'] ?? 'مادة غير مسماة';
               final quantity = data['quantity']?.toString() ?? 'N/A';
               final projectName = data['projectName'] ?? 'مشروع غير محدد';
               final status = data['status'] ?? 'غير معروف';
@@ -882,7 +882,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
                 elevation: 1.5,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
                 child: ListTile(
-                  title: Text('اسم القطعة: $partName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                  title: Text('اسم المادة: $partName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -916,7 +916,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
           if (_currentEngineerUid != null && _engineerName != null) {
             Navigator.pushNamed(
               context,
-              '/engineer/request_part',
+              '/engineer/request_material',
               arguments: {
                 'engineerId': _currentEngineerUid,
                 'engineerName': _engineerName,
@@ -926,7 +926,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             _showFeedbackSnackBar(context, 'بيانات المهندس غير متوفرة.', isError: true);
           }
         },
-        label: const Text('طلب قطعة جديدة', style: TextStyle(color: Colors.white)),
+        label: const Text('طلب مواد جديد', style: TextStyle(color: Colors.white)),
         icon: const Icon(Icons.add_shopping_cart_rounded, color: Colors.white),
         backgroundColor: AppConstants.primaryColor,
       ),
@@ -1034,7 +1034,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         unselectedLabelStyle: const TextStyle(fontSize: 16, fontFamily: 'Tajawal'),
         tabs: const [
           Tab(text: 'مشاريعي', icon: Icon(Icons.business_center_outlined)),
-          Tab(text: 'طلبات القطع', icon: Icon(Icons.build_circle_outlined)),
+          Tab(text: 'طلبات المواد', icon: Icon(Icons.build_circle_outlined)),
           Tab(text: 'جدولي اليومي', icon: Icon(Icons.calendar_today_rounded)),
           Tab(text: 'محاضر الاجتماعات', icon: Icon(Icons.event_note_outlined)),
         ],

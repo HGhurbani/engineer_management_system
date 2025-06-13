@@ -612,7 +612,7 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
         tabs: const [
           Tab(text: 'مراحل المشروع', icon: Icon(Icons.stairs_outlined)),
           Tab(text: 'الاختبارات النهائية', icon: Icon(Icons.checklist_rtl_rounded)),
-          Tab(text: 'طلبات القطع', icon: Icon(Icons.build_circle_outlined)),
+          Tab(text: 'طلبات المواد', icon: Icon(Icons.build_circle_outlined)),
         ],
       ),
     );
@@ -1125,10 +1125,10 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
           return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
         }
         if (snapshot.hasError) {
-          return _buildErrorState('حدث خطأ في تحميل طلبات القطع: ${snapshot.error}');
+          return _buildErrorState('حدث خطأ في تحميل طلبات المواد: ${snapshot.error}');
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState('لا توجد طلبات قطع لهذا المشروع حالياً.', icon: Icons.construction_rounded);
+          return _buildEmptyState('لا توجد طلبات مواد لهذا المشروع حالياً.', icon: Icons.construction_rounded);
         }
 
         final requests = snapshot.data!.docs;
@@ -1139,7 +1139,7 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
           itemBuilder: (context, index) {
             final requestDoc = requests[index];
             final data = requestDoc.data() as Map<String, dynamic>;
-            final partName = data['partName'] ?? 'قطعة غير مسماة';
+            final partName = data['partName'] ?? 'مادة غير مسماة';
             final quantity = data['quantity']?.toString() ?? 'N/A';
             final engineerName = data['engineerName'] ?? 'مهندس غير معروف';
             final status = data['status'] ?? 'غير معروف';
@@ -1168,7 +1168,7 @@ class _ClientHomeState extends State<ClientHome> with TickerProviderStateMixin {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('اسم القطعة: $partName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                    Text('اسم المادة: $partName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
                     const SizedBox(height: AppConstants.paddingSmall / 2),
                     Text('الكمية: $quantity', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
                     Text('مقدم الطلب: $engineerName', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),

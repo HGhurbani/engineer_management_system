@@ -24,7 +24,7 @@ import 'package:engineer_management_system/pages/engineer/project_details_page.d
     show ProjectDetailsPage;
 import 'package:engineer_management_system/pages/admin/admin_settings_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_holiday_settings_page.dart';
-import 'package:engineer_management_system/pages/engineer/request_part_page.dart';
+import 'package:engineer_management_system/pages/engineer/request_material_page.dart';
 import 'package:engineer_management_system/pages/engineer/meeting_logs_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_meeting_logs_page.dart';
 import 'package:engineer_management_system/pages/common/change_password_page.dart';
@@ -127,16 +127,16 @@ class MyApp extends StatelessWidget {
         '/admin/change_password': (context) => const ChangePasswordPage(role: 'admin'),
         '/engineer/change_password': (context) => const ChangePasswordPage(role: 'engineer'),
         '/client/change_password': (context) => const ChangePasswordPage(role: 'client'),
-        // New route for requesting parts
-        '/engineer/request_part': (context) {
+        // New route for requesting materials
+        '/engineer/request_material': (context) {
           final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
           if (args != null && args.containsKey('engineerId') && args.containsKey('engineerName')) {
-            return RequestPartPage(
+            return RequestMaterialPage(
               engineerId: args['engineerId'] as String,
               engineerName: args['engineerName'] as String,
             );
           }
-          print('Error: Missing arguments for /engineer/request_part route.');
+          print('Error: Missing arguments for /engineer/request_material route.');
           return const LoginPage();
         },
         '/engineer/meeting_logs': (context) {
