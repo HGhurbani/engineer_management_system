@@ -584,7 +584,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         IconButton(
           icon: const Icon(Icons.today, color: Colors.white),
           tooltip: 'تقرير اليوم',
-          onPressed: _generateDailyReportPdf,
+          onPressed: () {
+            final now = DateTime.now();
+            final start = DateTime(now.year, now.month, now.day);
+            _generateDailyReportPdf(
+                start: start, end: start.add(const Duration(days: 1)));
+          },
         ),
       ],
       bottom: TabBar(
@@ -1434,10 +1439,11 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     );
   }
 
-  Future<void> _generateDailyReportPdf() async {
+  Future<void> _generateDailyReportPdf({DateTime? start, DateTime? end}) async {
     DateTime now = DateTime.now();
-    DateTime start = DateTime(now.year, now.month, now.day);
-    DateTime end = start.add(const Duration(days: 1));
+    final bool useRange = start != null && end != null;
+    start ??= DateTime(now.year, now.month, now.day);
+    end ??= start.add(const Duration(days: 1));
 
     final List<Map<String, dynamic>> dayEntries = [];
     final List<Map<String, dynamic>> dayTests = [];
@@ -1449,16 +1455,18 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         final phaseId = phase['id'];
         final phaseName = phase['name'];
 
-        final snap = await FirebaseFirestore.instance
+        Query<Map<String, dynamic>> q = FirebaseFirestore.instance
             .collection('projects')
             .doc(widget.projectId)
             .collection('phases_status')
             .doc(phaseId)
-            .collection('entries')
-            .where('timestamp', isGreaterThanOrEqualTo: start)
-            .where('timestamp', isLessThan: end)
-            .orderBy('timestamp')
-            .get();
+            .collection('entries');
+        if (useRange) {
+          q = q
+              .where('timestamp', isGreaterThanOrEqualTo: start)
+              .where('timestamp', isLessThan: end);
+        }
+        final snap = await q.orderBy('timestamp').get();
         for (var doc in snap.docs) {
           final data = doc.data();
           final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
@@ -1473,16 +1481,18 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         for (var sub in phase['subPhases']) {
           final subId = sub['id'];
           final subName = sub['name'];
-          final subSnap = await FirebaseFirestore.instance
+          Query<Map<String, dynamic>> qSub = FirebaseFirestore.instance
               .collection('projects')
               .doc(widget.projectId)
               .collection('subphases_status')
               .doc(subId)
-              .collection('entries')
-              .where('timestamp', isGreaterThanOrEqualTo: start)
-              .where('timestamp', isLessThan: end)
-              .orderBy('timestamp')
-              .get();
+              .collection('entries');
+          if (useRange) {
+            qSub = qSub
+                .where('timestamp', isGreaterThanOrEqualTo: start)
+                .where('timestamp', isLessThan: end);
+          }
+          final subSnap = await qSub.orderBy('timestamp').get();
           for (var doc in subSnap.docs) {
             final data = doc.data();
             final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
@@ -1507,13 +1517,16 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         }
       }
 
-      final testsSnap = await FirebaseFirestore.instance
+      Query<Map<String, dynamic>> qTests = FirebaseFirestore.instance
           .collection('projects')
           .doc(widget.projectId)
-          .collection('tests_status')
-          .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
-          .where('lastUpdatedAt', isLessThan: end)
-          .get();
+          .collection('tests_status');
+      if (useRange) {
+        qTests = qTests
+            .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
+            .where('lastUpdatedAt', isLessThan: end);
+      }
+      final testsSnap = await qTests.get();
 
       for (var doc in testsSnap.docs) {
         final data = doc.data();
@@ -1528,12 +1541,15 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         });
       }
 
-      final reqSnap = await FirebaseFirestore.instance
+      Query<Map<String, dynamic>> qReq = FirebaseFirestore.instance
           .collection('partRequests')
-          .where('projectId', isEqualTo: widget.projectId)
-          .where('requestedAt', isGreaterThanOrEqualTo: start)
-          .where('requestedAt', isLessThan: end)
-          .get();
+          .where('projectId', isEqualTo: widget.projectId);
+      if (useRange) {
+        qReq = qReq
+            .where('requestedAt', isGreaterThanOrEqualTo: start)
+            .where('requestedAt', isLessThan: end);
+      }
+      final reqSnap = await qReq.get();
       for (var doc in reqSnap.docs) {
         dayRequests.add(doc.data());
       }
@@ -1557,6 +1573,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     final pw.TextStyle regularStyle = pw.TextStyle(font: _arabicFont, fontSize: 12);
     final pw.TextStyle headerStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16);
     final pw.TextStyle smallGrey = pw.TextStyle(font: _arabicFont, fontSize: 10, color: PdfColors.grey600);
+    final String headerText = useRange ? 'التقرير اليومي' : 'التقرير التراكمي';
 
     pdf.addPage(
       pw.MultiPage(
@@ -1568,7 +1585,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         ),
         build: (context) {
           final widgets = <pw.Widget>[];
-          widgets.add(pw.Header(level: 0, child: pw.Text('التقرير اليومي', style: headerStyle)));
+          widgets.add(pw.Header(level: 0, child: pw.Text(headerText, style: headerStyle)));
           widgets.add(pw.Text('التاريخ: ${DateFormat('yyyy/MM/dd HH:mm', 'ar').format(now)}', style: regularStyle));
           widgets.add(pw.SizedBox(height: 10));
           widgets.add(pw.Text('عدد الملاحظات المسجلة: ${dayEntries.length}', style: regularStyle));
@@ -1685,8 +1702,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       await _saveOrSharePdf(
         pdfBytes,
         fileName,
-        'التقرير اليومي',
-        'يرجى الإطلاع على التقرير اليومي للمشروع.',
+        headerText,
+        'يرجى الإطلاع على $headerText للمشروع.',
       );
     } catch (e) {
       _hideLoadingDialog(context);
@@ -1731,8 +1748,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
   Future<Map<String, pw.MemoryImage>> _fetchImagesForUrls(List<String> urls) async {
     final Map<String, pw.MemoryImage> fetched = {};
-    for (final url in urls) {
-      if (fetched.containsKey(url)) continue;
+    await Future.wait(urls.map((url) async {
+      if (fetched.containsKey(url)) return;
       try {
         final response = await http.get(Uri.parse(url));
         final contentType = response.headers['content-type'] ?? '';
@@ -1745,7 +1762,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       } catch (e) {
         print('Error fetching image from URL $url: $e');
       }
-    }
+    }));
     return fetched;
   }
 
