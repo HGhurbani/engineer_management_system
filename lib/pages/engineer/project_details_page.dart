@@ -849,10 +849,22 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
   }
 
-  Future<void> _generateDailyReportPdf() async {
+  Future<void> _selectReportRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      locale: const Locale('ar'),
+    );
+    if (picked != null) {
+      await _generateDailyReportPdf(start: picked.start, end: picked.end.add(const Duration(days: 1)));
+    }
+  }
+
+  Future<void> _generateDailyReportPdf({DateTime? start, DateTime? end}) async {
     DateTime now = DateTime.now();
-    DateTime start = DateTime(now.year, now.month, now.day);
-    DateTime end = start.add(const Duration(days: 1));
+    start ??= DateTime(now.year, now.month, now.day);
+    end ??= start.add(const Duration(days: 1));
 
     final List<Map<String, dynamic>> dayEntries = [];
     final List<Map<String, dynamic>> dayTests = [];
@@ -972,6 +984,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final pw.TextStyle regularStyle = pw.TextStyle(font: _arabicFont, fontSize: 12);
     final pw.TextStyle headerStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16);
     final pw.TextStyle smallGrey = pw.TextStyle(font: _arabicFont, fontSize: 10, color: PdfColors.grey600);
+    final bool isRange = start!.difference(end!).inDays != -1;
+    final String headerText = isRange ? 'التقرير التراكمي' : 'التقرير اليومي';
 
     pdf.addPage(
       pw.MultiPage(
@@ -983,7 +997,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         ),
         build: (context) {
           final widgets = <pw.Widget>[];
-          widgets.add(pw.Header(level: 0, child: pw.Text('التقرير اليومي', style: headerStyle)));
+          widgets.add(pw.Header(level: 0, child: pw.Text(headerText, style: headerStyle)));
           widgets.add(pw.Text('التاريخ: ${DateFormat('yyyy/MM/dd HH:mm', 'ar').format(now)}', style: regularStyle));
           widgets.add(pw.SizedBox(height: 10));
           widgets.add(pw.Text('عدد الملاحظات المسجلة: ${dayEntries.length}', style: regularStyle));
@@ -994,7 +1008,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           // Entries details
           widgets.add(pw.Text('الملاحظات والصور:', style: headerStyle));
           if (dayEntries.isEmpty) {
-            widgets.add(pw.Text('لا توجد ملاحظات مسجلة اليوم.', style: regularStyle));
+            widgets.add(pw.Text('لا توجد ملاحظات مسجلة.', style: regularStyle));
           } else {
             for (var entry in dayEntries) {
               final note = entry['note'] ?? '';
@@ -1027,7 +1041,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           widgets.add(pw.SizedBox(height: 10));
           widgets.add(pw.Text('الاختبارات:', style: headerStyle));
           if (dayTests.isEmpty) {
-            widgets.add(pw.Text('لا توجد اختبارات محدثة اليوم.', style: regularStyle));
+            widgets.add(pw.Text('لا توجد اختبارات محدثة.', style: regularStyle));
           } else {
             for (var test in dayTests) {
               final note = test['note'] ?? '';
@@ -1055,7 +1069,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           widgets.add(pw.SizedBox(height: 10));
           widgets.add(pw.Text('طلبات المواد:', style: headerStyle));
           if (dayRequests.isEmpty) {
-            widgets.add(pw.Text('لا توجد طلبات مواد اليوم.', style: regularStyle));
+            widgets.add(pw.Text('لا توجد طلبات مواد.', style: regularStyle));
           } else {
             for (var pr in dayRequests) {
               final name = pr['partName'] ?? '';
@@ -1106,8 +1120,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       await _saveOrSharePdf(
         pdfBytes,
         fileName,
-        'التقرير اليومي',
-        'يرجى الإطلاع على التقرير اليومي للمشروع.',
+        headerText,
+        'يرجى الإطلاع على $headerText للمشروع.',
       );
     } catch (e) {
       _hideLoadingDialog(context);
@@ -1223,9 +1237,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       centerTitle: true,
       actions: [
         IconButton(
-          icon: const Icon(Icons.today, color: Colors.white),
-          tooltip: 'تقرير اليوم',
-          onPressed: _generateDailyReportPdf,
+          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
+          tooltip: 'تقرير PDF',
+          onPressed: _selectReportRange,
         ),
       ],
       bottom: TabBar(
@@ -2498,8 +2512,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   Future<Map<String, pw.MemoryImage>> _fetchImagesForUrls(
       List<String> urls) async {
     final Map<String, pw.MemoryImage> fetched = {};
-    for (final url in urls) {
-      if (fetched.containsKey(url)) continue;
+    await Future.wait(urls.map((url) async {
+      if (fetched.containsKey(url)) return;
       try {
         final response = await http.get(Uri.parse(url));
         final contentType = response.headers['content-type'] ?? '';
@@ -2516,7 +2530,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       } catch (e) {
         print('Error fetching image from URL $url: $e');
       }
-    }
+    }));
     return fetched;
   }
 
