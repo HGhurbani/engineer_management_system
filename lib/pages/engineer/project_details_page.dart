@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:io'; // For File
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -333,7 +336,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _currentEngineerUid = FirebaseAuth.instance.currentUser?.uid;
     _loadArabicFont(); // Load the font
     _fetchInitialData();
@@ -557,6 +560,252 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     );
   }
 
+  Widget _buildAttachmentsTab() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(AppConstants.paddingSmall),
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.attach_file, color: Colors.white, size: 18),
+              label: const Text('إضافة مرفق', style: TextStyle(color: Colors.white)),
+              onPressed: _showAddAttachmentDialog,
+              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+            ),
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('projects')
+                .doc(widget.projectId)
+                .collection('attachments')
+                .orderBy('uploadedAt', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+              }
+              if (snapshot.hasError) {
+                return const Center(child: Text('فشل تحميل المرفقات'));
+              }
+              final files = snapshot.data?.docs ?? [];
+              if (files.isEmpty) {
+                return const Center(child: Text('لا توجد مرفقات حالياً'));
+              }
+              return ListView.builder(
+                itemCount: files.length,
+                itemBuilder: (context, index) {
+                  final data = files[index].data() as Map<String, dynamic>;
+                  final fileName = data['fileName'] ?? 'ملف';
+                  final fileUrl = data['fileUrl'] as String?;
+                  final uploader = data['uploaderName'] ?? '';
+                  return ListTile(
+                    leading: const Icon(Icons.attach_file_outlined),
+                    title: Text(fileName),
+                    subtitle: Text('بواسطة: $uploader'),
+                    onTap: fileUrl != null ? () => launchUrl(Uri.parse(fileUrl)) : null,
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImportantNotesTab() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(AppConstants.paddingSmall),
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.note_add, color: Colors.white, size: 18),
+              label: const Text('إضافة ملاحظة', style: TextStyle(color: Colors.white)),
+              onPressed: _showAddImportantNoteDialog,
+              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+            ),
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('projects')
+                .doc(widget.projectId)
+                .collection('importantNotes')
+                .orderBy('createdAt', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+              }
+              if (snapshot.hasError) {
+                return const Center(child: Text('فشل تحميل الملاحظات'));
+              }
+              final notes = snapshot.data?.docs ?? [];
+              if (notes.isEmpty) {
+                return const Center(child: Text('لا توجد ملاحظات'));
+              }
+              return ListView.builder(
+                itemCount: notes.length,
+                itemBuilder: (context, index) {
+                  final data = notes[index].data() as Map<String, dynamic>;
+                  final text = data['text'] ?? '';
+                  final author = data['authorName'] ?? '';
+                  final ts = data['createdAt'] as Timestamp?;
+                  final date = ts != null ? DateFormat('yyyy/MM/dd').format(ts.toDate()) : '';
+                  return ListTile(
+                    leading: const Icon(Icons.sticky_note_2_outlined),
+                    title: Text(text),
+                    subtitle: Text('$author - $date'),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showAddAttachmentDialog() async {
+    if (!mounted) return;
+    final result = await FilePicker.platform.pickFiles();
+    if (result == null || result.files.isEmpty) return;
+    final picked = result.files.first;
+    if (picked.path == null) return;
+    final file = File(picked.path!);
+    try {
+      final ref = FirebaseStorage.instance
+          .ref('project_attachments/${widget.projectId}/${DateTime.now().millisecondsSinceEpoch}_${picked.name}');
+      await ref.putFile(file);
+      final url = await ref.getDownloadURL();
+      await FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .collection('attachments')
+          .add({
+        'fileName': picked.name,
+        'fileUrl': url,
+        'uploaderUid': _currentEngineerUid,
+        'uploaderName': _currentEngineerName ?? 'مهندس',
+        'uploadedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      _showFeedbackSnackBar(context, 'فشل رفع المرفق: $e', isError: true);
+    }
+  }
+
+  Future<void> _showAddImportantNoteDialog() async {
+    final controller = TextEditingController();
+    await showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: ui.TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('إضافة ملاحظة هامة'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(labelText: 'الملاحظة'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            ElevatedButton(
+              onPressed: () async {
+                if (controller.text.trim().isEmpty) return;
+                await FirebaseFirestore.instance
+                    .collection('projects')
+                    .doc(widget.projectId)
+                    .collection('importantNotes')
+                    .add({
+                  'text': controller.text.trim(),
+                  'authorUid': _currentEngineerUid,
+                  'authorName': _currentEngineerName ?? 'مهندس',
+                  'createdAt': FieldValue.serverTimestamp(),
+                });
+                if (mounted) Navigator.pop(ctx);
+              },
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showDailyReportDialog() async {
+    DateTime now = DateTime.now();
+    DateTime start = DateTime(now.year, now.month, now.day);
+    DateTime end = start.add(const Duration(days: 1));
+    int entriesCount = 0;
+    int testsCount = 0;
+    int requestsCount = 0;
+    try {
+      for (var phase in predefinedPhasesStructure) {
+        final phaseId = phase['id'];
+        final snap = await FirebaseFirestore.instance
+            .collection('projects')
+            .doc(widget.projectId)
+            .collection('phases_status')
+            .doc(phaseId)
+            .collection('entries')
+            .where('timestamp', isGreaterThanOrEqualTo: start)
+            .where('timestamp', isLessThan: end)
+            .get();
+        entriesCount += snap.docs.length;
+        for (var sub in phase['subPhases']) {
+          final subId = sub['id'];
+          final subSnap = await FirebaseFirestore.instance
+              .collection('projects')
+              .doc(widget.projectId)
+              .collection('subphases_status')
+              .doc(subId)
+              .collection('entries')
+              .where('timestamp', isGreaterThanOrEqualTo: start)
+              .where('timestamp', isLessThan: end)
+              .get();
+          entriesCount += subSnap.docs.length;
+        }
+      }
+      final testsSnap = await FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .collection('tests_status')
+          .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
+          .where('lastUpdatedAt', isLessThan: end)
+          .get();
+      testsCount = testsSnap.docs.length;
+      final reqSnap = await FirebaseFirestore.instance
+          .collection('partRequests')
+          .where('projectId', isEqualTo: widget.projectId)
+          .where('requestedAt', isGreaterThanOrEqualTo: start)
+          .where('requestedAt', isLessThan: end)
+          .get();
+      requestsCount = reqSnap.docs.length;
+    } catch (e) {
+      // ignore errors
+    }
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: ui.TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تقرير اليوم'),
+          content: Text('عدد الملاحظات المسجلة اليوم: $entriesCount\n'
+              'عدد الاختبارات المحدثة اليوم: $testsCount\n'
+              'عدد طلبات المواد اليوم: $requestsCount'),
+          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إغلاق'))],
+        ),
+      ),
+    );
+  }
+
   // --- Function to load Arabic font ---
   Future<void> _loadArabicFont() async {
     try {
@@ -676,6 +925,13 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       ),
       elevation: 3,
       centerTitle: true,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.today, color: Colors.white),
+          tooltip: 'تقرير اليوم',
+          onPressed: _showDailyReportDialog,
+        ),
+      ],
       bottom: TabBar(
         controller: _tabController,
         indicatorColor: Colors.white,
@@ -685,6 +941,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           Tab(text: 'مراحل المشروع', icon: Icon(Icons.list_alt_rounded)),
           Tab(text: 'اختبارات التشغيل', icon: Icon(Icons.checklist_rtl_rounded)),
           Tab(text: 'عمال المشروع', icon: Icon(Icons.group)),
+          Tab(text: 'مرفقات', icon: Icon(Icons.attach_file_outlined)),
+          Tab(text: 'ملاحظات هامة', icon: Icon(Icons.notes)),
         ],
       ),
     );
@@ -1095,6 +1353,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                   _buildPhasesTab(),
                   _buildTestsTab(),
                   _buildEmployeesTab(),
+                  _buildAttachmentsTab(),
+                  _buildImportantNotesTab(),
                 ],
               ),
             ),
