@@ -12,6 +12,7 @@ import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:mime/mime.dart';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:share_plus/share_plus.dart';
@@ -1343,6 +1344,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     final picked = result.files.first;
     if (picked.path == null) return;
     final file = File(picked.path!);
+    final mimeType = lookupMimeType(picked.path!) ?? 'application/octet-stream';
     try {
       var request =
           http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
@@ -1352,13 +1354,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           'image',
           bytes,
           filename: picked.name,
-          contentType: MediaType.parse(picked.mimeType ?? 'application/octet-stream'),
+          contentType: MediaType.parse(mimeType),
         ));
       } else {
         request.files.add(await http.MultipartFile.fromPath(
           'image',
           file.path,
-          contentType: MediaType.parse(picked.mimeType ?? 'application/octet-stream'),
+          contentType: MediaType.parse(mimeType),
         ));
       }
 
