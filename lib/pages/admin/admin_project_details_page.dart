@@ -613,12 +613,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         IconButton(
           icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           tooltip: 'تقرير اليوم',
-          onPressed: () {
-            final now = DateTime.now();
-            final start = DateTime(now.year, now.month, now.day);
-            _generateDailyReportPdf(
-                start: start, end: start.add(const Duration(days: 1)));
-          },
+          onPressed: _selectReportDate,
         ),
       ],
       bottom: TabBar(
@@ -1532,6 +1527,62 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 if (mounted) Navigator.pop(ctx);
               },
               child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectReportDate() async {
+    final now = DateTime.now();
+    await showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: ui.TextDirection.rtl,
+        child: SimpleDialog(
+          title: const Text('نوع التقرير'),
+          children: [
+            SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(ctx);
+                final start = DateTime(now.year, now.month, now.day);
+                _generateDailyReportPdf(
+                    start: start, end: start.add(const Duration(days: 1)));
+              },
+              child: const Text('تقرير اليوم'),
+            ),
+            SimpleDialogOption(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final DateTimeRange? range = await showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(2020),
+                  lastDate: now,
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: const ColorScheme.light(
+                          primary: AppConstants.primaryColor,
+                          onPrimary: Colors.white,
+                          surface: Colors.white,
+                          onSurface: Colors.black,
+                        ),
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (range != null) {
+                  final start = DateTime(
+                      range.start.year, range.start.month, range.start.day);
+                  final end = DateTime(
+                      range.end.year, range.end.month, range.end.day);
+                  _generateDailyReportPdf(
+                      start: start, end: end.add(const Duration(days: 1)));
+                }
+              },
+              child: const Text('تقرير فترة محددة'),
             ),
           ],
         ),
