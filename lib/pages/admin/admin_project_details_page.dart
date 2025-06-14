@@ -24,6 +24,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:image/image.dart' as img;
 import 'package:printing/printing.dart';
+import '../../utils/pdf_styles.dart';
 import 'package:engineer_management_system/html_stub.dart'
     if (dart.library.html) 'dart:html' as html;
 // import 'package:url_launcher/url_launcher.dart'; // Not used directly for notifications
@@ -1643,7 +1644,11 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     final pw.TextStyle regularStyle = pw.TextStyle(font: _arabicFont, fontSize: 12);
     final pw.TextStyle headerStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16);
     final pw.TextStyle smallGrey = pw.TextStyle(font: _arabicFont, fontSize: 10, color: PdfColors.grey600);
-    final String headerText = useRange ? 'التقرير اليومي' : 'التقرير التراكمي';
+    final String headerText = useRange ? 'التقرير التراكمي' : 'التقرير اليومي';
+
+    final ByteData logoByteData = await rootBundle.load('assets/images/app_logo.png');
+    final Uint8List logoBytes = logoByteData.buffer.asUint8List();
+    final pw.MemoryImage appLogo = pw.MemoryImage(logoBytes);
 
     pdf.addPage(
       pw.MultiPage(
@@ -1651,13 +1656,16 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
           theme: pw.ThemeData.withFont(base: _arabicFont),
-          margin: const pw.EdgeInsets.all(30),
+          margin: const pw.EdgeInsets.all(50),
+        ),
+        header: (context) => PdfStyles.buildHeader(
+          font: _arabicFont!,
+          logo: appLogo,
+          headerText: headerText,
+          now: now,
         ),
         build: (context) {
           final widgets = <pw.Widget>[];
-          widgets.add(pw.Header(level: 0, child: pw.Text(headerText, style: headerStyle)));
-          widgets.add(pw.Text('التاريخ: ${DateFormat('yyyy/MM/dd HH:mm', 'ar').format(now)}', style: regularStyle));
-          widgets.add(pw.SizedBox(height: 10));
           widgets.add(pw.Text('عدد الملاحظات المسجلة: ${dayEntries.length}', style: regularStyle));
           widgets.add(pw.Text('عدد الاختبارات المحدثة: ${dayTests.length}', style: regularStyle));
           widgets.add(pw.Text('عدد طلبات المواد: ${dayRequests.length}', style: regularStyle));
@@ -1754,11 +1762,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
           return widgets;
         },
-        footer: (context) => pw.Container(
-          alignment: pw.Alignment.center,
-          margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
-          child: pw.Text('صفحة ${context.pageNumber} من ${context.pagesCount}', style: smallGrey),
-        ),
+        footer: (context) => PdfStyles.buildFooter(context, font: _arabicFont!),
       ),
     );
 

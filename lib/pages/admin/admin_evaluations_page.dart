@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter/services.dart' show rootBundle;
+import '../../utils/pdf_styles.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:engineer_management_system/html_stub.dart'
@@ -1307,10 +1308,13 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
     _showLoadingDialog(context, 'جاري إنشاء التقرير...');
 
+    final ByteData logoByteData = await rootBundle.load('assets/images/app_logo.png');
+    final Uint8List logoBytes = logoByteData.buffer.asUint8List();
+    final pw.MemoryImage appLogo = pw.MemoryImage(logoBytes);
+
     final pdf = pw.Document();
     final pw.TextStyle regular = pw.TextStyle(font: _arabicFont, fontSize: 12);
-    final pw.TextStyle bold = pw.TextStyle(
-        font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 14);
+    final pw.TextStyle bold = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 14);
 
     pdf.addPage(
       pw.MultiPage(
@@ -1318,12 +1322,16 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
           theme: pw.ThemeData.withFont(base: _arabicFont),
-          margin: const pw.EdgeInsets.all(30),
+          margin: const pw.EdgeInsets.all(50),
+        ),
+        header: (context) => PdfStyles.buildHeader(
+          font: _arabicFont!,
+          logo: appLogo,
+          headerText: 'تقرير تقييم الموظف',
+          now: DateTime.now(),
         ),
         build: (context) =>
         [
-          pw.Header(
-              level: 0, child: pw.Text('تقرير تقييم الموظف', style: bold)),
           pw.Text('اسم الموظف: ${evaluation.engineerName}', style: regular),
           pw.Text('الفترة: ${evaluation.periodIdentifier}', style: regular),
           pw.Text(
@@ -1354,15 +1362,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
               text: 'عدد الإدخالات: ${evaluation.rawMetrics['totalEntries'] ??
                   '0'}', style: regular),
         ],
-        footer: (context) =>
-            pw.Container(
-              alignment: pw.Alignment.center,
-              margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
-              child: pw.Text(
-                  'صفحة ${context.pageNumber} من ${context.pagesCount}',
-                  style: pw.TextStyle(
-                      font: _arabicFont, fontSize: 10, color: PdfColors.grey)),
-            ),
+        footer: (context) => PdfStyles.buildFooter(context, font: _arabicFont!),
       ),
     );
 
