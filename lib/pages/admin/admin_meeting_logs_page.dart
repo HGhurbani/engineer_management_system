@@ -2,6 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:convert';
+import 'dart:io';
 import 'dart:ui' as ui;
 
 class AdminMeetingLogsPage extends StatefulWidget {
@@ -496,6 +502,7 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
     String? type;
     final formKey = GlobalKey<FormState>();
     bool isLoading = false;
+    List<XFile>? selectedImages;
 
     final currentAdmin = FirebaseAuth.instance.currentUser;
     String adminName = 'المسؤول';
@@ -522,9 +529,22 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                title: const Text(
-                  'إضافة محضر جديد',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppConstants.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.add, color: AppConstants.primaryColor),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'إضافة محضر جديد',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
                 content: Form(
                   key: formKey,
@@ -533,25 +553,101 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
                     children: [
                       TextFormField(
                         controller: titleController,
-                        decoration: const InputDecoration(labelText: 'العنوان'),
+                        decoration: InputDecoration(
+                          labelText: 'عنوان المحضر *',
+                          hintText: 'أدخل عنوان المحضر',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          prefixIcon: const Icon(Icons.title),
+                        ),
                         validator: (v) => v == null || v.trim().isEmpty ? 'يرجى إدخال العنوان' : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: descController,
-                        decoration: const InputDecoration(labelText: 'الوصف'),
+                        decoration: InputDecoration(
+                          labelText: 'التفاصيل',
+                          hintText: 'أدخل تفاصيل المحضر (اختياري)',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          prefixIcon: const Icon(Icons.description),
+                        ),
                         maxLines: 3,
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         value: type,
-                        decoration: const InputDecoration(labelText: 'نوع الاجتماع'),
+                        decoration: InputDecoration(
+                          labelText: 'نوع الاجتماع *',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          prefixIcon: const Icon(Icons.category),
+                        ),
                         items: const [
                           DropdownMenuItem(value: 'client', child: Text('مع العميل')),
                           DropdownMenuItem(value: 'employee', child: Text('مع الموظفين')),
                         ],
                         onChanged: (val) => setStateDialog(() => type = val),
                         validator: (val) => val == null ? 'اختر نوع الاجتماع' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      if (selectedImages != null && selectedImages.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: selectedImages!.map((xFile) {
+                              return Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: kIsWeb
+                                        ? Image.network(xFile.path, height: 80, width: 80, fit: BoxFit.cover)
+                                        : Image.file(File(xFile.path), height: 80, width: 80, fit: BoxFit.cover),
+                                  ),
+                                  Positioned(
+                                    top: -5,
+                                    right: -5,
+                                    child: IconButton(
+                                      icon: const CircleAvatar(
+                                        backgroundColor: Colors.black54,
+                                        radius: 12,
+                                        child: Icon(Icons.close, color: Colors.white, size: 14),
+                                      ),
+                                      onPressed: () {
+                                        setStateDialog(() {
+                                          selectedImages!.remove(xFile);
+                                          if (selectedImages!.isEmpty) selectedImages = null;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
+                        label: Text(
+                            selectedImages == null || selectedImages!.isEmpty
+                                ? 'إضافة صور (اختياري)'
+                                : 'تغيير/إضافة المزيد من الصور',
+                            style: const TextStyle(color: AppConstants.primaryColor)),
+                        onPressed: () async {
+                          final picker = ImagePicker();
+                          final images = await picker.pickMultiImage(imageQuality: 70);
+                          if (images.isNotEmpty) {
+                            setStateDialog(() {
+                              selectedImages ??= [];
+                              selectedImages!.addAll(images);
+                            });
+                          }
+                        },
                       ),
                     ],
                   ),
@@ -567,6 +663,51 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
                         : () async {
                             if (!formKey.currentState!.validate()) return;
                             setStateDialog(() => isLoading = true);
+                            List<String> uploadedUrls = [];
+                            if (selectedImages != null && selectedImages!.isNotEmpty) {
+                              for (int i = 0; i < selectedImages!.length; i++) {
+                                final img = selectedImages![i];
+                                try {
+                                  var request = http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
+                                  if (kIsWeb) {
+                                    final bytes = await img.readAsBytes();
+                                    request.files.add(http.MultipartFile.fromBytes(
+                                      'image',
+                                      bytes,
+                                      filename: img.name,
+                                      contentType: MediaType.parse(img.mimeType ?? 'image/jpeg'),
+                                    ));
+                                  } else {
+                                    request.files.add(await http.MultipartFile.fromPath(
+                                      'image',
+                                      img.path,
+                                      contentType: MediaType.parse(img.mimeType ?? 'image/jpeg'),
+                                    ));
+                                  }
+
+                                  var streamedResponse = await request.send();
+                                  var response = await http.Response.fromStream(streamedResponse);
+
+                                  if (response.statusCode == 200) {
+                                    var data = json.decode(response.body);
+                                    if (data['status'] == 'success' && data['url'] != null) {
+                                      uploadedUrls.add(data['url']);
+                                    } else {
+                                      throw Exception(data['message'] ?? 'فشل رفع الصورة (${i + 1}) من السيرفر.');
+                                    }
+                                  } else {
+                                    throw Exception('خطأ في الاتصال بالسيرفر لرفع الصورة (${i + 1}): ${response.statusCode}');
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('فشل رفع الصورة (${i + 1}): $e'), backgroundColor: Colors.red),
+                                    );
+                                  }
+                                }
+                              }
+                            }
+
                             try {
                               await FirebaseFirestore.instance.collection('meeting_logs').add({
                                 'adminId': currentAdmin?.uid,
@@ -575,6 +716,7 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
                                 'description': descController.text.trim(),
                                 'type': type,
                                 'date': Timestamp.now(),
+                                if (uploadedUrls.isNotEmpty) 'imageUrls': uploadedUrls,
                                 'createdAt': FieldValue.serverTimestamp(),
                               });
                               Navigator.pop(context);
@@ -582,13 +724,23 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
                               setStateDialog(() => isLoading = false);
                             }
                           },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConstants.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                     child: isLoading
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text('إضافة'),
+                        : const Text(
+                            'إضافة',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
                   ),
                 ],
               ),
@@ -690,6 +842,64 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
                         if (data['date'] != null)
                           _buildDetailRow('التاريخ',
                               (data['date'] as Timestamp).toDate().toString().split(' ')[0]),
+                        const SizedBox(height: 12),
+                        if (data['imageUrls'] != null || data['imageUrl'] != null)
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              ...((data['imageUrls'] as List<dynamic>? ?? [])
+                                  .map((e) => e.toString()))
+                                  .map((url) => InkWell(
+                                        onTap: () => _viewImageDialog(url),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.network(
+                                            url,
+                                            height: 100,
+                                            width: 100,
+                                            fit: BoxFit.cover,
+                                            loadingBuilder: (ctx, child, progress) => progress == null
+                                                ? child
+                                                : const SizedBox(
+                                                    height: 20,
+                                                    width: 20,
+                                                    child: CircularProgressIndicator(strokeWidth: 2)),
+                                            errorBuilder: (c, e, s) => Container(
+                                                height: 100,
+                                                width: 100,
+                                                color: Colors.grey[300],
+                                                child: const Icon(Icons.broken_image_outlined)),
+                                          ),
+                                        ),
+                                      ))
+                                  .toList(),
+                              if (data['imageUrl'] != null && (data['imageUrl'] as String).isNotEmpty)
+                                InkWell(
+                                  onTap: () => _viewImageDialog(data['imageUrl']),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      data['imageUrl'],
+                                      height: 100,
+                                      width: 100,
+                                      fit: BoxFit.cover,
+                                      loadingBuilder: (ctx, child, progress) => progress == null
+                                          ? child
+                                          : const SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator(strokeWidth: 2)),
+                                      errorBuilder: (c, e, s) => Container(
+                                          height: 100,
+                                          width: 100,
+                                          color: Colors.grey[300],
+                                          child: const Icon(Icons.broken_image_outlined)),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
@@ -725,6 +935,46 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _viewImageDialog(String imageUrl) async {
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.transparent,
+        contentPadding: EdgeInsets.zero,
+        insetPadding: const EdgeInsets.all(10),
+        content: InteractiveViewer(
+          panEnabled: true,
+          boundaryMargin: const EdgeInsets.all(20),
+          minScale: 0.5,
+          maxScale: 4,
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.contain,
+            loadingBuilder: (ctx, child, progress) =>
+                progress == null
+                    ? child
+                    : const Center(
+                        child: CircularProgressIndicator(
+                            color: AppConstants.primaryColor)),
+            errorBuilder: (ctx, err, st) => const Center(
+                child: Icon(Icons.error_outline,
+                    color: AppConstants.errorColor, size: 50)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(
+                backgroundColor: Colors.black.withOpacity(0.5)),
+            onPressed: () => Navigator.pop(dialogContext),
+            child:
+                const Text('إغلاق', style: TextStyle(color: Colors.white)),
+          )
+        ],
+        actionsAlignment: MainAxisAlignment.center,
       ),
     );
   }
