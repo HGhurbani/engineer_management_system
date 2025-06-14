@@ -1312,16 +1312,26 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
     final Uint8List logoBytes = logoByteData.buffer.asUint8List();
     final pw.MemoryImage appLogo = pw.MemoryImage(logoBytes);
 
+    // Load emoji fallback font
+    pw.Font? emojiFont;
+    try {
+      emojiFont = await PdfGoogleFonts.notoColorEmoji();
+    } catch (e) {
+      print('Error loading NotoColorEmoji font: $e');
+    }
+
+    final List<pw.Font> commonFontFallback = emojiFont != null ? [emojiFont!] : [];
+
     final pdf = pw.Document();
-    final pw.TextStyle regular = pw.TextStyle(font: _arabicFont, fontSize: 12);
-    final pw.TextStyle bold = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 14);
+    final pw.TextStyle regular = pw.TextStyle(font: _arabicFont, fontSize: 12, fontFallback: commonFontFallback);
+    final pw.TextStyle bold = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 14, fontFallback: commonFontFallback);
 
     pdf.addPage(
       pw.MultiPage(
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
-          theme: pw.ThemeData.withFont(base: _arabicFont),
+          theme: pw.ThemeData.withFont(base: _arabicFont, fontFallback: commonFontFallback),
           margin: const pw.EdgeInsets.all(50),
         ),
         header: (context) => PdfStyles.buildHeader(
@@ -1362,7 +1372,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
               text: 'عدد الإدخالات: ${evaluation.rawMetrics['totalEntries'] ??
                   '0'}', style: regular),
         ],
-        footer: (context) => PdfStyles.buildFooter(context, font: _arabicFont!),
+        footer: (context) =>
+            PdfStyles.buildFooter(context, font: _arabicFont!, fontFallback: commonFontFallback),
       ),
     );
 

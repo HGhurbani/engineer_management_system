@@ -49,7 +49,8 @@ class PdfStyles {
     );
   }
 
-  static pw.Widget buildFooter(pw.Context context, {required pw.Font font}) {
+  static pw.Widget buildFooter(pw.Context context,
+      {required pw.Font font, List<pw.Font> fontFallback = const []}) {
     return pw.Container(
       height: 80,
       decoration: pw.BoxDecoration(
@@ -77,6 +78,7 @@ class PdfStyles {
                         font: font,
                         color: PdfColors.white,
                         fontSize: 10,
+                        fontFallback: fontFallback,
                       ),
                     ),
                     pw.SizedBox(height: 2),
@@ -86,6 +88,7 @@ class PdfStyles {
                         font: font,
                         color: PdfColor.fromHex('#F5C842'),
                         fontSize: 8,
+                        fontFallback: fontFallback,
                       ),
                     ),
                   ],
@@ -103,6 +106,7 @@ class PdfStyles {
                               font: font,
                               color: PdfColors.white,
                               fontSize: 9,
+                              fontFallback: fontFallback,
                             ),
                           ),
                           pw.SizedBox(width: 10),
@@ -114,7 +118,10 @@ class PdfStyles {
                               borderRadius: pw.BorderRadius.circular(6),
                             ),
                             child: pw.Center(
-                              child: pw.Text('📍', style: pw.TextStyle(fontSize: 8)),
+                              child: pw.Text('📍',
+                                  style: pw.TextStyle(
+                                      fontSize: 8,
+                                      fontFallback: fontFallback)),
                             ),
                           ),
                         ],
@@ -129,6 +136,7 @@ class PdfStyles {
                               font: font,
                               color: PdfColor.fromHex('#F5C842'),
                               fontSize: 9,
+                              fontFallback: fontFallback,
                             ),
                           ),
                           pw.SizedBox(width: 20),
@@ -138,6 +146,7 @@ class PdfStyles {
                               font: font,
                               color: PdfColors.white,
                               fontSize: 9,
+                              fontFallback: fontFallback,
                             ),
                           ),
                           pw.SizedBox(width: 10),
@@ -149,7 +158,10 @@ class PdfStyles {
                               borderRadius: pw.BorderRadius.circular(6),
                             ),
                             child: pw.Center(
-                              child: pw.Text('📞', style: pw.TextStyle(fontSize: 8)),
+                              child: pw.Text('📞',
+                                  style: pw.TextStyle(
+                                      fontSize: 8,
+                                      fontFallback: fontFallback)),
                             ),
                           ),
                         ],
@@ -161,6 +173,7 @@ class PdfStyles {
                           font: font,
                           color: PdfColor.fromHex('#F5C842'),
                           fontSize: 9,
+                          fontFallback: fontFallback,
                         ),
                       ),
                     ],
@@ -181,6 +194,7 @@ class PdfStyles {
                         color: PdfColor.fromHex('#1B4D3E'),
                         fontSize: 8,
                         fontWeight: pw.FontWeight.bold,
+                        fontFallback: fontFallback,
                       ),
                     ),
                   ),

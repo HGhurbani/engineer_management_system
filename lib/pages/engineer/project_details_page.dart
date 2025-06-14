@@ -1250,7 +1250,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           widgets.add(_buildImportantNotice(regularStyle));
           return widgets;
         },
-        footer: (context) => _buildFooter(context, metaStyle, primaryColor),
+        footer: (context) =>
+            _buildFooter(context, metaStyle, primaryColor, fontFallback: commonFontFallback),
       ),
     );
 
@@ -1833,7 +1834,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     );
   }
 
-  pw.Widget _buildFooter(pw.Context context, pw.TextStyle metaStyle, PdfColor primaryColor) {
+  pw.Widget _buildFooter(pw.Context context, pw.TextStyle metaStyle, PdfColor primaryColor,
+      {List<pw.Font> fontFallback = const []}) {
     return pw.Container(
       height: 80,
       decoration: pw.BoxDecoration(
@@ -1879,6 +1881,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                             font: _arabicFont,
                             color: PdfColors.white,
                             fontSize: 10,
+                            fontFallback: fontFallback,
                           ),
                         ),
                         pw.SizedBox(height: 2),
@@ -1888,6 +1891,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                             font: _arabicFont,
                             color: PdfColor.fromHex('#F5C842'),
                             fontSize: 8,
+                            fontFallback: fontFallback,
                           ),
                         ),
                       ],
@@ -1906,6 +1910,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                   font: _arabicFont,
                                   color: PdfColors.white,
                                   fontSize: 9,
+                                  fontFallback: fontFallback,
                                 ),
                               ),
                               pw.SizedBox(width: 10),
@@ -1919,7 +1924,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                 child: pw.Center(
                                   child: pw.Text(
                                     '📍',
-                                    style: pw.TextStyle(fontSize: 8),
+                                    style: pw.TextStyle(fontSize: 8, fontFallback: fontFallback),
                                   ),
                                 ),
                               ),
@@ -1935,6 +1940,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                   font: _arabicFont,
                                   color: PdfColor.fromHex('#F5C842'),
                                   fontSize: 9,
+                                  fontFallback: fontFallback,
                                 ),
                               ),
                               pw.SizedBox(width: 20),
@@ -1944,6 +1950,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                   font: _arabicFont,
                                   color: PdfColors.white,
                                   fontSize: 9,
+                                  fontFallback: fontFallback,
                                 ),
                               ),
                               pw.SizedBox(width: 10),
@@ -1957,7 +1964,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                 child: pw.Center(
                                   child: pw.Text(
                                     '📞',
-                                    style: pw.TextStyle(fontSize: 8),
+                                    style: pw.TextStyle(fontSize: 8, fontFallback: fontFallback),
                                   ),
                                 ),
                               ),
@@ -1970,6 +1977,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                               font: _arabicFont,
                               color: PdfColor.fromHex('#F5C842'),
                               fontSize: 9,
+                              fontFallback: fontFallback,
                             ),
                           ),
                         ],
@@ -1991,6 +1999,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                             color: PdfColor.fromHex('#1B4D3E'),
                             fontSize: 8,
                             fontWeight: pw.FontWeight.bold,
+                            fontFallback: fontFallback,
                           ),
                         ),
                       ),
@@ -3452,15 +3461,36 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final Uint8List logoBytes = logoByteData.buffer.asUint8List();
     final pw.MemoryImage appLogo = pw.MemoryImage(logoBytes);
 
+    // Load emoji fallback font
+    pw.Font? emojiFont;
+    try {
+      emojiFont = await PdfGoogleFonts.notoColorEmoji();
+    } catch (e) {
+      print('Error loading NotoColorEmoji font: $e');
+    }
+
+    final List<pw.Font> commonFontFallback = emojiFont != null ? [emojiFont!] : [];
+
     final pdf = pw.Document();
     final List<pw.Widget> contentWidgets = [];
 
-
-    final pw.TextStyle regularStyle = pw.TextStyle(font: _arabicFont, fontSize: 11);
-    final pw.TextStyle boldStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 12);
-    final pw.TextStyle headerStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16, color: PdfColors.blueGrey800);
-    final pw.TextStyle subHeaderStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 14, color: PdfColors.blueGrey600);
-    final pw.TextStyle smallGreyStyle = pw.TextStyle(font: _arabicFont, fontSize: 9, color: PdfColors.grey600);
+    final pw.TextStyle regularStyle =
+        pw.TextStyle(font: _arabicFont, fontSize: 11, fontFallback: commonFontFallback);
+    final pw.TextStyle boldStyle = pw.TextStyle(
+        font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 12, fontFallback: commonFontFallback);
+    final pw.TextStyle headerStyle = pw.TextStyle(
+        font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16, color: PdfColors.blueGrey800, fontFallback: commonFontFallback);
+    final pw.TextStyle subHeaderStyle = pw.TextStyle(
+        font: _arabicFont,
+        fontWeight: pw.FontWeight.bold,
+        fontSize: 14,
+        color: PdfColors.blueGrey600,
+        fontFallback: commonFontFallback);
+    final pw.TextStyle smallGreyStyle = pw.TextStyle(
+        font: _arabicFont,
+        fontSize: 9,
+        color: PdfColors.grey600,
+        fontFallback: commonFontFallback);
 
     String projectName = (_projectDataSnapshot?.data() as Map<String, dynamic>)?['name'] ?? 'اسم المشروع غير محدد';
     final List<dynamic> assignedEngs = (_projectDataSnapshot?.data() as Map<String, dynamic>?)?['assignedEngineers'] as List<dynamic>? ?? [];
@@ -3854,7 +3884,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               pageFormat: PdfPageFormat.a4,
               orientation: pw.PageOrientation.portrait,
               textDirection: pw.TextDirection.rtl,
-              theme: pw.ThemeData.withFont(base: _arabicFont, bold: _arabicFont),
+              theme: pw.ThemeData.withFont(
+                  base: _arabicFont, bold: _arabicFont, fontFallback: commonFontFallback),
               margin: const pw.EdgeInsets.all(50),
             ),
             header: (context) => PdfStyles.buildHeader(
@@ -3864,8 +3895,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               now: DateTime.now(),
             ),
             build: (context) => contentWidgets,
-            footer: (pw.Context context) =>
-                PdfStyles.buildFooter(context, font: _arabicFont!),
+            footer: (pw.Context context) => PdfStyles.buildFooter(context,
+                font: _arabicFont!, fontFallback: commonFontFallback),
         )
     );
 

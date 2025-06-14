@@ -1738,10 +1738,23 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
     final fetchedImages = await _fetchImagesForUrls(imageUrls.toList());
 
+    // Load emoji fallback font
+    pw.Font? emojiFont;
+    try {
+      emojiFont = await PdfGoogleFonts.notoColorEmoji();
+    } catch (e) {
+      print('Error loading NotoColorEmoji font: $e');
+    }
+
+    final List<pw.Font> commonFontFallback = emojiFont != null ? [emojiFont!] : [];
+
     final pdf = pw.Document();
-    final pw.TextStyle regularStyle = pw.TextStyle(font: _arabicFont, fontSize: 12);
-    final pw.TextStyle headerStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16);
-    final pw.TextStyle smallGrey = pw.TextStyle(font: _arabicFont, fontSize: 10, color: PdfColors.grey600);
+    final pw.TextStyle regularStyle =
+        pw.TextStyle(font: _arabicFont, fontSize: 12, fontFallback: commonFontFallback);
+    final pw.TextStyle headerStyle = pw.TextStyle(
+        font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16, fontFallback: commonFontFallback);
+    final pw.TextStyle smallGrey = pw.TextStyle(
+        font: _arabicFont, fontSize: 10, color: PdfColors.grey600, fontFallback: commonFontFallback);
     final String headerText = useRange ? 'التقرير التراكمي' : 'التقرير اليومي';
 
     final ByteData logoByteData = await rootBundle.load('assets/images/app_logo.png');
@@ -1753,7 +1766,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
-          theme: pw.ThemeData.withFont(base: _arabicFont),
+          theme:
+              pw.ThemeData.withFont(base: _arabicFont, fontFallback: commonFontFallback),
           margin: const pw.EdgeInsets.all(50),
         ),
         header: (context) => PdfStyles.buildHeader(
@@ -1862,7 +1876,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
           return widgets;
         },
-        footer: (context) => PdfStyles.buildFooter(context, font: _arabicFont!),
+        footer: (context) => PdfStyles.buildFooter(context,
+            font: _arabicFont!, fontFallback: commonFontFallback),
       ),
     );
 
