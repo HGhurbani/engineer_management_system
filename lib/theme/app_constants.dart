@@ -22,6 +22,7 @@ class AppConstants {
   static const Color warningColor = Color(0xFFF59E0B);
   static const Color errorColor = Color(0xFFEF4444);
   static const Color infoColor = Color(0xFF3B82F6);
+  static const Color highlightColor = Color(0xFFFFF59D);
   static const Color deleteColor = errorColor;
 
   // Spacing and dimensions

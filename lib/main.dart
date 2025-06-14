@@ -122,11 +122,27 @@ class MyApp extends StatelessWidget {
         '/admin/employees': (context) => const AdminEmployeesPage(),
         '/admin/projects': (context) => const AdminProjectsPage(),
         '/admin/projectDetails': (context) {
-          final projectId = ModalRoute.of(context)!.settings.arguments as String;
+          final args = ModalRoute.of(context)!.settings.arguments;
+          if (args is Map<String, dynamic>) {
+            return AdminProjectDetailsPage(
+              projectId: args['projectId'] as String,
+              highlightItemId: args['itemId'] as String?,
+              notificationType: args['notificationType'] as String?,
+            );
+          }
+          final projectId = args as String;
           return AdminProjectDetailsPage(projectId: projectId);
         },
         '/projectDetails': (context) {
-          final projectId = ModalRoute.of(context)!.settings.arguments as String;
+          final args = ModalRoute.of(context)!.settings.arguments;
+          if (args is Map<String, dynamic>) {
+            return ProjectDetailsPage(
+              projectId: args['projectId'] as String,
+              highlightItemId: args['itemId'] as String?,
+              notificationType: args['notificationType'] as String?,
+            );
+          }
+          final projectId = args as String;
           return ProjectDetailsPage(projectId: projectId);
         },
         '/admin/daily_schedule': (context) => const AdminDailySchedulePage(),

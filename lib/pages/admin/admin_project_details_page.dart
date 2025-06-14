@@ -44,7 +44,14 @@ import '../../main.dart'; // Assuming helper functions are in main.dart
 
 class AdminProjectDetailsPage extends StatefulWidget {
   final String projectId;
-  const AdminProjectDetailsPage({super.key, required this.projectId});
+  final String? highlightItemId;
+  final String? notificationType;
+  const AdminProjectDetailsPage({
+    super.key,
+    required this.projectId,
+    this.highlightItemId,
+    this.notificationType,
+  });
 
   @override
   State<AdminProjectDetailsPage> createState() =>
@@ -59,6 +66,14 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   // --- MODIFICATION END ---
   bool _isPageLoading = true;
   DocumentSnapshot? _projectDataSnapshot;
+
+  String? _highlightPhaseId;
+  String? _highlightSubPhaseId;
+  String? _highlightTestId;
+  final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _phaseKeys = {};
+  final Map<String, GlobalKey> _subPhaseKeys = {};
+  final Map<String, GlobalKey> _testKeys = {};
 
   late TabController _tabController;
   List<QueryDocumentSnapshot> _allAvailableEngineers = [];
@@ -333,8 +348,19 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   void initState() {
     super.initState();
     _tabController = TabController(length: 6, vsync: this);
+    if (widget.notificationType != null && widget.highlightItemId != null) {
+      final type = widget.notificationType!;
+      if (type.contains('subphase')) {
+        _highlightSubPhaseId = widget.highlightItemId;
+      } else if (type.contains('phase')) {
+        _highlightPhaseId = widget.highlightItemId;
+      } else if (type.contains('test')) {
+        _highlightTestId = widget.highlightItemId;
+      }
+    }
     _loadArabicFont();
     _fetchInitialData();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToHighlighted());
   }
 
   String _getClientTypeDisplayValue(String? clientTypeKey) {
@@ -735,6 +761,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     }
     return ListView.builder(
       key: const PageStorageKey<String>('adminProjectDetails_phasesTabListView'), // For scroll position restoration
+      controller: _scrollController,
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       itemCount: predefinedPhasesStructure.length,
       itemBuilder: (context, index) {
@@ -761,11 +788,15 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
               }
 
               return Card(
+                key: _phaseKeys.putIfAbsent(phaseId, () => GlobalKey()),
+                color: phaseId == _highlightPhaseId ? AppConstants.highlightColor : null,
                 margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
                 elevation: 2,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
                 child: ExpansionTile(
                   key: PageStorageKey<String>(phaseId), // For scroll position restoration of individual tiles
+                  initiallyExpanded: phaseId == _highlightPhaseId ||
+                      subPhasesStructure.any((sp) => sp['id'] == _highlightSubPhaseId),
                   leading: CircleAvatar(
                     backgroundColor: isCompleted ? AppConstants.successColor : AppConstants.primaryColor,
                     child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -839,12 +870,14 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                                       subPhaseActualName = subStatusData['name'] ?? subPhaseName;
                                     }
                                     return Card(
+                                      key: _subPhaseKeys.putIfAbsent(subPhaseId, () => GlobalKey()),
                                       elevation: 0.5,
-                                      color: AppConstants.backgroundColor, // Slightly different background for sub-phase cards
+                                      color: subPhaseId == _highlightSubPhaseId ? AppConstants.highlightColor : AppConstants.backgroundColor,
                                       margin: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall / 2, horizontal: AppConstants.paddingSmall /2),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
                                       child: ExpansionTile( // Sub-phases are also ExpansionTiles
                                         key: PageStorageKey<String>('sub_$subPhaseId'), // Key for sub-phase tile
+                                        initiallyExpanded: subPhaseId == _highlightSubPhaseId,
                                         leading: Icon(
                                           isSubCompleted ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
                                           color: isSubCompleted ? AppConstants.successColor : AppConstants.textSecondary, size: 20,
@@ -886,6 +919,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     }
     return ListView.builder(
       key: const PageStorageKey<String>('adminProjectDetails_testsTabListView'),
+      controller: _scrollController,
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       itemCount: finalCommissioningTests.length,
       itemBuilder: (context, sectionIndex) {
@@ -900,6 +934,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
           child: ExpansionTile(
             key: PageStorageKey<String>(sectionId),
+            initiallyExpanded: tests.any((t) => t['id'] == _highlightTestId),
             title: Text(sectionName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
             childrenPadding: const EdgeInsets.symmetric(horizontal: AppConstants.paddingSmall, vertical: AppConstants.paddingSmall / 2),
             children: tests.map((test) {
@@ -927,6 +962,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     }
 
                     return ListTile(
+                      key: _testKeys.putIfAbsent(testId, () => GlobalKey()),
+                      tileColor: testId == _highlightTestId ? AppConstants.highlightColor : null,
                       title: Text(testName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: null)),
                       leading: Icon(
                         isTestCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
@@ -1829,6 +1866,23 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   void _hideLoadingDialog(BuildContext context) {
     if (mounted) {
       Navigator.of(context, rootNavigator: true).pop();
+    }
+  }
+
+  void _scrollToHighlighted() {
+    GlobalKey? key;
+    if (_highlightSubPhaseId != null) {
+      key = _subPhaseKeys[_highlightSubPhaseId];
+    } else if (_highlightPhaseId != null) {
+      key = _phaseKeys[_highlightPhaseId];
+    } else if (_highlightTestId != null) {
+      key = _testKeys[_highlightTestId];
+    }
+    if (key != null && key.currentContext != null) {
+      Scrollable.ensureVisible(
+        key.currentContext!,
+        duration: const Duration(milliseconds: 500),
+      );
     }
   }
 
