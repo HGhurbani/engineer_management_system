@@ -24,8 +24,10 @@ class RequestMaterialPage extends StatefulWidget {
 
 class _RequestMaterialPageState extends State<RequestMaterialPage> {
   final _formKey = GlobalKey<FormState>();
-  final _materialNameController = TextEditingController();
-  final _quantityController = TextEditingController();
+
+  /// Controllers for multiple requested items
+  final List<TextEditingController> _materialControllers = [TextEditingController()];
+  final List<TextEditingController> _quantityControllers = [TextEditingController()];
 
   String? _selectedProjectId;
   String? _selectedProjectName;
@@ -75,9 +77,19 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
     setState(() => _isSubmitting = true);
 
     try {
+      // Collect requested items as a list of maps
+      final List<Map<String, dynamic>> items = [];
+      for (int i = 0; i < _materialControllers.length; i++) {
+        final name = _materialControllers[i].text.trim();
+        final qty = int.tryParse(_quantityControllers[i].text.trim()) ?? 1;
+        items.add({'name': name, 'quantity': qty});
+      }
+
       await FirebaseFirestore.instance.collection('partRequests').add({
-        'partName': _materialNameController.text.trim(),
-        'quantity': int.tryParse(_quantityController.text.trim()) ?? 1,
+        // Store first item for backwards compatibility
+        'partName': items.isNotEmpty ? items.first['name'] : '',
+        'quantity': items.isNotEmpty ? items.first['quantity'] : 0,
+        'items': items,
         'projectId': _selectedProjectId,
         'projectName': _selectedProjectName,
         'engineerId': widget.engineerId,
@@ -88,10 +100,14 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
       final List<String> adminUids = await getAdminUids(); // جلب جميع الـ UIDs للمسؤولين
 
       if (adminUids.isNotEmpty) {
+        final itemSummary = items
+            .map((e) => '${e['name']} (${e['quantity']})')
+            .join('، ');
         await sendNotificationsToMultiple(
           recipientUserIds: adminUids,
           title: 'طلب مواد جديد',
-          body: 'المهندس ${widget.engineerName} طلب مادة "${_materialNameController.text.trim()}" (الكمية: ${_quantityController.text.trim()}) لمشروع "${_selectedProjectName ?? 'غير محدد'}".',
+          body:
+              'المهندس ${widget.engineerName} طلب: $itemSummary لمشروع "${_selectedProjectName ?? 'غير محدد'}".',
           type: 'part_request_new',
           projectId: _selectedProjectId,
           itemId: null, // لا يوجد itemId محدد لطلب المواد بعد، يمكن تحديثه لاحقاً
@@ -128,8 +144,12 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
 
   @override
   void dispose() {
-    _materialNameController.dispose();
-    _quantityController.dispose();
+    for (final c in _materialControllers) {
+      c.dispose();
+    }
+    for (final c in _quantityControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -160,38 +180,77 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
             key: _formKey,
             child: ListView(
               children: [
-                TextFormField(
-                  controller: _materialNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'اسم المادة المطلوبة',
-                    prefixIcon: Icon(Icons.settings_input_component_outlined, color: AppConstants.primaryColor),
-                    border: OutlineInputBorder(),
+                ...List.generate(_materialControllers.length, (index) {
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _materialControllers[index],
+                              decoration: const InputDecoration(
+                                labelText: 'اسم المادة المطلوبة',
+                                prefixIcon: Icon(Icons.settings_input_component_outlined, color: AppConstants.primaryColor),
+                                border: OutlineInputBorder(),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'الرجاء إدخال اسم المادة.';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _quantityControllers[index],
+                              decoration: const InputDecoration(
+                                labelText: 'الكمية المطلوبة',
+                                prefixIcon: Icon(Icons.format_list_numbered_rtl_outlined, color: AppConstants.primaryColor),
+                                border: OutlineInputBorder(),
+                              ),
+                              keyboardType: TextInputType.number,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'الرجاء إدخال الكمية.';
+                                }
+                                if (int.tryParse(value) == null || int.parse(value) <= 0) {
+                                  return 'الرجاء إدخال كمية صحيحة أكبر من الصفر.';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          if (_materialControllers.length > 1)
+                            IconButton(
+                              icon: const Icon(Icons.remove_circle_outline, color: AppConstants.errorColor),
+                              onPressed: () {
+                                setState(() {
+                                  _materialControllers.removeAt(index).dispose();
+                                  _quantityControllers.removeAt(index).dispose();
+                                });
+                              },
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                    ],
+                  );
+                }),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _materialControllers.add(TextEditingController());
+                        _quantityControllers.add(TextEditingController());
+                      });
+                    },
+                    icon: const Icon(Icons.add_circle_outline, color: AppConstants.primaryColor),
+                    label: const Text('إضافة مادة'),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'الرجاء إدخال اسم المادة.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: AppConstants.itemSpacing),
-                TextFormField(
-                  controller: _quantityController,
-                  decoration: const InputDecoration(
-                    labelText: 'الكمية المطلوبة',
-                    prefixIcon: Icon(Icons.format_list_numbered_rtl_outlined, color: AppConstants.primaryColor),
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'الرجاء إدخال الكمية.';
-                    }
-                    if (int.tryParse(value) == null || int.parse(value) <= 0) {
-                      return 'الرجاء إدخال كمية صحيحة أكبر من الصفر.';
-                    }
-                    return null;
-                  },
                 ),
                 const SizedBox(height: AppConstants.itemSpacing),
                 if (_assignedProjects.isEmpty && !_isLoadingProjects)

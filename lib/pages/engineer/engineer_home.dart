@@ -850,8 +850,18 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             itemBuilder: (context, index) {
               final requestDoc = requests[index];
               final data = requestDoc.data() as Map<String, dynamic>;
-              final partName = data['partName'] ?? 'مادة غير مسماة';
-              final quantity = data['quantity']?.toString() ?? 'N/A';
+              final List<dynamic>? itemsData = data['items'];
+              String partName;
+              String quantity;
+              if (itemsData != null && itemsData.isNotEmpty) {
+                partName = itemsData
+                    .map((e) => '${e['name']} (${e['quantity']})')
+                    .join('، ');
+                quantity = '-';
+              } else {
+                partName = data['partName'] ?? 'مادة غير مسماة';
+                quantity = data['quantity']?.toString() ?? 'N/A';
+              }
               final projectName = data['projectName'] ?? 'مشروع غير محدد';
               final status = data['status'] ?? 'غير معروف';
               final requestedAt = (data['requestedAt'] as Timestamp?)?.toDate();

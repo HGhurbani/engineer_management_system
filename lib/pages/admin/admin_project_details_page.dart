@@ -1015,8 +1015,18 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           itemBuilder: (context, index) {
             final requestDoc = requests[index];
             final data = requestDoc.data() as Map<String, dynamic>;
-            final partName = data['partName'] ?? 'مادة غير مسماة';
-            final quantity = data['quantity']?.toString() ?? 'N/A';
+            final List<dynamic>? itemsData = data['items'];
+            String partName;
+            String quantity;
+            if (itemsData != null && itemsData.isNotEmpty) {
+              partName = itemsData
+                  .map((e) => '${e['name']} (${e['quantity']})')
+                  .join('، ');
+              quantity = '-';
+            } else {
+              partName = data['partName'] ?? 'مادة غير مسماة';
+              quantity = data['quantity']?.toString() ?? 'N/A';
+            }
             final engineerName = data['engineerName'] ?? 'مهندس غير معروف';
             final status = data['status'] ?? 'غير معروف';
             final requestedAt = (data['requestedAt'] as Timestamp?)?.toDate();
@@ -1732,14 +1742,16 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             widgets.add(pw.Text('لا توجد طلبات مواد اليوم.', style: regularStyle));
           } else {
             for (var pr in dayRequests) {
-              final name = pr['partName'] ?? '';
-              final qty = pr['quantity']?.toString() ?? '1';
+              final List<dynamic>? items = pr['items'];
+              final itemSummary = (items != null && items.isNotEmpty)
+                  ? items.map((e) => '${e['name']} (${e['quantity']})').join('، ')
+                  : '${pr['partName'] ?? ''} (${pr['quantity'] ?? '1'})';
               final status = pr['status'] ?? '';
               final eng = pr['engineerName'] ?? '';
               final ts = (pr['requestedAt'] as Timestamp?)?.toDate();
               final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
               widgets.add(pw.Bullet(
-                  text: '$name - الكمية: $qty - $status - $eng - $dateStr',
+                  text: '$itemSummary - $status - $eng - $dateStr',
                   textAlign: pw.TextAlign.right,
                   style: regularStyle));
             }
