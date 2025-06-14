@@ -851,6 +851,35 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     );
   }
 
+  Future<void> _selectReportDate() async {
+    final DateTime now = DateTime.now();
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppConstants.primaryColor,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      final start = DateTime(picked.year, picked.month, picked.day);
+      _generateDailyReportPdf(
+          start: start, end: start.add(const Duration(days: 1)));
+    }
+  }
+
   // --- Function to load Arabic font ---
   Future<void> _loadArabicFont() async {
     try {
@@ -2027,11 +2056,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         IconButton(
           icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           tooltip: 'تقرير اليوم',
-          onPressed: () {
-            final now = DateTime.now();
-            final start = DateTime(now.year, now.month, now.day);
-            _generateDailyReportPdf(start: start, end: start.add(const Duration(days: 1)));
-          },
+          onPressed: _selectReportDate,
         ),
       ],
       bottom: TabBar(
