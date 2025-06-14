@@ -1,4 +1,6 @@
 // lib/pages/admin/admin_project_details_page.dart
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -582,7 +584,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       centerTitle: true,
       actions: [
         IconButton(
-          icon: const Icon(Icons.today, color: Colors.white),
+          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           tooltip: 'تقرير اليوم',
           onPressed: () {
             final now = DateTime.now();
@@ -1730,7 +1732,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
               final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
               widgets.add(pw.Bullet(
                   text: '$name - الكمية: $qty - $status - $eng - $dateStr',
-                  textDirection: pw.TextDirection.rtl,
+                  textAlign: pw.TextAlign.right,
                   style: regularStyle));
             }
           }

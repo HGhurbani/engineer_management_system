@@ -869,7 +869,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   Future<void> _generateDailyReportPdf({DateTime? start, DateTime? end}) async {
     DateTime now = DateTime.now();
     start ??= DateTime(now.year, now.month, now.day);
-    end ??= start.add(const Duration(days: 1));
+    end ??= start.add(const Duration(days: 1)); // Default to end of today if not a range
 
     _showLoadingDialog(context, 'جاري إنشاء التقرير...');
 
@@ -880,10 +880,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
     try {
       List<Future<void>> fetchTasks = [];
+
+      // Fetch entries from phases and sub-phases
       for (var phase in predefinedPhasesStructure) {
         final phaseId = phase['id'];
         final phaseName = phase['name'];
-
         fetchTasks.add(
           FirebaseFirestore.instance
               .collection('projects')
@@ -908,7 +909,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             }
           }),
         );
-
         for (var sub in phase['subPhases']) {
           final subId = sub['id'];
           final subName = sub['name'];
@@ -939,6 +939,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         }
       }
 
+      // Prepare test info for easier lookup
       final Map<String, Map<String, String>> testInfo = {};
       for (var section in finalCommissioningTests) {
         final sectionName = section['section_name'] as String;
@@ -950,6 +951,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         }
       }
 
+      // Fetch tests data
       fetchTasks.add(
         FirebaseFirestore.instance
             .collection('projects')
@@ -974,6 +976,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         }),
       );
 
+      // Fetch part requests data
       fetchTasks.add(
         FirebaseFirestore.instance
             .collection('partRequests')
@@ -993,6 +996,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       print('Error preparing daily report details: $e');
     }
 
+    // Ensure Arabic font is loaded
     if (_arabicFont == null) {
       await _loadArabicFont();
       if (_arabicFont == null) {
@@ -1002,145 +1006,180 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       }
     }
 
-    final fetchedImages = await _fetchImagesForUrls(imageUrls.toList());
+    // Load the emoji fallback font for special characters (like 📍, 📞)
+    pw.Font? emojiFont;
+    try {
+      emojiFont = await PdfGoogleFonts.notoColorEmoji(); // Corrected method name
+    } catch (e) {
+      print('Error loading NotoColorEmoji font: $e. Emojis might not display.');
+    }
 
+    // Load the app logo from assets
+    final ByteData logoByteData = await rootBundle.load('assets/images/app_logo.png');
+    final Uint8List logoBytes = logoByteData.buffer.asUint8List();
+    final pw.MemoryImage appLogo = pw.MemoryImage(logoBytes);
+
+    // Fetch images from URLs (for entries/tests)
+    final fetchedImages = await _fetchImagesForUrls(imageUrls.toList());
     final pdf = pw.Document();
-    final pw.TextStyle regularStyle = pw.TextStyle(font: _arabicFont, fontSize: 12);
-    final pw.TextStyle headerStyle = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16);
-    final pw.TextStyle smallGrey = pw.TextStyle(font: _arabicFont, fontSize: 10, color: PdfColors.grey600);
+
+    // Define professional color scheme
+    final primaryColor = PdfColor.fromHex('#1B4D3E'); // Dark Green
+    final secondaryColor = PdfColor.fromHex('#2E8B57'); // Medium Green
+    final accentColor = PdfColor.fromHex('#4CAF50'); // Lighter Green (used if needed)
+    final lightGrey = PdfColor.fromHex('#F5F5F5'); // Very Light Grey for backgrounds
+    final darkGrey = PdfColor.fromHex('#424242'); // Dark Grey for main text
+    final borderColor = PdfColor.fromHex('#E0E0E0'); // Light Grey for borders
+
+    // Define a common font fallback list (empty if emojiFont is null)
+    final List<pw.Font> commonFontFallback = emojiFont != null ? [emojiFont!] : [];
+
+    // Define professional typography with font fallbacks
+    final pw.TextStyle titleStyle = pw.TextStyle(
+      font: _arabicFont,
+      fontWeight: pw.FontWeight.bold,
+      fontSize: 24,
+      color: primaryColor,
+      fontFallback: commonFontFallback, // Apply fallback
+    );
+    final pw.TextStyle headerStyle = pw.TextStyle(
+      font: _arabicFont,
+      fontWeight: pw.FontWeight.bold,
+      fontSize: 16,
+      color: primaryColor,
+      fontFallback: commonFontFallback, // Apply fallback
+    );
+    final pw.TextStyle subHeaderStyle = pw.TextStyle(
+      font: _arabicFont,
+      fontWeight: pw.FontWeight.bold,
+      fontSize: 14,
+      color: secondaryColor,
+      fontFallback: commonFontFallback, // Apply fallback
+    );
+    final pw.TextStyle regularStyle = pw.TextStyle(
+      font: _arabicFont,
+      fontSize: 12,
+      color: darkGrey,
+      fontFallback: commonFontFallback, // Apply fallback
+    );
+    final pw.TextStyle metaStyle = pw.TextStyle(
+      font: _arabicFont,
+      fontSize: 10,
+      color: PdfColors.grey600,
+      fontFallback: commonFontFallback, // Apply fallback
+    );
+    final pw.TextStyle labelStyle = pw.TextStyle(
+      font: _arabicFont,
+      fontSize: 11,
+      fontWeight: pw.FontWeight.bold,
+      color: secondaryColor,
+      fontFallback: commonFontFallback, // Apply fallback
+    );
+
     final bool isRange = start!.difference(end!).inDays != -1;
     final String headerText = isRange ? 'التقرير التراكمي' : 'التقرير اليومي';
 
     pdf.addPage(
       pw.MultiPage(
         pageTheme: pw.PageTheme(
-          pageFormat: PdfPageFormat.a4,
+          pageFormat: PdfPageFormat.a4, // Ensures a consistent page size
           textDirection: pw.TextDirection.rtl,
-          theme: pw.ThemeData.withFont(base: _arabicFont),
-          margin: const pw.EdgeInsets.all(30),
+          // Apply font fallback to the general theme as well
+          theme: pw.ThemeData.withFont(base: _arabicFont, fontFallback: commonFontFallback),
+          margin: const pw.EdgeInsets.all(50), // Increased margins for cleaner look
+        ),
+        header: (context) => _buildHeader(
+          headerText,
+          now,
+          titleStyle,
+          regularStyle,
+          primaryColor,
+          lightGrey,
+          appLogo, // Pass the app logo to the header builder
         ),
         build: (context) {
           final widgets = <pw.Widget>[];
-          widgets.add(pw.Header(level: 0, child: pw.Text(headerText, style: headerStyle)));
-          widgets.add(pw.Text('التاريخ: ${DateFormat('yyyy/MM/dd HH:mm', 'ar').format(now)}', style: regularStyle));
-          widgets.add(pw.SizedBox(height: 10));
-          widgets.add(pw.Text('عدد الملاحظات المسجلة: ${dayEntries.length}', style: regularStyle));
-          widgets.add(pw.Text('عدد الاختبارات المحدثة: ${dayTests.length}', style: regularStyle));
-          widgets.add(pw.Text('عدد طلبات المواد: ${dayRequests.length}', style: regularStyle));
-          widgets.add(pw.SizedBox(height: 20));
 
-          // Entries details
-          widgets.add(pw.Text('الملاحظات والصور:', style: headerStyle));
+          // Executive Summary Card
+          widgets.add(_buildSummaryCard(
+              dayEntries.length,
+              dayTests.length,
+              dayRequests.length,
+              headerStyle,
+              regularStyle,
+              primaryColor,
+              lightGrey));
+          widgets.add(pw.SizedBox(height: 30));
+
+          // Entries Section
+          widgets.add(_buildSectionHeader('الملاحظات والتحديثات', headerStyle, primaryColor));
+          widgets.add(pw.SizedBox(height: 15));
           if (dayEntries.isEmpty) {
-            widgets.add(pw.Text('لا توجد ملاحظات مسجلة.', style: regularStyle));
+            widgets.add(_buildEmptyState('لا توجد ملاحظات مسجلة في هذه الفترة', regularStyle, lightGrey));
           } else {
-            for (var entry in dayEntries) {
-              final note = entry['note'] ?? '';
-              final engineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
-              final ts = (entry['timestamp'] as Timestamp?)?.toDate();
-              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
-              final phaseName = entry['phaseName'] ?? '';
-              final subName = entry['subPhaseName'];
-              widgets.add(pw.Container(
-                margin: const pw.EdgeInsets.symmetric(vertical: 4),
-                child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text(subName != null ? '$phaseName > $subName' : phaseName,
-                          style: pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold)),
-                      if (note.toString().isNotEmpty)
-                        pw.Text('ملاحظة: $note', style: regularStyle),
-                      for (var url in (entry['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [])
-                        if (fetchedImages.containsKey(url))
-                          pw.Padding(
-                              padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                              child: pw.Image(fetchedImages[url]!, width: 150, height: 100, fit: pw.BoxFit.contain)),
-                      pw.Text('بواسطة: $engineer - $dateStr', style: smallGrey),
-                    ]),
-              ));
+            for (int i = 0; i < dayEntries.length; i++) {
+              final entry = dayEntries[i];
+              widgets.add(_buildEntryCard(
+                  entry,
+                  fetchedImages,
+                  i + 1,
+                  subHeaderStyle,
+                  regularStyle,
+                  labelStyle,
+                  metaStyle,
+                  borderColor,
+                  lightGrey));
+              widgets.add(pw.SizedBox(height: 15));
             }
           }
 
-          // Tests details
-          widgets.add(pw.SizedBox(height: 10));
-          widgets.add(pw.Text('الاختبارات:', style: headerStyle));
-          if (dayTests.isEmpty) {
-            widgets.add(pw.Text('لا توجد اختبارات محدثة.', style: regularStyle));
-          } else {
-            for (var test in dayTests) {
-              final note = test['note'] ?? '';
-              final engineer = test['lastUpdatedByName'] ?? 'مهندس';
-              final ts = (test['lastUpdatedAt'] as Timestamp?)?.toDate();
-              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
-              final section = test['sectionName'] ?? '';
-              final name = test['testName'] ?? '';
-              widgets.add(pw.Container(
-                  margin: const pw.EdgeInsets.symmetric(vertical: 4),
-                  child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-                    pw.Text('$section - $name', style: pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold)),
-                    if (note.toString().isNotEmpty) pw.Text('الملاحظات: $note', style: regularStyle),
-                    if (test['imageUrl'] != null && fetchedImages.containsKey(test['imageUrl']))
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                        child: pw.Image(fetchedImages[test['imageUrl']]!, width: 150, height: 100, fit: pw.BoxFit.contain),
-                      ),
-                    pw.Text('بواسطة: $engineer - $dateStr', style: smallGrey),
-                  ])));
-            }
-          }
-
-          // Part requests
-          widgets.add(pw.SizedBox(height: 10));
-          widgets.add(pw.Text('طلبات المواد:', style: headerStyle));
-          if (dayRequests.isEmpty) {
-            widgets.add(pw.Text('لا توجد طلبات مواد.', style: regularStyle));
-          } else {
-            for (var pr in dayRequests) {
-              final name = pr['partName'] ?? '';
-              final qty = pr['quantity']?.toString() ?? '1';
-              final status = pr['status'] ?? '';
-              final eng = pr['engineerName'] ?? '';
-              final ts = (pr['requestedAt'] as Timestamp?)?.toDate();
-              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
-              widgets.add(pw.Bullet(
-                  text: '$name - الكمية: $qty - $status - $eng - $dateStr',
-                  textDirection: pw.TextDirection.rtl,
-                  style: regularStyle));
-            }
-          }
-
+          // Tests Section
           widgets.add(pw.SizedBox(height: 20));
-          widgets.add(pw.Container(
-            padding: const pw.EdgeInsets.all(8),
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfColors.red, width: 1.5),
-              borderRadius: pw.BorderRadius.circular(5),
-            ),
-            child: pw.Text(
-              'ملاحظة هامة: في حال مضى 24 ساعة يعتبر هذا التقرير مكتمل وغير قابل للتعديل.',
-              style: pw.TextStyle(font: _arabicFont, color: PdfColors.red, fontWeight: pw.FontWeight.bold, fontSize: 10),
-              textDirection: pw.TextDirection.rtl,
-              textAlign: pw.TextAlign.center,
-            ),
-          ));
+          widgets.add(_buildSectionHeader('الاختبارات والفحوصات', headerStyle, primaryColor));
+          widgets.add(pw.SizedBox(height: 15));
+          if (dayTests.isEmpty) {
+            widgets.add(_buildEmptyState('لا توجد اختبارات محدثة في هذه الفترة', regularStyle, lightGrey));
+          } else {
+            for (int i = 0; i < dayTests.length; i++) {
+              final test = dayTests[i];
+              widgets.add(_buildTestCard(
+                  test,
+                  fetchedImages,
+                  i + 1,
+                  subHeaderStyle,
+                  regularStyle,
+                  labelStyle,
+                  metaStyle,
+                  borderColor,
+                  lightGrey));
+              widgets.add(pw.SizedBox(height: 15));
+            }
+          }
 
+          // Part Requests Section
+          widgets.add(pw.SizedBox(height: 20));
+          widgets.add(_buildSectionHeader('طلبات المواد والمعدات', headerStyle, primaryColor));
+          widgets.add(pw.SizedBox(height: 15));
+          if (dayRequests.isEmpty) {
+            widgets.add(_buildEmptyState('لا توجد طلبات مواد في هذه الفترة', regularStyle, lightGrey));
+          } else {
+            widgets.add(_buildRequestsTable(dayRequests, regularStyle, labelStyle, borderColor, lightGrey));
+          }
+
+          // Important Notice
+          widgets.add(pw.SizedBox(height: 30));
+          widgets.add(_buildImportantNotice(regularStyle));
           return widgets;
         },
-        footer: (context) => pw.Container(
-          alignment: pw.Alignment.center,
-          margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
-          child: pw.Text('صفحة ${context.pageNumber} من ${context.pagesCount}', style: smallGrey),
-        ),
+        footer: (context) => _buildFooter(context, metaStyle, primaryColor),
       ),
     );
 
     try {
       final pdfBytes = await pdf.save();
       final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
-
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
-
       await _saveOrSharePdf(
         pdfBytes,
         fileName,
@@ -1152,6 +1191,731 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       _showFeedbackSnackBar(context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
       print('Error generating daily report PDF: $e');
     }
+  }
+
+// You MUST ensure your _buildHeader method has this signature to accept the logo:
+  pw.Widget _buildHeader(
+      String headerText,
+      DateTime now,
+      pw.TextStyle titleStyle,
+      pw.TextStyle regularStyle,
+      PdfColor primaryColor,
+      PdfColor lightGrey,
+      pw.MemoryImage appLogo, // <--- This parameter is crucial
+      ) {
+    // Your existing _buildHeader logic, ensuring it uses 'appLogo' where the QR code was.
+    return pw.Container(
+      alignment: pw.Alignment.centerRight,
+      margin: const pw.EdgeInsets.only(bottom: 20),
+      decoration: pw.BoxDecoration(
+        color: lightGrey,
+        border: pw.Border(bottom: pw.BorderSide(color: primaryColor, width: 2)),
+      ),
+      padding: const pw.EdgeInsets.all(10),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                headerText,
+                style: titleStyle,
+              ),
+              pw.SizedBox(height: 5),
+              pw.Text(
+                'تاريخ الإنشاء: ${DateFormat('dd-MM-yyyy HH:mm').format(now)}',
+                textDirection: pw.TextDirection.rtl,
+                style: regularStyle.copyWith(color: PdfColors.grey600),
+              ),
+            ],
+          ),
+          // Use the appLogo here instead of the QR code
+          pw.Image(appLogo, width: 70, height: 70), // Adjust width/height as needed
+        ],
+      ),
+    );
+  }
+
+  // Helper methods for professional components
+  // pw.Widget _buildHeader(String headerText, DateTime now, pw.TextStyle titleStyle, pw.TextStyle regularStyle, PdfColor primaryColor, PdfColor lightGrey) {
+  //   return pw.Container(
+  //     height: 120,
+  //     decoration: pw.BoxDecoration(
+  //       gradient: pw.LinearGradient(
+  //         colors: [PdfColor.fromHex('#F5C842'), PdfColor.fromHex('#FFD700')],
+  //         begin: pw.Alignment.topLeft,
+  //         end: pw.Alignment.bottomRight,
+  //       ),
+  //     ),
+  //     child: pw.Stack(
+  //       children: [
+  //         // Background pattern
+  //         pw.Positioned(
+  //           right: 0,
+  //           top: 0,
+  //           child: pw.Container(
+  //             width: 200,
+  //             height: 120,
+  //             decoration: pw.BoxDecoration(
+  //               // color: PdfColor.fromHex('#FFE55C').withOpacity(0.3),
+  //               borderRadius: pw.BorderRadius.only(
+  //                 bottomLeft: pw.Radius.circular(100),
+  //               ),
+  //             ),
+  //           ),
+  //         ),
+  //         // Main content
+  //         pw.Padding(
+  //           padding: const pw.EdgeInsets.all(20),
+  //           child: pw.Row(
+  //             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+  //             crossAxisAlignment: pw.CrossAxisAlignment.center,
+  //             children: [
+  //               // Report info
+  //               pw.Expanded(
+  //                 child: pw.Column(
+  //                   crossAxisAlignment: pw.CrossAxisAlignment.end,
+  //                   mainAxisAlignment: pw.MainAxisAlignment.center,
+  //                   children: [
+  //                     pw.Text(
+  //                       headerText,
+  //                       style: pw.TextStyle(
+  //                         font: _arabicFont,
+  //                         fontSize: 24,
+  //                         fontWeight: pw.FontWeight.bold,
+  //                         color: PdfColor.fromHex('#1B4D3E'),
+  //                       ),
+  //                     ),
+  //                     pw.SizedBox(height: 5),
+  //                     pw.Text(
+  //                       'تاريخ الإنشاء: ${DateFormat('yyyy/MM/dd - HH:mm', 'ar').format(now)}',
+  //                       style: pw.TextStyle(
+  //                         font: _arabicFont,
+  //                         fontSize: 12,
+  //                         color: PdfColor.fromHex('#424242'),
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 ),
+  //               ),
+  //               pw.SizedBox(width: 20),
+  //               // Company info and logo
+  //               pw.Column(
+  //                 crossAxisAlignment: pw.CrossAxisAlignment.start,
+  //                 mainAxisAlignment: pw.MainAxisAlignment.center,
+  //                 children: [
+  //                   pw.Row(
+  //                     children: [
+  //                       // Logo placeholder
+  //                       pw.Container(
+  //                         width: 60,
+  //                         height: 60,
+  //                         decoration: pw.BoxDecoration(
+  //                           color: PdfColor.fromHex('#1B4D3E'),
+  //                           borderRadius: pw.BorderRadius.circular(8),
+  //                         ),
+  //                         child: pw.Center(
+  //                           child: pw.Column(
+  //                             mainAxisAlignment: pw.MainAxisAlignment.center,
+  //                             children: [
+  //                               pw.Text(
+  //                                 'BHB',
+  //                                 style: pw.TextStyle(
+  //                                   font: _arabicFont,
+  //                                   color: PdfColor.fromHex('#F5C842'),
+  //                                   fontWeight: pw.FontWeight.bold,
+  //                                   fontSize: 16,
+  //                                 ),
+  //                               ),
+  //                               pw.Text(
+  //                                 'Group',
+  //                                 style: pw.TextStyle(
+  //                                   font: _arabicFont,
+  //                                   color: PdfColors.white,
+  //                                   fontSize: 8,
+  //                                 ),
+  //                               ),
+  //                             ],
+  //                           ),
+  //                         ),
+  //                       ),
+  //                       pw.SizedBox(width: 15),
+  //                       pw.Column(
+  //                         crossAxisAlignment: pw.CrossAxisAlignment.start,
+  //                         children: [
+  //                           pw.Text(
+  //                             'مؤسسة الجهد الأمين التجارية لأعمال السباكة والكهرباء',
+  //                             style: pw.TextStyle(
+  //                               font: _arabicFont,
+  //                               fontSize: 11,
+  //                               fontWeight: pw.FontWeight.bold,
+  //                               color: PdfColor.fromHex('#1B4D3E'),
+  //                             ),
+  //                           ),
+  //                           pw.SizedBox(height: 2),
+  //                           pw.Text(
+  //                             'Al-Jahad Al-Aman Trading Est.',
+  //                             style: pw.TextStyle(
+  //                               font: _arabicFont,
+  //                               fontSize: 9,
+  //                               color: PdfColor.fromHex('#424242'),
+  //                             ),
+  //                           ),
+  //                           pw.Text(
+  //                             'For Plumbing & Electrical Works',
+  //                             style: pw.TextStyle(
+  //                               font: _arabicFont,
+  //                               fontSize: 9,
+  //                               color: PdfColor.fromHex('#424242'),
+  //                             ),
+  //                           ),
+  //                         ],
+  //                       ),
+  //                     ],
+  //                   ),
+  //                 ],
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  pw.Widget _buildSummaryCard(int entriesCount, int testsCount, int requestsCount, pw.TextStyle headerStyle, pw.TextStyle regularStyle, PdfColor primaryColor, PdfColor lightGrey) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(20),
+      decoration: pw.BoxDecoration(
+        color: lightGrey,
+        borderRadius: pw.BorderRadius.circular(8),
+        border: pw.Border.all(color: primaryColor, width: 1),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: [
+          pw.Text('ملخص التقرير', style: headerStyle),
+          pw.SizedBox(height: 15),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildSummaryItem('الملاحظات', entriesCount.toString(), regularStyle, primaryColor),
+              _buildSummaryItem('الاختبارات', testsCount.toString(), regularStyle, primaryColor),
+              _buildSummaryItem('طلبات المواد', requestsCount.toString(), regularStyle, primaryColor),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _buildSummaryItem(String label, String value, pw.TextStyle regularStyle, PdfColor primaryColor) {
+    return pw.Column(
+      children: [
+        pw.Container(
+          width: 40,
+          height: 40,
+          decoration: pw.BoxDecoration(
+            color: primaryColor,
+            borderRadius: pw.BorderRadius.circular(20),
+          ),
+          child: pw.Center(
+            child: pw.Text(
+              value,
+              style: pw.TextStyle(
+                font: _arabicFont,
+                color: PdfColors.white,
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ),
+        pw.SizedBox(height: 8),
+        pw.Text(label, style: regularStyle),
+      ],
+    );
+  }
+
+  pw.Widget _buildSectionHeader(String title, pw.TextStyle headerStyle, PdfColor primaryColor) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+      decoration: pw.BoxDecoration(
+        color: primaryColor,
+        borderRadius: pw.BorderRadius.circular(5),
+      ),
+      child: pw.Text(
+        title,
+        style: pw.TextStyle(
+          font: _arabicFont,
+          color: PdfColors.white,
+          fontWeight: pw.FontWeight.bold,
+          fontSize: 16,
+        ),
+      ),
+    );
+  }
+
+  pw.Widget _buildEmptyState(String message, pw.TextStyle regularStyle, PdfColor lightGrey) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(20),
+      decoration: pw.BoxDecoration(
+        color: lightGrey,
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Center(
+        child: pw.Text(message, style: regularStyle),
+      ),
+    );
+  }
+
+  pw.Widget _buildEntryCard(Map<String, dynamic> entry, Map<String, pw.MemoryImage> fetchedImages, int index, pw.TextStyle subHeaderStyle, pw.TextStyle regularStyle, pw.TextStyle labelStyle, pw.TextStyle metaStyle, PdfColor borderColor, PdfColor lightGrey) {
+    final note = entry['note'] ?? '';
+    final engineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
+    final ts = (entry['timestamp'] as Timestamp?)?.toDate();
+    final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
+    final phaseName = entry['phaseName'] ?? '';
+    final subName = entry['subPhaseName'];
+    final imageUrls = (entry['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(15),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: borderColor),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: pw.BoxDecoration(
+                  color: lightGrey,
+                  borderRadius: pw.BorderRadius.circular(15),
+                ),
+                child: pw.Text('#$index', style: metaStyle),
+              ),
+              pw.Expanded(
+                child: pw.Text(
+                  subName != null ? '$phaseName > $subName' : phaseName,
+                  style: subHeaderStyle,
+                  textAlign: pw.TextAlign.right,
+                ),
+              ),
+            ],
+          ),
+          if (note.toString().isNotEmpty) ...[
+            pw.SizedBox(height: 10),
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: pw.Text(note.toString(), style: regularStyle, textAlign: pw.TextAlign.right),
+                ),
+                pw.SizedBox(width: 10),
+                pw.Text('الملاحظة:', style: labelStyle),
+              ],
+            ),
+          ],
+          if (imageUrls.isNotEmpty) ...[
+            pw.SizedBox(height: 10),
+            pw.Text('الصور المرفقة:', style: labelStyle),
+            pw.SizedBox(height: 5),
+            pw.Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: imageUrls.where((url) => fetchedImages.containsKey(url)).map((url) =>
+                  pw.Container(
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: borderColor),
+                      borderRadius: pw.BorderRadius.circular(5),
+                    ),
+                    child: pw.ClipRRect(
+                      // borderRadius: pw.BorderRadius.circular(5),
+                      child: pw.Image(
+                        fetchedImages[url]!,
+                        width: 120,
+                        height: 80,
+                        fit: pw.BoxFit.cover,
+                      ),
+                    ),
+                  ),
+              ).toList(),
+            ),
+          ],
+          pw.SizedBox(height: 10),
+          pw.Divider(color: borderColor),
+          pw.SizedBox(height: 5),
+          pw.Text('$engineer - $dateStr', style: metaStyle),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _buildTestCard(Map<String, dynamic> test, Map<String, pw.MemoryImage> fetchedImages, int index, pw.TextStyle subHeaderStyle, pw.TextStyle regularStyle, pw.TextStyle labelStyle, pw.TextStyle metaStyle, PdfColor borderColor, PdfColor lightGrey) {
+    final note = test['note'] ?? '';
+    final engineer = test['lastUpdatedByName'] ?? 'مهندس';
+    final ts = (test['lastUpdatedAt'] as Timestamp?)?.toDate();
+    final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
+    final section = test['sectionName'] ?? '';
+    final name = test['testName'] ?? '';
+    final imageUrl = test['imageUrl'];
+
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(15),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: borderColor),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: pw.BoxDecoration(
+                  color: lightGrey,
+                  borderRadius: pw.BorderRadius.circular(15),
+                ),
+                child: pw.Text('#$index', style: metaStyle),
+              ),
+              pw.Expanded(
+                child: pw.Text('$section - $name', style: subHeaderStyle, textAlign: pw.TextAlign.right),
+              ),
+            ],
+          ),
+          if (note.toString().isNotEmpty) ...[
+            pw.SizedBox(height: 10),
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: pw.Text(note.toString(), style: regularStyle, textAlign: pw.TextAlign.right),
+                ),
+                pw.SizedBox(width: 10),
+                pw.Text('الملاحظات:', style: labelStyle),
+              ],
+            ),
+          ],
+          if (imageUrl != null && fetchedImages.containsKey(imageUrl)) ...[
+            pw.SizedBox(height: 10),
+            pw.Text('الصورة المرفقة:', style: labelStyle),
+            pw.SizedBox(height: 5),
+            pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: borderColor),
+                borderRadius: pw.BorderRadius.circular(5),
+              ),
+              child: pw.ClipRRect(
+                // borderRadius: pw.BorderRadius.circular(5),
+                child: pw.Image(
+                  fetchedImages[imageUrl]!,
+                  width: 150,
+                  height: 100,
+                  fit: pw.BoxFit.cover,
+                ),
+              ),
+            ),
+          ],
+          pw.SizedBox(height: 10),
+          pw.Divider(color: borderColor),
+          pw.SizedBox(height: 5),
+          pw.Text('$engineer - $dateStr', style: metaStyle),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _buildRequestsTable(List<Map<String, dynamic>> requests, pw.TextStyle regularStyle, pw.TextStyle labelStyle, PdfColor borderColor, PdfColor lightGrey) {
+    return pw.Table(
+      border: pw.TableBorder.all(color: borderColor),
+      children: [
+        pw.TableRow(
+          decoration: pw.BoxDecoration(color: lightGrey),
+          children: [
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Text('التاريخ', style: labelStyle, textAlign: pw.TextAlign.center),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Text('المهندس', style: labelStyle, textAlign: pw.TextAlign.center),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Text('الحالة', style: labelStyle, textAlign: pw.TextAlign.center),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Text('الكمية', style: labelStyle, textAlign: pw.TextAlign.center),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Text('اسم المادة', style: labelStyle, textAlign: pw.TextAlign.center),
+            ),
+          ],
+        ),
+        ...requests.map((pr) {
+          final name = pr['partName'] ?? '';
+          final qty = pr['quantity']?.toString() ?? '1';
+          final status = pr['status'] ?? '';
+          final eng = pr['engineerName'] ?? '';
+          final ts = (pr['requestedAt'] as Timestamp?)?.toDate();
+          final dateStr = ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts) : '';
+
+          return pw.TableRow(
+            children: [
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(8),
+                child: pw.Text(dateStr, style: regularStyle, textAlign: pw.TextAlign.center),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(8),
+                child: pw.Text(eng, style: regularStyle, textAlign: pw.TextAlign.center),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(8),
+                child: pw.Text(status, style: regularStyle, textAlign: pw.TextAlign.center),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(8),
+                child: pw.Text(qty, style: regularStyle, textAlign: pw.TextAlign.center),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(8),
+                child: pw.Text(name, style: regularStyle, textAlign: pw.TextAlign.right),
+              ),
+            ],
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  pw.Widget _buildImportantNotice(pw.TextStyle regularStyle) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(15),
+      decoration: pw.BoxDecoration(
+        color: PdfColor.fromHex('#FFF3E0'),
+        border: pw.Border.all(color: PdfColor.fromHex('#FF9800'), width: 2),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Row(
+        children: [
+          pw.Expanded(
+            child: pw.Text(
+              'ملاحظة هامة: في حال مضى 24 ساعة يعتبر هذا التقرير مكتمل وغير قابل للتعديل.',
+              style: pw.TextStyle(
+                font: _arabicFont,
+                color: PdfColor.fromHex('#E65100'),
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 12,
+              ),
+              textDirection: pw.TextDirection.rtl,
+              textAlign: pw.TextAlign.right,
+            ),
+          ),
+          pw.SizedBox(width: 10),
+          pw.Container(
+            width: 30,
+            height: 30,
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('#FF9800'),
+              borderRadius: pw.BorderRadius.circular(15),
+            ),
+            child: pw.Center(
+              child: pw.Text(
+                '!',
+                style: pw.TextStyle(
+                  font: _arabicFont,
+                  color: PdfColors.white,
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _buildFooter(pw.Context context, pw.TextStyle metaStyle, PdfColor primaryColor) {
+    return pw.Container(
+      height: 80,
+      decoration: pw.BoxDecoration(
+        gradient: pw.LinearGradient(
+          colors: [PdfColor.fromHex('#1B4D3E'), PdfColor.fromHex('#2E8B57')],
+          begin: pw.Alignment.topLeft,
+          end: pw.Alignment.bottomRight,
+        ),
+      ),
+      child: pw.Stack(
+        children: [
+          // Background circle pattern
+          pw.Positioned(
+            left: -40,
+            bottom: -40,
+            child: pw.Container(
+              width: 120,
+              height: 120,
+              decoration: pw.BoxDecoration(
+                // color: PdfColor.fromHex('#F5C842').withOpacity(0.2),
+                borderRadius: pw.BorderRadius.circular(60),
+              ),
+            ),
+          ),
+          // Main content
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+            child: pw.Column(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                // Contact info and QR placeholder
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    // Page info
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'صفحة ${context.pageNumber} من ${context.pagesCount}',
+                          style: pw.TextStyle(
+                            font: _arabicFont,
+                            color: PdfColors.white,
+                            fontSize: 10,
+                          ),
+                        ),
+                        pw.SizedBox(height: 2),
+                        pw.Text(
+                          'تم إنشاء هذا التقرير آلياً',
+                          style: pw.TextStyle(
+                            font: _arabicFont,
+                            color: PdfColor.fromHex('#F5C842'),
+                            fontSize: 8,
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Contact details
+                    pw.Expanded(
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.center,
+                        children: [
+                          pw.Row(
+                            mainAxisAlignment: pw.MainAxisAlignment.center,
+                            children: [
+                              pw.Text(
+                                'المملكة العربية السعودية - الأحساء - سجل تجاري رقم: ٢٢٠١٤٩٢٠٥٠',
+                                style: pw.TextStyle(
+                                  font: _arabicFont,
+                                  color: PdfColors.white,
+                                  fontSize: 9,
+                                ),
+                              ),
+                              pw.SizedBox(width: 10),
+                              pw.Container(
+                                width: 12,
+                                height: 12,
+                                decoration: pw.BoxDecoration(
+                                  color: PdfColor.fromHex('#F5C842'),
+                                  borderRadius: pw.BorderRadius.circular(6),
+                                ),
+                                child: pw.Center(
+                                  child: pw.Text(
+                                    '📍',
+                                    style: pw.TextStyle(fontSize: 8),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          pw.SizedBox(height: 3),
+                          pw.Row(
+                            mainAxisAlignment: pw.MainAxisAlignment.center,
+                            children: [
+                              pw.Text(
+                                'الرقم الضريبي: ٣٠٠٤٧١٣٦٥٠٠٠٠٣',
+                                style: pw.TextStyle(
+                                  font: _arabicFont,
+                                  color: PdfColor.fromHex('#F5C842'),
+                                  fontSize: 9,
+                                ),
+                              ),
+                              pw.SizedBox(width: 20),
+                              pw.Text(
+                                '+966 54 538 8835',
+                                style: pw.TextStyle(
+                                  font: _arabicFont,
+                                  color: PdfColors.white,
+                                  fontSize: 9,
+                                ),
+                              ),
+                              pw.SizedBox(width: 10),
+                              pw.Container(
+                                width: 12,
+                                height: 12,
+                                decoration: pw.BoxDecoration(
+                                  color: PdfColor.fromHex('#F5C842'),
+                                  borderRadius: pw.BorderRadius.circular(6),
+                                ),
+                                child: pw.Center(
+                                  child: pw.Text(
+                                    '📞',
+                                    style: pw.TextStyle(fontSize: 8),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          pw.SizedBox(height: 3),
+                          pw.Text(
+                            'bhbcont@outlook.sa',
+                            style: pw.TextStyle(
+                              font: _arabicFont,
+                              color: PdfColor.fromHex('#F5C842'),
+                              fontSize: 9,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // QR Code placeholder
+                    pw.Container(
+                      width: 40,
+                      height: 40,
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.white,
+                        borderRadius: pw.BorderRadius.circular(5),
+                      ),
+                      child: pw.Center(
+                        child: pw.Text(
+                          'QR',
+                          style: pw.TextStyle(
+                            font: _arabicFont,
+                            color: PdfColor.fromHex('#1B4D3E'),
+                            fontSize: 8,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
 
