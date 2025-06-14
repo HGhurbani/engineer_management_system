@@ -27,6 +27,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart' show rootBundle; // For font loading
 import 'package:image/image.dart' as img;
 import 'package:printing/printing.dart';
+import '../../utils/pdf_styles.dart';
 // --- End PDF Imports ---
 
 import '../../main.dart'; // Assuming helper functions are in main.dart
@@ -852,32 +853,55 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   }
 
   Future<void> _selectReportDate() async {
-    final DateTime now = DateTime.now();
-    final DateTime? picked = await showDatePicker(
+    final now = DateTime.now();
+    await showDialog(
       context: context,
-      initialDate: now,
-      firstDate: DateTime(2020),
-      lastDate: now,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: AppConstants.primaryColor,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
+      builder: (ctx) => Directionality(
+        textDirection: ui.TextDirection.rtl,
+        child: SimpleDialog(
+          title: const Text('نوع التقرير'),
+          children: [
+            SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(ctx);
+                final start = DateTime(now.year, now.month, now.day);
+                _generateDailyReportPdf(start: start, end: start.add(const Duration(days: 1)));
+              },
+              child: const Text('تقرير اليوم'),
             ),
-          ),
-          child: child!,
-        );
-      },
+            SimpleDialogOption(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final DateTimeRange? range = await showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(2020),
+                  lastDate: now,
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: const ColorScheme.light(
+                          primary: AppConstants.primaryColor,
+                          onPrimary: Colors.white,
+                          surface: Colors.white,
+                          onSurface: Colors.black,
+                        ),
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (range != null) {
+                  final start = DateTime(range.start.year, range.start.month, range.start.day);
+                  final end = DateTime(range.end.year, range.end.month, range.end.day);
+                  _generateDailyReportPdf(start: start, end: end.add(const Duration(days: 1)));
+                }
+              },
+              child: const Text('تقرير فترة محددة'),
+            ),
+          ],
+        ),
+      ),
     );
-
-    if (picked != null) {
-      final start = DateTime(picked.year, picked.month, picked.day);
-      _generateDailyReportPdf(
-          start: start, end: start.add(const Duration(days: 1)));
-    }
   }
 
   // --- Function to load Arabic font ---
@@ -3363,6 +3387,10 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
     _showLoadingDialog(context, "جاري إنشاء التقرير...");
 
+    final ByteData logoByteData = await rootBundle.load('assets/images/app_logo.png');
+    final Uint8List logoBytes = logoByteData.buffer.asUint8List();
+    final pw.MemoryImage appLogo = pw.MemoryImage(logoBytes);
+
     final pdf = pw.Document();
     final List<pw.Widget> contentWidgets = [];
 
@@ -3379,26 +3407,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         ? assignedEngs.map((e) => (e as Map<String, dynamic>)['name'] ?? 'مهندس').join('، ')
         : '';
 
-    contentWidgets.add(pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-      children: [
-        pw.Text(LoginConstants.appName, style: headerStyle, textDirection: pw.TextDirection.rtl),
-      ],
-    ));
-    contentWidgets.add(pw.SizedBox(height: 8));
-    contentWidgets.add(pw.Header(
-        level: 0,
-        child: pw.Container(
-            alignment: pw.Alignment.centerRight,
-            child: pw.Text('تقرير مشروع: $projectName', style: headerStyle, textDirection: pw.TextDirection.rtl)
-        ),
-        padding: pw.EdgeInsets.only(bottom: 10)
-    ));
+    final String headerText = 'تقرير مشروع: $projectName';
 
     contentWidgets.add(pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
-        pw.Text('تاريخ الإنشاء: ${DateFormat('yyyy/MM/dd HH:mm', 'ar').format(DateTime.now())}', style: regularStyle, textDirection: pw.TextDirection.rtl),
         pw.Text('بواسطة المهندس: ${_currentEngineerName ?? 'غير محدد'}', style: regularStyle, textDirection: pw.TextDirection.rtl),
       ],
     ));
@@ -3779,19 +3792,17 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               orientation: pw.PageOrientation.portrait,
               textDirection: pw.TextDirection.rtl,
               theme: pw.ThemeData.withFont(base: _arabicFont, bold: _arabicFont),
-              margin: pw.EdgeInsets.all(30),
+              margin: const pw.EdgeInsets.all(50),
+            ),
+            header: (context) => PdfStyles.buildHeader(
+              font: _arabicFont!,
+              logo: appLogo,
+              headerText: headerText,
+              now: DateTime.now(),
             ),
             build: (context) => contentWidgets,
-            footer: (pw.Context context) {
-              return pw.Container(
-                  alignment: pw.Alignment.center,
-                  margin: const pw.EdgeInsets.only(top: 1.0 * PdfPageFormat.cm),
-                  child: pw.Text(
-                      'صفحة ${context.pageNumber} من ${context.pagesCount}',
-                      style: pw.Theme.of(context).defaultTextStyle.copyWith(color: PdfColors.grey, font: _arabicFont, fontSize: 10)
-                  )
-              );
-            }
+            footer: (pw.Context context) =>
+                PdfStyles.buildFooter(context, font: _arabicFont!),
         )
     );
 
