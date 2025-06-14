@@ -144,7 +144,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
       case 'project_assignment':
         if (_currentUserRole == 'engineer' && projectId != null && projectId.isNotEmpty) {
-          Navigator.pushNamed(context, '/projectDetails', arguments: projectId);
+          Navigator.pushNamed(
+            context,
+            '/projectDetails',
+            arguments: {
+              'projectId': projectId,
+              'itemId': itemId,
+              'notificationType': notificationType,
+            },
+          );
         } else if (_currentUserRole == 'client') {
           // Client does not get project assignment notifications directly
           // or they are handled by a general client home page, no deep link for client
@@ -164,8 +172,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
       case 'project_entry_engineer': // المهندس أضاف إدخال
         if ((_currentUserRole == 'admin' || _currentUserRole == 'engineer') && projectId != null && projectId.isNotEmpty) {
           String detailRoute = _currentUserRole == 'admin' ? '/admin/projectDetails' : '/projectDetails';
-          Navigator.pushNamed(context, detailRoute, arguments: projectId);
-          // Future enhancement: pass itemId to scroll to the specific phase/test/entry.
+          Navigator.pushNamed(
+            context,
+            detailRoute,
+            arguments: {
+              'projectId': projectId,
+              'itemId': itemId,
+              'notificationType': notificationType,
+            },
+          );
         }
         break;
 

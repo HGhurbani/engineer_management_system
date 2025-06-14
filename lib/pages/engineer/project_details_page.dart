@@ -38,7 +38,14 @@ import '../../theme/app_constants.dart';
 
 class ProjectDetailsPage extends StatefulWidget {
   final String projectId;
-  const ProjectDetailsPage({super.key, required this.projectId});
+  final String? highlightItemId;
+  final String? notificationType;
+  const ProjectDetailsPage({
+    super.key,
+    required this.projectId,
+    this.highlightItemId,
+    this.notificationType,
+  });
 
   @override
   State<ProjectDetailsPage> createState() => _ProjectDetailsPageState();
@@ -48,6 +55,14 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   String? _currentEngineerName;
   bool _isPageLoading = true;
   DocumentSnapshot? _projectDataSnapshot;
+
+  String? _highlightPhaseId;
+  String? _highlightSubPhaseId;
+  String? _highlightTestId;
+  final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _phaseKeys = {};
+  final Map<String, GlobalKey> _subPhaseKeys = {};
+  final Map<String, GlobalKey> _testKeys = {};
 
   late TabController _tabController;
 
@@ -316,8 +331,19 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
     _currentEngineerUid = FirebaseAuth.instance.currentUser?.uid;
+    if (widget.notificationType != null && widget.highlightItemId != null) {
+      final type = widget.notificationType!;
+      if (type.contains('subphase')) {
+        _highlightSubPhaseId = widget.highlightItemId;
+      } else if (type.contains('phase')) {
+        _highlightPhaseId = widget.highlightItemId;
+      } else if (type.contains('test')) {
+        _highlightTestId = widget.highlightItemId;
+      }
+    }
     _loadArabicFont(); // Load the font
     _fetchInitialData();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToHighlighted());
   }
 
   Widget _buildEmployeesTab() {
@@ -2068,6 +2094,23 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
   }
 
+  void _scrollToHighlighted() {
+    GlobalKey? key;
+    if (_highlightSubPhaseId != null) {
+      key = _subPhaseKeys[_highlightSubPhaseId];
+    } else if (_highlightPhaseId != null) {
+      key = _phaseKeys[_highlightPhaseId];
+    } else if (_highlightTestId != null) {
+      key = _testKeys[_highlightTestId];
+    }
+    if (key != null && key.currentContext != null) {
+      Scrollable.ensureVisible(
+        key.currentContext!,
+        duration: const Duration(milliseconds: 500),
+      );
+    }
+  }
+
 
   PreferredSizeWidget _buildAppBar() {
     // ... (no changes in this function)
@@ -2194,6 +2237,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       return const Center(child: Text("لا يمكن تحميل تفاصيل المشروع للمراحل."));
     }
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       itemCount: predefinedPhasesStructure.length,
       itemBuilder: (context, index) {
@@ -2252,10 +2296,14 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
 
               return Card(
+                key: _phaseKeys.putIfAbsent(phaseId, () => GlobalKey()),
+                color: phaseId == _highlightPhaseId ? AppConstants.highlightColor : null,
                 margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
                 elevation: 2,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
                 child: ExpansionTile(
+                  initiallyExpanded: phaseId == _highlightPhaseId ||
+                      subPhasesStructure.any((sp) => sp['id'] == _highlightSubPhaseId),
                   leading: CircleAvatar(
                     backgroundColor: isMainPhaseCompletedByAnyEngineer ? AppConstants.successColor : AppConstants.primaryColor,
                     child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -2302,7 +2350,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
 
                                   return ListTile(
+                                    key: _subPhaseKeys.putIfAbsent(subPhaseId, () => GlobalKey()),
                                     dense: true,
+                                    tileColor: subPhaseId == _highlightSubPhaseId ? AppConstants.highlightColor : null,
                                     leading: Icon(
                                       isSubPhaseCompletedByAnyEngineer ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
                                       color: isSubPhaseCompletedByAnyEngineer ? AppConstants.successColor : AppConstants.textSecondary,
@@ -2345,6 +2395,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       return const Center(child: Text("لا يمكن تحميل تفاصيل المشروع للاختبارات."));
     }
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       itemCount: finalCommissioningTests.length,
       itemBuilder: (context, sectionIndex) {
@@ -2424,6 +2475,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                     }
 
                     return ListTile(
+                      key: _testKeys.putIfAbsent(testId, () => GlobalKey()),
+                      tileColor: testId == _highlightTestId ? AppConstants.highlightColor : null,
                       title: Text(testName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: null)),
                       leading: Icon(
                         isTestCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
