@@ -1715,8 +1715,16 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           ],
         ),
         ...requests.map((pr) {
-          final name = pr['partName'] ?? '';
-          final qty = pr['quantity']?.toString() ?? '1';
+          final List<dynamic>? items = pr['items'];
+          String name;
+          String qty;
+          if (items != null && items.isNotEmpty) {
+            name = items.map((e) => '${e['name']} (${e['quantity']})').join('، ');
+            qty = '-';
+          } else {
+            name = pr['partName'] ?? '';
+            qty = pr['quantity']?.toString() ?? '1';
+          }
           final status = pr['status'] ?? '';
           final eng = pr['engineerName'] ?? '';
           final ts = (pr['requestedAt'] as Timestamp?)?.toDate();
@@ -3425,12 +3433,14 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       contentWidgets.add(pw.SizedBox(height: 6));
       contentWidgets.add(pw.Text('القطع المطلوبة للمشروع:', style: boldStyle, textDirection: pw.TextDirection.rtl));
       for (var pr in partRequests) {
-        final String pName = pr['partName'] ?? '';
-        final String qty = pr['quantity']?.toString() ?? '1';
+        final List<dynamic>? items = pr['items'];
+        final String itemSummary = (items != null && items.isNotEmpty)
+            ? items.map((e) => '${e['name']} (${e['quantity']})').join('، ')
+            : '${pr['partName'] ?? ''} (${pr['quantity'] ?? '1'})';
         final String status = pr['status'] ?? '';
         final Timestamp? ts = pr['requestedAt'] as Timestamp?;
         final String dt = ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts.toDate()) : '';
-        contentWidgets.add(pw.Bullet(text: '$pName - الكمية: $qty - $status - $dt', textAlign: pw.TextAlign.right, style: smallGreyStyle));
+        contentWidgets.add(pw.Bullet(text: '$itemSummary - $status - $dt', textAlign: pw.TextAlign.right, style: smallGreyStyle));
       }
     }
     contentWidgets.add(pw.Divider(height: 20, thickness: 1, color: PdfColors.grey400));
