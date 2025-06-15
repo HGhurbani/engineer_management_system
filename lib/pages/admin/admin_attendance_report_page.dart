@@ -14,6 +14,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:engineer_management_system/html_stub.dart'
     if (dart.library.html) 'dart:html' as html;
 import '../../utils/pdf_styles.dart';
+import '../../utils/report_storage.dart';
 
 class AdminAttendanceReportPage extends StatefulWidget {
   const AdminAttendanceReportPage({super.key});
@@ -835,6 +836,9 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
     final pw.MemoryImage appLogo = pw.MemoryImage(logoData.buffer.asUint8List());
 
     final pdf = pw.Document();
+    final fileName = 'attendance_${DateFormat('yyyyMMdd').format(_selectedDate)}.pdf';
+    final token = generateReportToken();
+    final qrLink = buildReportDownloadUrl(fileName, token);
     final pw.TextStyle headerStyle = pw.TextStyle(
         font: _arabicFont,
         fontSize: 12,
@@ -937,14 +941,13 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
           ];
         },
         footer: (context) => PdfStyles.buildFooter(context,
-            font: _arabicFont!, fontFallback: commonFontFallback),
+            font: _arabicFont!, fontFallback: commonFontFallback, qrData: qrLink),
       ),
     );
 
     try {
       final pdfBytes = await pdf.save();
-      final fileName =
-          'attendance_${DateFormat('yyyyMMdd').format(_selectedDate)}.pdf';
+      await uploadReportPdf(pdfBytes, fileName, token);
 
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
