@@ -1155,6 +1155,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       fontFallback: commonFontFallback, // Apply fallback
     );
 
+    final projectDataMap =
+        _projectDataSnapshot?.data() as Map<String, dynamic>?;
+    final String projectName = projectDataMap?['name'] ?? 'مشروع غير مسمى';
+    final String clientName = projectDataMap?['clientName'] ?? 'غير معروف';
+
     final bool isRange = start!.difference(end!).inDays != -1;
     final String headerText = isRange ? 'التقرير التراكمي' : 'التقرير اليومي';
 
@@ -1174,7 +1179,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           regularStyle,
           primaryColor,
           lightGrey,
-          appLogo, // Pass the app logo to the header builder
+          appLogo,
+          projectName,
+          clientName,
         ),
         build: (context) {
           final widgets = <pw.Widget>[];
@@ -1281,7 +1288,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       pw.TextStyle regularStyle,
       PdfColor primaryColor,
       PdfColor lightGrey,
-      pw.MemoryImage appLogo, // <--- This parameter is crucial
+      pw.MemoryImage appLogo,
+      String projectName,
+      String clientName,
       ) {
     // Your existing _buildHeader logic, ensuring it uses 'appLogo' where the QR code was.
     return pw.Container(
@@ -1302,6 +1311,10 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 headerText,
                 style: titleStyle,
               ),
+              pw.SizedBox(height: 5),
+              pw.Text('المشروع: $projectName', style: regularStyle),
+              pw.SizedBox(height: 2),
+              pw.Text('العميل: $clientName', style: regularStyle),
               pw.SizedBox(height: 5),
               pw.Text(
                 'تاريخ الإنشاء: ${DateFormat('dd-MM-yyyy HH:mm').format(now)}',
@@ -3493,6 +3506,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         fontFallback: commonFontFallback);
 
     String projectName = (_projectDataSnapshot?.data() as Map<String, dynamic>)?['name'] ?? 'اسم المشروع غير محدد';
+    String clientName = (_projectDataSnapshot?.data() as Map<String, dynamic>)?['clientName'] ?? 'غير معروف';
     final List<dynamic> assignedEngs = (_projectDataSnapshot?.data() as Map<String, dynamic>?)?['assignedEngineers'] as List<dynamic>? ?? [];
     final String responsibleEngineers = assignedEngs.isNotEmpty
         ? assignedEngs.map((e) => (e as Map<String, dynamic>)['name'] ?? 'مهندس').join('، ')
@@ -3893,6 +3907,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               logo: appLogo,
               headerText: headerText,
               now: DateTime.now(),
+              projectName: projectName,
+              clientName: clientName,
             ),
             build: (context) => contentWidgets,
             footer: (pw.Context context) => PdfStyles.buildFooter(context,

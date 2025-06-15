@@ -1757,6 +1757,10 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         font: _arabicFont, fontSize: 10, color: PdfColors.grey600, fontFallback: commonFontFallback);
     final String headerText = useRange ? 'التقرير التراكمي' : 'التقرير اليومي';
 
+    final projectDataMap = _projectDataSnapshot?.data() as Map<String, dynamic>?;
+    final String projectName = projectDataMap?['name'] ?? 'مشروع غير مسمى';
+    final String clientName = projectDataMap?['clientName'] ?? 'غير معروف';
+
     final ByteData logoByteData = await rootBundle.load('assets/images/app_logo.png');
     final Uint8List logoBytes = logoByteData.buffer.asUint8List();
     final pw.MemoryImage appLogo = pw.MemoryImage(logoBytes);
@@ -1775,6 +1779,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           logo: appLogo,
           headerText: headerText,
           now: now,
+          projectName: projectName,
+          clientName: clientName,
         ),
         build: (context) {
           final widgets = <pw.Widget>[];
