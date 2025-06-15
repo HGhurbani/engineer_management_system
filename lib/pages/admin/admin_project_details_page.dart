@@ -25,6 +25,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:image/image.dart' as img;
 import 'package:printing/printing.dart';
 import '../../utils/pdf_styles.dart';
+import '../../utils/report_storage.dart';
 import 'package:engineer_management_system/html_stub.dart'
     if (dart.library.html) 'dart:html' as html;
 // import 'package:url_launcher/url_launcher.dart'; // Not used directly for notifications
@@ -1749,6 +1750,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     final List<pw.Font> commonFontFallback = emojiFont != null ? [emojiFont!] : [];
 
     final pdf = pw.Document();
+    final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
+    final token = generateReportToken();
+    final qrLink = buildReportDownloadUrl(fileName, token);
     final pw.TextStyle regularStyle =
         pw.TextStyle(font: _arabicFont, fontSize: 12, fontFallback: commonFontFallback);
     final pw.TextStyle headerStyle = pw.TextStyle(
@@ -1883,13 +1887,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           return widgets;
         },
         footer: (context) => PdfStyles.buildFooter(context,
-            font: _arabicFont!, fontFallback: commonFontFallback),
+            font: _arabicFont!, fontFallback: commonFontFallback, qrData: qrLink),
       ),
     );
 
     try {
       final pdfBytes = await pdf.save();
-      final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
+      await uploadReportPdf(pdfBytes, fileName, token);
 
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);

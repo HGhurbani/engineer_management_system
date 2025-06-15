@@ -13,6 +13,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter/services.dart' show rootBundle;
 import '../../utils/pdf_styles.dart';
+import '../../utils/report_storage.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:engineer_management_system/html_stub.dart'
@@ -1324,7 +1325,12 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
     final List<pw.Font> commonFontFallback = emojiFont != null ? [emojiFont!] : [];
 
+    final sanitizedName =
+        evaluation.engineerName.replaceAll(RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
     final pdf = pw.Document();
+    final fileName = '${sanitizedName}_${evaluation.periodIdentifier}.pdf';
+    final token = generateReportToken();
+    final qrLink = buildReportDownloadUrl(fileName, token);
     final pw.TextStyle regular = pw.TextStyle(font: _arabicFont, fontSize: 12, fontFallback: commonFontFallback);
     final pw.TextStyle bold = pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 14, fontFallback: commonFontFallback);
 
@@ -1377,15 +1383,13 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
                   '0'}', style: regular),
         ],
         footer: (context) =>
-            PdfStyles.buildFooter(context, font: _arabicFont!, fontFallback: commonFontFallback),
+            PdfStyles.buildFooter(context, font: _arabicFont!, fontFallback: commonFontFallback, qrData: qrLink),
       ),
     );
 
     try {
       final bytes = await pdf.save();
-      final sanitizedName = evaluation.engineerName.replaceAll(
-          RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
-      final fileName = '${sanitizedName}_${evaluation.periodIdentifier}.pdf';
+      await uploadReportPdf(bytes, fileName, token);
 
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);

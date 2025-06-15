@@ -1,5 +1,6 @@
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:barcode/barcode.dart';
 import 'package:intl/intl.dart';
 
 class PdfStyles {
@@ -56,7 +57,9 @@ class PdfStyles {
   }
 
   static pw.Widget buildFooter(pw.Context context,
-      {required pw.Font font, List<pw.Font> fontFallback = const []}) {
+      {required pw.Font font,
+      List<pw.Font> fontFallback = const [],
+      String? qrData}) {
     return pw.Container(
       height: 80,
       decoration: pw.BoxDecoration(
@@ -193,16 +196,23 @@ class PdfStyles {
                     borderRadius: pw.BorderRadius.circular(5),
                   ),
                   child: pw.Center(
-                    child: pw.Text(
-                      'QR',
-                      style: pw.TextStyle(
-                        font: font,
-                        color: PdfColor.fromHex('#1B4D3E'),
-                        fontSize: 8,
-                        fontWeight: pw.FontWeight.bold,
-                        fontFallback: fontFallback,
-                      ),
-                    ),
+                    child: qrData != null
+                        ? pw.BarcodeWidget(
+                            barcode: pw.Barcode.qrCode(),
+                            data: qrData!,
+                            width: 40,
+                            height: 40,
+                          )
+                        : pw.Text(
+                            'QR',
+                            style: pw.TextStyle(
+                              font: font,
+                              color: PdfColor.fromHex('#1B4D3E'),
+                              fontSize: 8,
+                              fontWeight: pw.FontWeight.bold,
+                              fontFallback: fontFallback,
+                            ),
+                          ),
                   ),
                 ),
               ],

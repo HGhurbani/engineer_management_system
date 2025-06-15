@@ -28,6 +28,7 @@ import 'package:flutter/services.dart' show rootBundle; // For font loading
 import 'package:image/image.dart' as img;
 import 'package:printing/printing.dart';
 import '../../utils/pdf_styles.dart';
+import '../../utils/report_storage.dart';
 // --- End PDF Imports ---
 
 import '../../main.dart'; // Assuming helper functions are in main.dart
@@ -1102,6 +1103,10 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final fetchedImages = await _fetchImagesForUrls(imageUrls.toList());
     final pdf = pw.Document();
 
+    final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
+    final token = generateReportToken();
+    final qrLink = buildReportDownloadUrl(fileName, token);
+
     // Define professional color scheme
     final primaryColor = PdfColor.fromHex('#1B4D3E'); // Dark Green
     final secondaryColor = PdfColor.fromHex('#2E8B57'); // Medium Green
@@ -1258,13 +1263,13 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           return widgets;
         },
         footer: (context) =>
-            _buildFooter(context, metaStyle, primaryColor, fontFallback: commonFontFallback),
+            _buildFooter(context, metaStyle, primaryColor, fontFallback: commonFontFallback, qrData: qrLink),
       ),
     );
 
     try {
       final pdfBytes = await pdf.save();
-      final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
+      await uploadReportPdf(pdfBytes, fileName, token);
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
       await _saveOrSharePdf(
@@ -1848,7 +1853,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   }
 
   pw.Widget _buildFooter(pw.Context context, pw.TextStyle metaStyle, PdfColor primaryColor,
-      {List<pw.Font> fontFallback = const []}) {
+      {List<pw.Font> fontFallback = const [], String? qrData}) {
     return pw.Container(
       height: 80,
       decoration: pw.BoxDecoration(
@@ -1996,7 +2001,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                         ],
                       ),
                     ),
-                    // QR Code placeholder
                     pw.Container(
                       width: 40,
                       height: 40,
@@ -2005,16 +2009,23 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                         borderRadius: pw.BorderRadius.circular(5),
                       ),
                       child: pw.Center(
-                        child: pw.Text(
-                          'QR',
-                          style: pw.TextStyle(
-                            font: _arabicFont,
-                            color: PdfColor.fromHex('#1B4D3E'),
-                            fontSize: 8,
-                            fontWeight: pw.FontWeight.bold,
-                            fontFallback: fontFallback,
-                          ),
-                        ),
+                        child: qrData != null
+                            ? pw.BarcodeWidget(
+                                barcode: pw.Barcode.qrCode(),
+                                data: qrData!,
+                                width: 40,
+                                height: 40,
+                              )
+                            : pw.Text(
+                                'QR',
+                                style: pw.TextStyle(
+                                  font: _arabicFont,
+                                  color: PdfColor.fromHex('#1B4D3E'),
+                                  fontSize: 8,
+                                  fontWeight: pw.FontWeight.bold,
+                                  fontFallback: fontFallback,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -3485,6 +3496,10 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final List<pw.Font> commonFontFallback = emojiFont != null ? [emojiFont!] : [];
 
     final pdf = pw.Document();
+    final sanitizedName = name.replaceAll(RegExp(r'[^\w\s]+'),'').replaceAll(' ', '_');
+    final fileName = "${sanitizedName}_report_${DateTime.now().millisecondsSinceEpoch}.pdf";
+    final token = generateReportToken();
+    final qrLink = buildReportDownloadUrl(fileName, token);
     final List<pw.Widget> contentWidgets = [];
 
     final pw.TextStyle regularStyle =
@@ -3912,15 +3927,13 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             ),
             build: (context) => contentWidgets,
             footer: (pw.Context context) => PdfStyles.buildFooter(context,
-                font: _arabicFont!, fontFallback: commonFontFallback),
+                font: _arabicFont!, fontFallback: commonFontFallback, qrData: qrLink),
         )
     );
 
     try {
       final pdfBytes = await pdf.save();
-
-      final sanitizedName = name.replaceAll(RegExp(r'[^\w\s]+'),'').replaceAll(' ', '_');
-      final fileName = "${sanitizedName}_report_${DateTime.now().millisecondsSinceEpoch}.pdf";
+      await uploadReportPdf(pdfBytes, fileName, token);
 
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, "تم إنشاء التقرير بنجاح.", isError: false);

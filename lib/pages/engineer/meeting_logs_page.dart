@@ -15,6 +15,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 import '../../utils/pdf_styles.dart';
+import '../../utils/report_storage.dart';
 import 'package:engineer_management_system/html_stub.dart'
     if (dart.library.html) 'dart:html' as html;
 import 'dart:convert';
@@ -1173,6 +1174,10 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
     final fetchedImages = await _fetchImagesForUrls(imageUrls);
 
     final pdf = pw.Document();
+    final fileName =
+        'meeting_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
+    final token = generateReportToken();
+    final qrLink = buildReportDownloadUrl(fileName, token);
     final pw.TextStyle regularStyle = pw.TextStyle(
         font: _arabicFont, fontSize: 12, fontFallback: commonFontFallback);
 
@@ -1210,14 +1215,13 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
           return widgets;
         },
         footer: (context) => PdfStyles.buildFooter(context,
-            font: _arabicFont!, fontFallback: commonFontFallback),
+            font: _arabicFont!, fontFallback: commonFontFallback, qrData: qrLink),
       ),
     );
 
     try {
       final pdfBytes = await pdf.save();
-      final fileName =
-          'meeting_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
+      await uploadReportPdf(pdfBytes, fileName, token);
 
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء المحضر بنجاح.', isError: false);
