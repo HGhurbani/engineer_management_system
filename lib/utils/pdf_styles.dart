@@ -8,6 +8,8 @@ class PdfStyles {
     required pw.MemoryImage logo,
     required String headerText,
     required DateTime now,
+    required String projectName,
+    required String clientName,
   }) {
     final PdfColor primaryColor = PdfColor.fromHex('#1B4D3E');
     final PdfColor lightGrey = PdfColor.fromHex('#F5F5F5');
@@ -35,6 +37,10 @@ class PdfStyles {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(headerText, style: titleStyle),
+              pw.SizedBox(height: 5),
+              pw.Text('المشروع: $projectName', style: regularStyle),
+              pw.SizedBox(height: 2),
+              pw.Text('العميل: $clientName', style: regularStyle),
               pw.SizedBox(height: 5),
               pw.Text(
                 'تاريخ الإنشاء: ${DateFormat('dd-MM-yyyy HH:mm').format(now)}',

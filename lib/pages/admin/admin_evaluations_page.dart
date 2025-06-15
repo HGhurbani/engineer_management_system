@@ -1341,6 +1341,8 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           logo: appLogo,
           headerText: 'تقرير تقييم الموظف',
           now: DateTime.now(),
+          projectName: 'غير محدد',
+          clientName: 'غير محدد',
         ),
         build: (context) =>
         [
