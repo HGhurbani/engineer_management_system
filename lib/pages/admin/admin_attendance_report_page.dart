@@ -4,6 +4,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
+import 'dart:typed_data';
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:engineer_management_system/html_stub.dart'
+    if (dart.library.html) 'dart:html' as html;
+import '../../utils/pdf_styles.dart';
 
 class AdminAttendanceReportPage extends StatefulWidget {
   const AdminAttendanceReportPage({super.key});
@@ -19,6 +29,7 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
   Map<String, Map<String, dynamic>> _userSummaries = {};
   double _defaultWorkingHours = 10.0;
   double _hourlyRate = 50.0;
+  pw.Font? _arabicFont;
 
   late AnimationController _fadeController;
   late AnimationController _slideController;
@@ -36,6 +47,7 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
     super.initState();
     _initializeAnimations();
     _loadInitialData();
+    _loadArabicFont();
   }
 
   void _initializeAnimations() {
@@ -730,6 +742,224 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
     );
   }
 
+  Future<void> _loadArabicFont() async {
+    try {
+      final fontData = await rootBundle.load('assets/fonts/Tajawal-Regular.ttf');
+      _arabicFont = pw.Font.ttf(fontData);
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error loading Arabic font: $e');
+    }
+  }
+
+  void _showLoadingDialog(BuildContext context, String message) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(color: AppConstants.primaryColor),
+              const SizedBox(width: 20),
+              Text(message, style: const TextStyle(fontFamily: 'NotoSansArabic')),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _hideLoadingDialog(BuildContext context) {
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+  }
+
+  void _showFeedbackSnackBar(BuildContext context, String message,
+      {required bool isError}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        backgroundColor:
+            isError ? AppConstants.errorColor : AppConstants.successColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
+        margin: const EdgeInsets.all(AppConstants.paddingMedium),
+      ),
+    );
+  }
+
+  Future<void> _saveOrSharePdf(
+      Uint8List pdfBytes, String fileName, String subject, String text) async {
+    if (kIsWeb) {
+      final blob = html.Blob([pdfBytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', fileName)
+        ..click();
+      html.Url.revokeObjectUrl(url);
+    } else {
+      final dir = await getTemporaryDirectory();
+      final path = '${dir.path}/$fileName';
+      final file = File(path);
+      await file.writeAsBytes(pdfBytes);
+      await Share.shareXFiles([XFile(path)], subject: subject, text: text);
+    }
+  }
+
+  Future<void> _generateAttendancePdf() async {
+    if (_arabicFont == null) {
+      await _loadArabicFont();
+      if (_arabicFont == null) {
+        _showFeedbackSnackBar(context, 'فشل تحميل الخط العربي.', isError: true);
+        return;
+      }
+    }
+
+    _showLoadingDialog(context, 'جاري إنشاء التقرير...');
+
+    pw.Font? emojiFont;
+    try {
+      emojiFont = await PdfGoogleFonts.notoColorEmoji();
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error loading NotoColorEmoji font: $e');
+    }
+    final List<pw.Font> commonFontFallback = emojiFont != null ? [emojiFont] : [];
+
+    final ByteData logoData = await rootBundle.load('assets/images/app_logo.png');
+    final pw.MemoryImage appLogo = pw.MemoryImage(logoData.buffer.asUint8List());
+
+    final pdf = pw.Document();
+    final pw.TextStyle headerStyle = pw.TextStyle(
+        font: _arabicFont,
+        fontSize: 12,
+        fontWeight: pw.FontWeight.bold,
+        fontFallback: commonFontFallback);
+    final pw.TextStyle regularStyle = pw.TextStyle(
+        font: _arabicFont, fontSize: 11, fontFallback: commonFontFallback);
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          textDirection: pw.TextDirection.rtl,
+          theme: pw.ThemeData.withFont(
+              base: _arabicFont, fontFallback: commonFontFallback),
+          margin: const pw.EdgeInsets.all(50),
+        ),
+        header: (context) => PdfStyles.buildHeader(
+          font: _arabicFont!,
+          logo: appLogo,
+          headerText: 'تقرير الحضور اليومي',
+          now: _selectedDate,
+          projectName: 'غير محدد',
+          clientName: 'غير محدد',
+        ),
+        build: (context) {
+          final rows = <pw.TableRow>[];
+          rows.add(
+            pw.TableRow(
+              decoration: pw.BoxDecoration(color: PdfColor.fromHex('#F5F5F5')),
+              children: [
+                'الموظف',
+                'الوظيفة',
+                'الحضور',
+                'الانصراف',
+                'الساعات',
+                'الإضافي',
+                'المبلغ'
+              ].map((h) {
+                return pw.Padding(
+                  padding: const pw.EdgeInsets.all(8),
+                  child: pw.Text(h,
+                      style: headerStyle, textAlign: pw.TextAlign.center),
+                );
+              }).toList(),
+            ),
+          );
+
+          for (final summary in _userSummaries.values) {
+            final DateTime? checkIn = summary['checkIn'] as DateTime?;
+            DateTime? checkOut;
+            final co = summary['checkOut'];
+            if (co is Timestamp) {
+              checkOut = co.toDate();
+            } else if (co is DateTime) {
+              checkOut = co;
+            }
+            final totalHours = summary['totalHours'] as double;
+            final overtime = summary['overtimeHours'] as double? ?? 0.0;
+            final payment = summary['dailyPayment'] as double;
+
+            rows.add(
+              pw.TableRow(
+                children: [
+                  summary['name'] ?? '',
+                  summary['position'] ?? '',
+                  checkIn != null
+                      ? DateFormat('HH:mm').format(checkIn)
+                      : '--',
+                  checkOut != null
+                      ? DateFormat('HH:mm').format(checkOut)
+                      : '--',
+                  totalHours.toStringAsFixed(1),
+                  overtime.toStringAsFixed(1),
+                  payment.toStringAsFixed(0),
+                ].map((v) {
+                  return pw.Padding(
+                    padding: const pw.EdgeInsets.all(8),
+                    child:
+                        pw.Text(v.toString(), style: regularStyle, textAlign: pw.TextAlign.center),
+                  );
+                }).toList(),
+              ),
+            );
+          }
+
+          final summaryWidgets = [
+            pw.SizedBox(height: 10),
+            pw.Text('إجمالي الموظفين الحاضرين: $_presentCount',
+                style: regularStyle),
+            pw.Text('إجمالي الساعات: ${_totalHours.toStringAsFixed(1)}',
+                style: regularStyle),
+            pw.Text('إجمالي المبلغ: ${_totalPayment.toStringAsFixed(0)} ر.ق',
+                style: regularStyle),
+          ];
+
+          return [
+            pw.Table(border: pw.TableBorder.all(color: PdfColors.grey300), children: rows),
+            ...summaryWidgets
+          ];
+        },
+        footer: (context) => PdfStyles.buildFooter(context,
+            font: _arabicFont!, fontFallback: commonFontFallback),
+      ),
+    );
+
+    try {
+      final pdfBytes = await pdf.save();
+      final fileName =
+          'attendance_${DateFormat('yyyyMMdd').format(_selectedDate)}.pdf';
+
+      _hideLoadingDialog(context);
+      _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
+
+      await _saveOrSharePdf(
+          pdfBytes, fileName, 'تقرير الحضور', 'يرجى الاطلاع على التقرير المرفق.');
+    } catch (e) {
+      _hideLoadingDialog(context);
+      _showFeedbackSnackBar(
+          context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
+      // ignore: avoid_print
+      print('Error generating attendance PDF: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -744,6 +974,13 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
               fontSize: 22,
             ),
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
+              tooltip: 'تصدير PDF',
+              onPressed: _userSummaries.isEmpty ? null : _generateAttendancePdf,
+            ),
+          ],
           backgroundColor: AppConstants.primaryColor,
           elevation: 0,
           systemOverlayStyle: const SystemUiOverlayStyle(
