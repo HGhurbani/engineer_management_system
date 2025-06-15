@@ -610,11 +610,11 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       elevation: 4,
       centerTitle: true,
       actions: [
-        IconButton(
-          icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
-          tooltip: 'تقرير اليوم',
-          onPressed: _selectReportDate,
-        ),
+        // IconButton(
+        //   icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
+        //   tooltip: 'تقرير اليوم',
+        //   onPressed: _selectReportDate,
+        // ),
       ],
       bottom: TabBar(
         controller: _tabController, // Ensure this is using your state's _tabController

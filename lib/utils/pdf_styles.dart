@@ -61,7 +61,7 @@ class PdfStyles {
       height: 80,
       decoration: pw.BoxDecoration(
         gradient: pw.LinearGradient(
-          colors: [PdfColor.fromHex('#1B4D3E'), PdfColor.fromHex('#2E8B57')],
+          colors: [PdfColor.fromHex('#21206C'), PdfColor.fromHex('#21206C')],
           begin: pw.Alignment.topLeft,
           end: pw.Alignment.bottomRight,
         ),
