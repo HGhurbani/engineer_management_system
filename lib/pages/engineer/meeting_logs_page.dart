@@ -7,6 +7,16 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'dart:typed_data';
+import 'package:image/image.dart' as img;
+import '../../utils/pdf_styles.dart';
+import 'package:engineer_management_system/html_stub.dart'
+    if (dart.library.html) 'dart:html' as html;
 import 'dart:convert';
 import 'dart:io';
 
@@ -26,6 +36,7 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
   String _searchQuery = '';
   String _filterType = 'all';
   bool _isLoading = false;
+  pw.Font? _arabicFont;
 
   @override
   void initState() {
@@ -542,6 +553,14 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
                     ),
                   ),
                 ),
+                IconButton(
+                  onPressed: () => _generateMeetingPdf(data),
+                  icon: const Icon(Icons.picture_as_pdf_outlined),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
               ],
             ),
             content: Column(
@@ -1022,5 +1041,195 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
         actionsAlignment: MainAxisAlignment.center,
       ),
     );
+  }
+
+  Future<void> _loadArabicFont() async {
+    try {
+      final fontData = await rootBundle.load('assets/fonts/Tajawal-Regular.ttf');
+      _arabicFont = pw.Font.ttf(fontData);
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error loading Arabic font: $e');
+    }
+  }
+
+  void _showLoadingDialog(BuildContext context, String message) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(color: AppConstants.primaryColor),
+              const SizedBox(width: 20),
+              Text(message,
+                  style: const TextStyle(fontFamily: 'NotoSansArabic')),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _hideLoadingDialog(BuildContext context) {
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+  }
+
+  void _showFeedbackSnackBar(BuildContext context, String message,
+      {required bool isError}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        backgroundColor:
+            isError ? AppConstants.errorColor : AppConstants.successColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2)),
+        margin: const EdgeInsets.all(AppConstants.paddingMedium),
+      ),
+    );
+  }
+
+  Future<Map<String, pw.MemoryImage>> _fetchImagesForUrls(
+      List<String> urls) async {
+    final Map<String, pw.MemoryImage> fetched = {};
+    await Future.wait(urls.map((url) async {
+      if (fetched.containsKey(url)) return;
+      try {
+        final response = await http.get(Uri.parse(url));
+        final contentType = response.headers['content-type'] ?? '';
+        if (response.statusCode == 200 && contentType.startsWith('image/')) {
+          final decoded = img.decodeImage(response.bodyBytes);
+          if (decoded != null) {
+            fetched[url] = pw.MemoryImage(response.bodyBytes);
+          }
+        }
+      } catch (e) {
+        // ignore: avoid_print
+        print('Error fetching image from URL $url: $e');
+      }
+    }));
+    return fetched;
+  }
+
+  Future<void> _saveOrSharePdf(
+      Uint8List pdfBytes, String fileName, String subject, String text) async {
+    if (kIsWeb) {
+      final blob = html.Blob([pdfBytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', fileName)
+        ..click();
+      html.Url.revokeObjectUrl(url);
+    } else {
+      final dir = await getTemporaryDirectory();
+      final path = '${dir.path}/$fileName';
+      final file = File(path);
+      await file.writeAsBytes(pdfBytes);
+      await Share.shareXFiles([XFile(path)], subject: subject, text: text);
+    }
+  }
+
+  Future<void> _generateMeetingPdf(Map<String, dynamic> data) async {
+    final DateTime meetingDate =
+        (data['date'] as Timestamp?)?.toDate() ?? DateTime.now();
+
+    if (_arabicFont == null) {
+      await _loadArabicFont();
+      if (_arabicFont == null) {
+        _showFeedbackSnackBar(context, 'فشل تحميل الخط العربي. لا يمكن إنشاء PDF.',
+            isError: true);
+        return;
+      }
+    }
+
+    _showLoadingDialog(context, 'جاري إنشاء المحضر...');
+
+    pw.Font? emojiFont;
+    try {
+      emojiFont = await PdfGoogleFonts.notoColorEmoji();
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error loading NotoColorEmoji font: $e');
+    }
+    final List<pw.Font> commonFontFallback = emojiFont != null ? [emojiFont] : [];
+
+    final ByteData logoByteData =
+        await rootBundle.load('assets/images/app_logo.png');
+    final Uint8List logoBytes = logoByteData.buffer.asUint8List();
+    final pw.MemoryImage appLogo = pw.MemoryImage(logoBytes);
+
+    final imageUrls = <String>[...
+        (data['imageUrls'] as List<dynamic>? ?? []).map((e) => e.toString())];
+    if (data['imageUrl'] != null && (data['imageUrl'] as String).isNotEmpty) {
+      imageUrls.add(data['imageUrl'] as String);
+    }
+
+    final fetchedImages = await _fetchImagesForUrls(imageUrls);
+
+    final pdf = pw.Document();
+    final pw.TextStyle regularStyle = pw.TextStyle(
+        font: _arabicFont, fontSize: 12, fontFallback: commonFontFallback);
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          textDirection: pw.TextDirection.rtl,
+          theme:
+              pw.ThemeData.withFont(base: _arabicFont, fontFallback: commonFontFallback),
+          margin: const pw.EdgeInsets.all(50),
+        ),
+        header: (context) => PdfStyles.buildHeader(
+          font: _arabicFont!,
+          logo: appLogo,
+          headerText: 'محضر اجتماع',
+          now: meetingDate,
+          projectName: data['title'] ?? 'اجتماع',
+          clientName: data['type'] == 'client' ? 'عميل' : 'موظفين',
+        ),
+        build: (context) {
+          final widgets = <pw.Widget>[];
+          final desc = data['description']?.toString() ?? '';
+          if (desc.isNotEmpty) {
+            widgets.add(pw.Text(desc, style: regularStyle));
+            widgets.add(pw.SizedBox(height: 10));
+          }
+          for (final url in imageUrls) {
+            final imgMem = fetchedImages[url];
+            if (imgMem != null) {
+              widgets.add(pw.Image(imgMem, width: 400, fit: pw.BoxFit.contain));
+              widgets.add(pw.SizedBox(height: 10));
+            }
+          }
+          return widgets;
+        },
+        footer: (context) => PdfStyles.buildFooter(context,
+            font: _arabicFont!, fontFallback: commonFontFallback),
+      ),
+    );
+
+    try {
+      final pdfBytes = await pdf.save();
+      final fileName =
+          'meeting_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
+
+      _hideLoadingDialog(context);
+      _showFeedbackSnackBar(context, 'تم إنشاء المحضر بنجاح.', isError: false);
+
+      await _saveOrSharePdf(pdfBytes, fileName, 'محضر اجتماع',
+          'يرجى الاطلاع على المحضر المرفق.');
+    } catch (e) {
+      _hideLoadingDialog(context);
+      _showFeedbackSnackBar(context, 'فشل إنشاء أو مشاركة المحضر: $e',
+          isError: true);
+      // ignore: avoid_print
+      print('Error generating meeting PDF: $e');
+    }
   }
 }
