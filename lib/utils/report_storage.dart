@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:engineer_management_system/theme/app_constants.dart'; // تأكد من استيراد هذا
 
@@ -63,4 +64,22 @@ class ReportStorage {
       return null;
     }
   }
+}
+
+// Creates a random token for identifying generated reports
+String generateReportToken({int length = 16}) {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  final rand = Random.secure();
+  return List.generate(length, (_) => chars[rand.nextInt(chars.length)]).join();
+}
+
+// Build a download URL that includes the token as a query parameter
+String buildReportDownloadUrl(String fileName, String token) {
+  final baseUrl = ReportStorage.buildReportDownloadUrl(fileName);
+  return '$baseUrl?token=$token';
+}
+
+// Upload the PDF using [ReportStorage] ignoring the token on the client side
+Future<void> uploadReportPdf(Uint8List bytes, String fileName, String token) async {
+  await ReportStorage.uploadReportPdf(bytes, fileName);
 }
