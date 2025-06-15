@@ -594,7 +594,7 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
                         validator: (val) => val == null ? 'اختر نوع الاجتماع' : null,
                       ),
                       const SizedBox(height: 16),
-                      if (selectedImages != null && selectedImages.isNotEmpty)
+                      if (selectedImages != null && selectedImages!.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8.0),
                           child: Wrap(

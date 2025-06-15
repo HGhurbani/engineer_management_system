@@ -567,18 +567,18 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   Widget _buildAttachmentsTab() {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(AppConstants.paddingSmall),
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.attach_file, color: Colors.white, size: 18),
-              label: const Text('إضافة مرفق', style: TextStyle(color: Colors.white)),
-              onPressed: _showAddAttachmentDialog,
-              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
-            ),
-          ),
-        ),
+        // Padding(
+        //   padding: const EdgeInsets.all(AppConstants.paddingSmall),
+        //   child: Align(
+        //     alignment: AlignmentDirectional.centerStart,
+        //     child: ElevatedButton.icon(
+        //       icon: const Icon(Icons.attach_file, color: Colors.white, size: 18),
+        //       label: const Text('إضافة مرفق', style: TextStyle(color: Colors.white)),
+        //       onPressed: _showAddAttachmentDialog,
+        //       style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+        //     ),
+        //   ),
+        // ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
