@@ -81,56 +81,73 @@ class PdfStyles {
 
     final pw.TextStyle headerStyle = pw.TextStyle(
       font: font,
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: pw.FontWeight.bold,
       color: PdfColors.white,
     );
     final pw.TextStyle cellStyle =
-        pw.TextStyle(font: font, fontSize: 10, color: PdfColors.black);
+        pw.TextStyle(font: font, fontSize: 11, color: PdfColors.black);
 
-    // Reverse columns if right-to-left orientation is requested
     final headerCells = isRtl ? headers.reversed.toList() : headers;
-    final dataRows = isRtl
-        ? data.map((row) => row.reversed.toList()).toList()
-        : data;
+    final dataRows =
+        isRtl ? data.map((row) => row.reversed.toList()).toList() : data;
 
-    final rows = <pw.TableRow>[];
-    rows.add(
-      pw.TableRow(
-        decoration: pw.BoxDecoration(color: primary),
-        children: headerCells
-            .map((h) => pw.Padding(
-                  padding: const pw.EdgeInsets.all(8),
-                  child: pw.Text(
+    final List<pw.Widget> widgets = [];
+
+    widgets.add(
+      pw.Container(
+        color: primary,
+        padding: const pw.EdgeInsets.all(8),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: headerCells
+              .map((h) => pw.Expanded(
+                      child: pw.Text(
                     h,
                     style: headerStyle,
                     textAlign: pw.TextAlign.center,
                     textDirection: pw.TextDirection.rtl,
-                  ),
-                ))
-            .toList(),
+                  )))
+              .toList(),
+        ),
       ),
     );
 
+    bool alternate = false;
     for (final row in dataRows) {
-      rows.add(
-        pw.TableRow(
-          children: row
-              .map((c) => pw.Padding(
-                    padding: const pw.EdgeInsets.all(8),
-                    child: pw.Text(
-                      c,
-                      style: cellStyle,
-                      textAlign: pw.TextAlign.center,
-                      textDirection: pw.TextDirection.rtl,
-                    ),
-                  ))
-              .toList(),
+      final rowColor = alternate ? PdfColors.grey100 : PdfColors.white;
+      alternate = !alternate;
+      widgets.add(
+        pw.Container(
+          decoration: pw.BoxDecoration(
+            color: rowColor,
+            border: pw.Border(bottom: pw.BorderSide(color: border)),
+          ),
+          padding: const pw.EdgeInsets.all(8),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: row
+                .map((c) => pw.Expanded(
+                        child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.center,
+                      children: [
+                        pw.Text('🔹 ',
+                            style: cellStyle.copyWith(color: primary)),
+                        pw.Text(
+                          c,
+                          style: cellStyle,
+                          textAlign: pw.TextAlign.center,
+                          textDirection: pw.TextDirection.rtl,
+                        ),
+                      ],
+                    )))
+                .toList(),
+          ),
         ),
       );
     }
 
-    return pw.Table(border: pw.TableBorder.all(color: border), children: rows);
+    return pw.Column(children: widgets);
   }
 
   static pw.Widget buildFooter(pw.Context context,
