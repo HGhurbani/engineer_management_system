@@ -56,6 +56,56 @@ class PdfStyles {
     );
   }
 
+  static pw.Widget buildTable({
+    required pw.Font font,
+    required List<String> headers,
+    required List<List<String>> data,
+    PdfColor? headerColor,
+    PdfColor? borderColor,
+  }) {
+    final PdfColor primary = headerColor ?? PdfColor.fromHex('#21206C');
+    final PdfColor border = borderColor ?? PdfColors.grey300;
+
+    final pw.TextStyle headerStyle = pw.TextStyle(
+      font: font,
+      fontSize: 11,
+      fontWeight: pw.FontWeight.bold,
+      color: PdfColors.white,
+    );
+    final pw.TextStyle cellStyle =
+        pw.TextStyle(font: font, fontSize: 10, color: PdfColors.black);
+
+    final rows = <pw.TableRow>[];
+    rows.add(
+      pw.TableRow(
+        decoration: pw.BoxDecoration(color: primary),
+        children: headers
+            .map((h) => pw.Padding(
+                  padding: const pw.EdgeInsets.all(8),
+                  child: pw.Text(h,
+                      style: headerStyle, textAlign: pw.TextAlign.center),
+                ))
+            .toList(),
+      ),
+    );
+
+    for (final row in data) {
+      rows.add(
+        pw.TableRow(
+          children: row
+              .map((c) => pw.Padding(
+                    padding: const pw.EdgeInsets.all(8),
+                    child:
+                        pw.Text(c, style: cellStyle, textAlign: pw.TextAlign.center),
+                  ))
+              .toList(),
+        ),
+      );
+    }
+
+    return pw.Table(border: pw.TableBorder.all(color: border), children: rows);
+  }
+
   static pw.Widget buildFooter(pw.Context context,
       {required pw.Font font,
       List<pw.Font> fontFallback = const [],
