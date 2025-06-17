@@ -1487,7 +1487,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             cellStyle: regularStyle,
             headerStyle: labelStyle, // Use labelStyle for cell labels (first column)
             defaultColumnWidth: const pw.IntrinsicColumnWidth(),
-            defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
             tableWidth: pw.TableWidth.min, // Adjust table width based on content
           ),
           if (imageUrls.isNotEmpty) ...[
@@ -1580,7 +1579,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             cellStyle: regularStyle,
             headerStyle: labelStyle, // Use labelStyle for cell labels (first column)
             defaultColumnWidth: const pw.IntrinsicColumnWidth(),
-            defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
             tableWidth: pw.TableWidth.min, // Adjust table width based on content
           ),
           if (imageUrl != null && fetchedImages.containsKey(imageUrl)) ...[
@@ -1742,7 +1740,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           pw.Container(
             width: 30,
             height: 30,
-            decoration: pw.BoxBoxDecoration(
+            decoration: pw.BoxDecoration(
               color: PdfColor.fromHex('#FF9800'),
               borderRadius: pw.BorderRadius.circular(15),
             ),
