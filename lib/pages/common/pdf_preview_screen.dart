@@ -40,10 +40,11 @@ class PdfPreviewScreen extends StatelessWidget {
         title: const Text('معاينة PDF', style: TextStyle(color: Colors.white)),
         backgroundColor: AppConstants.primaryColor,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.whatsapp, color: Colors.white),
-            tooltip: 'مشاركة عبر واتساب',
+          TextButton.icon(
             onPressed: () => _sharePdf(context),
+            icon: const Icon(Icons.whatsapp, color: Colors.white),
+            label: const Text('مشاركة واتساب', style: TextStyle(color: Colors.white)),
+            style: TextButton.styleFrom(foregroundColor: Colors.white),
           ),
         ],
       ),
