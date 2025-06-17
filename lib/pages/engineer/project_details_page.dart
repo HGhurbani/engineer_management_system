@@ -2101,6 +2101,15 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     );
   }
 
+  bool _isCurrentEngineerResponsible() {
+    if (_projectDataSnapshot == null || _currentEngineerUid == null) return false;
+    final data = _projectDataSnapshot!.data() as Map<String, dynamic>?;
+    if (data == null) return false;
+    final List<dynamic> uidsDynamic = data['engineerUids'] as List<dynamic>? ?? [];
+    final List<String> uids = uidsDynamic.map((e) => e.toString()).toList();
+    return uids.contains(_currentEngineerUid);
+  }
+
   // --- Helper for loading dialog ---
   void _showLoadingDialog(BuildContext context, String message) {
     if (!mounted) return;
@@ -2297,7 +2306,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               }
 
               bool canEngineerEditThisPhase = !isMainPhaseCompletedByAnyEngineer;
-              bool canGeneratePdfForMainPhase = isMainPhaseCompletedByAnyEngineer && mainPhaseCompletedByUid == _currentEngineerUid;
+              bool canGeneratePdfForMainPhase =
+                  isMainPhaseCompletedByAnyEngineer && _isCurrentEngineerResponsible();
 
               Widget? trailingWidget;
               if (canEngineerEditThisPhase) {
@@ -2471,7 +2481,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       testCompletedByUid = statusData['lastUpdatedByUid'] as String?;
                     }
                     bool canEngineerEditThisTest = !isTestCompleted;
-                    bool canGeneratePdfForTest = isTestCompleted && testCompletedByUid == _currentEngineerUid;
+                    bool canGeneratePdfForTest =
+                        isTestCompleted && _isCurrentEngineerResponsible();
 
                     Widget? trailingWidget;
                     if (canEngineerEditThisTest) {

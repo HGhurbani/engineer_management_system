@@ -1202,7 +1202,7 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
         header: (context) => PdfStyles.buildHeader(
           font: _arabicFont!,
           logo: appLogo,
-          headerText: 'محضر اجتماع',
+          headerText: AppConstants.meetingReportHeader,
           now: meetingDate,
           projectName: data['title'] ?? 'اجتماع',
           clientName: data['type'] == 'client' ? 'عميل' : 'موظفين',

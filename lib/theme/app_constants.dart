@@ -49,4 +49,8 @@ class AppConstants {
   // File upload
   static const String uploadUrl = '$baseUrl/images_upload/upload_image.php';
   static const String baseUrl = 'https://bhbgroup.me';
+
+  // PDF header titles
+  static const String meetingReportHeader = 'تقرير الاجتماع';
+  static const String attendanceReportHeader = 'سجل الحضور اليومي';
 }
