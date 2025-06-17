@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:typed_data';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
 import 'firebase_options.dart';
@@ -29,6 +30,7 @@ import 'package:engineer_management_system/pages/engineer/request_material_page.
 import 'package:engineer_management_system/pages/engineer/meeting_logs_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_meeting_logs_page.dart';
 import 'package:engineer_management_system/pages/common/change_password_page.dart';
+import 'package:engineer_management_system/pages/common/pdf_preview_screen.dart';
 
 // --- ADDITION START ---
 import 'package:engineer_management_system/pages/admin/admin_evaluations_page.dart'; // استيراد صفحة التقييم الجديدة
@@ -172,6 +174,17 @@ class MyApp extends StatelessWidget {
             return MeetingLogsPage(engineerId: engineerId);
           }
           return const LoginPage();
+        },
+        '/pdf_preview': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+          if (args != null && args['bytes'] != null && args['fileName'] != null && args['text'] != null) {
+            return PdfPreviewScreen(
+              pdfBytes: args['bytes'] as Uint8List,
+              fileName: args['fileName'] as String,
+              shareText: args['text'] as String,
+            );
+          }
+          return const Scaffold(body: Center(child: Text('لا يمكن عرض الملف')));
         },
         // --- ADDITION START ---
         '/admin/evaluations': (context) => const AdminEvaluationsPage(), // مسار جديد لصفحة التقييم
