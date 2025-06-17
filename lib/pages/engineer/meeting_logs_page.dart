@@ -16,6 +16,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 import '../../utils/pdf_styles.dart';
+import '../../utils/pdf_image_cache.dart';
 import '../../utils/report_storage.dart';
 import 'package:engineer_management_system/html_stub.dart'
     if (dart.library.html) 'dart:html' as html;
@@ -1102,13 +1103,22 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
     final Map<String, pw.MemoryImage> fetched = {};
     await Future.wait(urls.map((url) async {
       if (fetched.containsKey(url)) return;
+
+      final cached = PdfImageCache.get(url);
+      if (cached != null) {
+        fetched[url] = cached;
+        return;
+      }
+
       try {
         final response = await http.get(Uri.parse(url));
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
           final decoded = img.decodeImage(response.bodyBytes);
           if (decoded != null) {
-            fetched[url] = pw.MemoryImage(response.bodyBytes);
+            final memImg = pw.MemoryImage(response.bodyBytes);
+            fetched[url] = memImg;
+            PdfImageCache.put(url, memImg);
           }
         }
       } catch (e) {
