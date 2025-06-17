@@ -1153,7 +1153,7 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
         header: (context) => PdfStyles.buildHeader(
           font: _arabicFont!,
           logo: appLogo,
-          headerText: 'محضر اجتماع',
+          headerText: AppConstants.meetingReportHeader,
           now: meetingDate,
           projectName: data['title'] ?? 'اجتماع',
           clientName:
@@ -1187,7 +1187,10 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء المحضر بنجاح.', isError: false);
 
-      await _saveOrSharePdf(pdfBytes, fileName, 'محضر اجتماع',
+      await _saveOrSharePdf(
+          pdfBytes,
+          fileName,
+          AppConstants.meetingReportHeader,
           'يرجى الاطلاع على المحضر المرفق.');
     } catch (e) {
       _hideLoadingDialog(context);

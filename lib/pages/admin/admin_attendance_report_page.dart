@@ -860,7 +860,7 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
         header: (context) => PdfStyles.buildHeader(
           font: _arabicFont!,
           logo: appLogo,
-          headerText: 'تقرير الحضور اليومي',
+          headerText: AppConstants.attendanceReportHeader,
           now: _selectedDate,
           projectName: 'غير محدد',
           clientName: 'غير محدد',
@@ -954,7 +954,10 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
 
       await _saveOrSharePdf(
-          pdfBytes, fileName, 'تقرير الحضور', 'يرجى الاطلاع على التقرير المرفق.');
+          pdfBytes,
+          fileName,
+          AppConstants.attendanceReportHeader,
+          'يرجى الاطلاع على التقرير المرفق.');
     } catch (e) {
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(
@@ -972,7 +975,7 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
         appBar: AppBar(
           centerTitle: true,
           title: const Text(
-            'تقرير الحضور اليومي',
+            AppConstants.attendanceReportHeader,
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 22,
