@@ -1204,7 +1204,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           textDirection: pw.TextDirection.rtl, // Entire page is RTL
           // Apply font fallback to the general theme as well
           theme: pw.ThemeData.withFont(base: _arabicFont, fontFallback: commonFontFallback),
-          margin: const pw.EdgeInsets.all(50), // Increased margins for cleaner look
+          margin: PdfStyles.pageMargins,
         ),
         header: (context) => PdfStyles.buildHeader(
           font: _arabicFont!,
@@ -3652,7 +3652,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               textDirection: pw.TextDirection.rtl,
               theme: pw.ThemeData.withFont(
                   base: _arabicFont, bold: _arabicFont, fontFallback: commonFontFallback),
-              margin: const pw.EdgeInsets.all(50),
+              margin: PdfStyles.pageMargins,
             ),
             header: (context) => PdfStyles.buildHeader(
               font: _arabicFont!,
