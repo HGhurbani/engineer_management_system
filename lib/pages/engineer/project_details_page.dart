@@ -1273,10 +1273,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       await uploadReportPdf(pdfBytes, fileName, token);
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
-      await _saveOrSharePdf(
+      _openPdfPreview(
         pdfBytes,
         fileName,
-        headerText,
         'يرجى الإطلاع على $headerText للمشروع.',
       );
     } catch (e) {
@@ -3939,10 +3938,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, "تم إنشاء التقرير بنجاح.", isError: false);
 
-      await _saveOrSharePdf(
+      _openPdfPreview(
         pdfBytes,
         fileName,
-        'تقرير مشروع: $projectName - $name',
         'الرجاء الإطلاع على تقرير ${isTestSection ? "الاختبار" : "المرحلة"}: $name لمشروع $projectName.'
       );
 
@@ -3973,6 +3971,14 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         text: text,
       );
     }
+  }
+
+  void _openPdfPreview(Uint8List pdfBytes, String fileName, String text) {
+    Navigator.of(context).pushNamed('/pdf_preview', arguments: {
+      'bytes': pdfBytes,
+      'fileName': fileName,
+      'text': text,
+    });
   }
 
 
