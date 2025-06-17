@@ -866,27 +866,17 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
           clientName: 'غير محدد',
         ),
         build: (context) {
-          final rows = <pw.TableRow>[];
-          rows.add(
-            pw.TableRow(
-              decoration: pw.BoxDecoration(color: PdfColor.fromHex('#F5F5F5')),
-              children: [
-                'الموظف',
-                'الوظيفة',
-                'الحضور',
-                'الانصراف',
-                'الساعات',
-                'الإضافي',
-                'المبلغ'
-              ].map((h) {
-                return pw.Padding(
-                  padding: const pw.EdgeInsets.all(8),
-                  child: pw.Text(h,
-                      style: headerStyle, textAlign: pw.TextAlign.center),
-                );
-              }).toList(),
-            ),
-          );
+          final headers = [
+            'الموظف',
+            'الوظيفة',
+            'الحضور',
+            'الانصراف',
+            'الساعات',
+            'الإضافي',
+            'المبلغ'
+          ];
+
+          final dataRows = <List<String>>[];
 
           for (final summary in _userSummaries.values) {
             final DateTime? checkIn = summary['checkIn'] as DateTime?;
@@ -901,29 +891,15 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
             final overtime = summary['overtimeHours'] as double? ?? 0.0;
             final payment = summary['dailyPayment'] as double;
 
-            rows.add(
-              pw.TableRow(
-                children: [
-                  summary['name'] ?? '',
-                  summary['position'] ?? '',
-                  checkIn != null
-                      ? DateFormat('HH:mm').format(checkIn)
-                      : '--',
-                  checkOut != null
-                      ? DateFormat('HH:mm').format(checkOut)
-                      : '--',
-                  totalHours.toStringAsFixed(1),
-                  overtime.toStringAsFixed(1),
-                  payment.toStringAsFixed(0),
-                ].map((v) {
-                  return pw.Padding(
-                    padding: const pw.EdgeInsets.all(8),
-                    child:
-                        pw.Text(v.toString(), style: regularStyle, textAlign: pw.TextAlign.center),
-                  );
-                }).toList(),
-              ),
-            );
+            dataRows.add([
+              summary['name'] ?? '',
+              summary['position'] ?? '',
+              checkIn != null ? DateFormat('HH:mm').format(checkIn) : '--',
+              checkOut != null ? DateFormat('HH:mm').format(checkOut) : '--',
+              totalHours.toStringAsFixed(1),
+              overtime.toStringAsFixed(1),
+              payment.toStringAsFixed(0),
+            ]);
           }
 
           final summaryWidgets = [
@@ -937,7 +913,11 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
           ];
 
           return [
-            pw.Table(border: pw.TableBorder.all(color: PdfColors.grey300), children: rows),
+            PdfStyles.buildTable(
+              font: _arabicFont!,
+              headers: headers,
+              data: dataRows,
+            ),
             ...summaryWidgets
           ];
         },
