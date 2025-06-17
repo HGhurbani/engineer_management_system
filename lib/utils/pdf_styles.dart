@@ -37,11 +37,23 @@ class PdfStyles {
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text(headerText, style: titleStyle),
+              pw.Text(
+                headerText,
+                style: titleStyle,
+                textDirection: pw.TextDirection.rtl,
+              ),
               pw.SizedBox(height: 5),
-              pw.Text('المشروع: $projectName', style: regularStyle),
+              pw.Text(
+                'المشروع: $projectName',
+                style: regularStyle,
+                textDirection: pw.TextDirection.rtl,
+              ),
               pw.SizedBox(height: 2),
-              pw.Text('العميل: $clientName', style: regularStyle),
+              pw.Text(
+                'العميل: $clientName',
+                style: regularStyle,
+                textDirection: pw.TextDirection.rtl,
+              ),
               pw.SizedBox(height: 5),
               pw.Text(
                 'تاريخ الإنشاء: ${DateFormat('dd-MM-yyyy HH:mm').format(now)}',
@@ -82,8 +94,12 @@ class PdfStyles {
         children: headers
             .map((h) => pw.Padding(
                   padding: const pw.EdgeInsets.all(8),
-                  child: pw.Text(h,
-                      style: headerStyle, textAlign: pw.TextAlign.center),
+                  child: pw.Text(
+                    h,
+                    style: headerStyle,
+                    textAlign: pw.TextAlign.center,
+                    textDirection: pw.TextDirection.rtl,
+                  ),
                 ))
             .toList(),
       ),
@@ -95,8 +111,12 @@ class PdfStyles {
           children: row
               .map((c) => pw.Padding(
                     padding: const pw.EdgeInsets.all(8),
-                    child:
-                        pw.Text(c, style: cellStyle, textAlign: pw.TextAlign.center),
+                    child: pw.Text(
+                      c,
+                      style: cellStyle,
+                      textAlign: pw.TextAlign.center,
+                      textDirection: pw.TextDirection.rtl,
+                    ),
                   ))
               .toList(),
         ),
@@ -140,6 +160,7 @@ class PdfStyles {
                         fontSize: 10,
                         fontFallback: fontFallback,
                       ),
+                      textDirection: pw.TextDirection.rtl,
                     ),
                     pw.SizedBox(height: 2),
                     pw.Text(
@@ -150,6 +171,7 @@ class PdfStyles {
                         fontSize: 8,
                         fontFallback: fontFallback,
                       ),
+                      textDirection: pw.TextDirection.rtl,
                     ),
                   ],
                 ),
@@ -160,15 +182,16 @@ class PdfStyles {
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.center,
                         children: [
-                          pw.Text(
-                            'المملكة العربية السعودية - الأحساء - سجل تجاري رقم: ٢٢٠١٤٩٢٠٥٠',
-                            style: pw.TextStyle(
-                              font: font,
-                              color: PdfColors.white,
-                              fontSize: 9,
-                              fontFallback: fontFallback,
-                            ),
-                          ),
+                      pw.Text(
+                        'المملكة العربية السعودية - الأحساء - سجل تجاري رقم: ٢٢٠١٤٩٢٠٥٠',
+                        style: pw.TextStyle(
+                          font: font,
+                          color: PdfColors.white,
+                          fontSize: 9,
+                          fontFallback: fontFallback,
+                        ),
+                        textDirection: pw.TextDirection.rtl,
+                      ),
                           pw.SizedBox(width: 10),
                           pw.Container(
                             width: 12,
@@ -198,6 +221,7 @@ class PdfStyles {
                               fontSize: 9,
                               fontFallback: fontFallback,
                             ),
+                            textDirection: pw.TextDirection.rtl,
                           ),
                           pw.SizedBox(width: 20),
                           pw.Text(
@@ -208,6 +232,7 @@ class PdfStyles {
                               fontSize: 9,
                               fontFallback: fontFallback,
                             ),
+                            textDirection: pw.TextDirection.rtl,
                           ),
                           pw.SizedBox(width: 10),
                           pw.Container(
@@ -235,6 +260,7 @@ class PdfStyles {
                           fontSize: 9,
                           fontFallback: fontFallback,
                         ),
+                        textDirection: pw.TextDirection.rtl,
                       ),
                     ],
                   ),
