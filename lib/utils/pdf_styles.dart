@@ -12,7 +12,7 @@ class PdfStyles {
     required String projectName,
     required String clientName,
   }) {
-    final PdfColor primaryColor = PdfColor.fromHex('#1B4D3E');
+    final PdfColor primaryColor = PdfColor.fromHex('#21206C');
     final PdfColor lightGrey = PdfColor.fromHex('#F5F5F5');
     final pw.TextStyle titleStyle = pw.TextStyle(
       font: font,
@@ -207,7 +207,7 @@ class PdfStyles {
                             'QR',
                             style: pw.TextStyle(
                               font: font,
-                              color: PdfColor.fromHex('#1B4D3E'),
+                              color: PdfColor.fromHex('#21206C'),
                               fontSize: 8,
                               fontWeight: pw.FontWeight.bold,
                               fontFallback: fontFallback,
