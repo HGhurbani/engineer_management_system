@@ -1162,7 +1162,7 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
           textDirection: pw.TextDirection.rtl,
           theme:
               pw.ThemeData.withFont(base: _arabicFont, fontFallback: commonFontFallback),
-          margin: const pw.EdgeInsets.all(50),
+          margin: PdfStyles.pageMargins,
         ),
         header: (context) => PdfStyles.buildHeader(
           font: _arabicFont!,

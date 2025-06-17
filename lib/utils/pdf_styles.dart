@@ -4,6 +4,8 @@ import 'package:barcode/barcode.dart';
 import 'package:intl/intl.dart';
 
 class PdfStyles {
+  /// Default page margins for all generated PDF documents.
+  static const pw.EdgeInsets pageMargins = pw.EdgeInsets.zero;
   static pw.Widget buildHeader({
     required pw.Font font,
     required pw.MemoryImage logo,
@@ -96,7 +98,13 @@ class PdfStyles {
 
     widgets.add(
       pw.Container(
-        color: primary,
+        decoration: pw.BoxDecoration(
+          gradient: pw.LinearGradient(
+            colors: [primary, PdfColor.fromHex('#4A4A8A')],
+            begin: pw.Alignment.centerLeft,
+            end: pw.Alignment.centerRight,
+          ),
+        ),
         padding: const pw.EdgeInsets.all(8),
         child: pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
