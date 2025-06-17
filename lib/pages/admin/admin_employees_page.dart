@@ -16,9 +16,69 @@ class AdminEmployeesPage extends StatefulWidget {
 class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
   final List<String> _positions = ['فني كهرباء', 'فني سباكة', 'عامل', 'مساعد', 'فني'];
 
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
+  }
+
+  List<QueryDocumentSnapshot> _filterEmployees(List<QueryDocumentSnapshot> docs) {
+    if (_searchQuery.isEmpty) return docs;
+    final query = _searchQuery.toLowerCase();
+    return docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final name = data['name']?.toString().toLowerCase() ?? '';
+      final email = data['email']?.toString().toLowerCase() ?? '';
+      final position = data['position']?.toString().toLowerCase() ?? '';
+      return name.contains(query) || email.contains(query) || position.contains(query);
+    }).toList();
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      margin: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        textDirection: TextDirection.rtl,
+        decoration: InputDecoration(
+          hintText: 'البحث في الموظفين...',
+          hintStyle: TextStyle(color: Colors.grey[500]),
+          prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+        onChanged: (value) => setState(() => _searchQuery = value),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _showAddEmployeeDialog() async { //
@@ -403,25 +463,32 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
       child: Scaffold(
         backgroundColor: AppConstants.backgroundColor,
         appBar: _buildAppBar(),
-        body: StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('users')
-              .where('role', isEqualTo: 'employee')
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
-            }
-            if (snapshot.hasError) {
-              return _buildErrorState('حدث خطأ: ${snapshot.error}');
-            }
-            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              return _buildEmptyState();
-            }
-            final employees = snapshot.data!.docs;
-            return _buildEmployeesList(employees);
-          },
+        body: Column(
+          children: [
+            _buildSearchBar(),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .where('role', isEqualTo: 'employee')
+                    .orderBy('createdAt', descending: true)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+                  }
+                  if (snapshot.hasError) {
+                    return _buildErrorState('حدث خطأ: ${snapshot.error}');
+                  }
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return _buildEmptyState();
+                  }
+                  final employees = _filterEmployees(snapshot.data!.docs);
+                  return _buildEmployeesList(employees);
+                },
+              ),
+            ),
+          ],
         ),
         floatingActionButton: _buildFloatingActionButton(),
       ),

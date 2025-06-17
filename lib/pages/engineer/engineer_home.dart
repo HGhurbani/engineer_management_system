@@ -38,10 +38,63 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     'company': 'شركة',
   };
 
+  final TextEditingController _projectSearchController = TextEditingController();
+  String _projectSearchQuery = '';
+
   // --- ADDITION START ---
   int _unreadNotificationsCount = 0;
   StreamSubscription? _notificationsSubscription;
   // --- ADDITION END ---
+
+  List<QueryDocumentSnapshot> _filterProjects(List<QueryDocumentSnapshot> docs) {
+    if (_projectSearchQuery.isEmpty) return docs;
+    final query = _projectSearchQuery.toLowerCase();
+    return docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final name = data['name']?.toString().toLowerCase() ?? '';
+      final client = data['clientName']?.toString().toLowerCase() ?? '';
+      return name.contains(query) || client.contains(query);
+    }).toList();
+  }
+
+  Widget _buildProjectSearchBar() {
+    return Container(
+      margin: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _projectSearchController,
+        textDirection: TextDirection.rtl,
+        decoration: InputDecoration(
+          hintText: 'البحث في المشاريع...',
+          hintStyle: TextStyle(color: Colors.grey[500]),
+          prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+          suffixIcon: _projectSearchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _projectSearchController.clear();
+                    setState(() => _projectSearchQuery = '');
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+        onChanged: (value) => setState(() => _projectSearchQuery = value),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -513,6 +566,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
   void dispose() {
     _fadeController.dispose();
     _tabController.dispose();
+    _projectSearchController.dispose();
     // --- ADDITION START ---
     _notificationsSubscription?.cancel();
     // --- ADDITION END ---
@@ -1059,25 +1113,28 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     if (_currentEngineerUid == null) {
       return _buildErrorState('لا يمكن تحميل المشاريع بدون معرّف مهندس.');
     }
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('projects')
-          .where('engineerUids', arrayContains: _currentEngineerUid)
-          .orderBy('createdAt', descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
-        }
-        if (snapshot.hasError) {
-          return _buildErrorState('حدث خطأ في تحميل المشاريع: ${snapshot.error}');
-        }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState('لا توجد مشاريع مخصصة لك حالياً.', icon: Icons.work_off_outlined);
-        }
-
-        final projects = snapshot.data!.docs;
-        return ListView.builder(
+    return Column(
+      children: [
+        _buildProjectSearchBar(),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('projects')
+                .where('engineerUids', arrayContains: _currentEngineerUid)
+                .orderBy('createdAt', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+              }
+              if (snapshot.hasError) {
+                return _buildErrorState('حدث خطأ في تحميل المشاريع: ${snapshot.error}');
+              }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return _buildEmptyState('لا توجد مشاريع مخصصة لك حالياً.', icon: Icons.work_off_outlined);
+              }
+              final projects = _filterProjects(snapshot.data!.docs);
+              return ListView.builder(
           padding: const EdgeInsets.all(AppConstants.paddingMedium),
           itemCount: projects.length,
           itemBuilder: (context, index) {
