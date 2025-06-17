@@ -1491,7 +1491,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           ),
           if (imageUrls.isNotEmpty) ...[
             pw.SizedBox(height: 10),
-            pw.Text(getLocalizedText('الصور المرفقة:', 'Attached Images:'), style: labelStyle),
+            pw.Text(getLocalizedText('الصور المرفقة', 'Attached Images:'), style: labelStyle),
             pw.SizedBox(height: 5),
             pw.Wrap(
               spacing: 10,
