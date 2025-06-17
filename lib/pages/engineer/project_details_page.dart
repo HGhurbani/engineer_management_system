@@ -1474,18 +1474,18 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             headerDecoration: null,
             rowDecoration: null,
             columnWidths: {
-              0: const pw.FixedColumnWidth(80), // Label column
-              1: const pw.FlexColumnWidth(), // Value column
+              0: const pw.FlexColumnWidth(), // Value column
+              1: const pw.FixedColumnWidth(80), // Label column
             },
             headers: [], // No headers for this internal table
             data: <List<String>>[
-              <String>[getLocalizedText('المهندس:', 'Engineer:'), engineer],
-              <String>[getLocalizedText('التاريخ:', 'Date:'), dateStr],
+              <String>[engineer, getLocalizedText('المهندس:', 'Engineer:')],
+              <String>[dateStr, getLocalizedText('التاريخ:', 'Date:')],
               if (note.toString().isNotEmpty)
-                <String>[getLocalizedText('الملاحظة:', 'Note:'), note.toString()],
+                <String>[note.toString(), getLocalizedText('الملاحظة:', 'Note:')],
             ],
             cellStyle: regularStyle,
-            headerStyle: labelStyle, // Use labelStyle for cell labels (first column)
+            headerStyle: labelStyle, // Use labelStyle for cell labels (second column)
             defaultColumnWidth: const pw.IntrinsicColumnWidth(),
             tableWidth: pw.TableWidth.min, // Adjust table width based on content
           ),
@@ -1566,18 +1566,18 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             headerDecoration: null,
             rowDecoration: null,
             columnWidths: {
-              0: const pw.FixedColumnWidth(80), // Label column
-              1: const pw.FlexColumnWidth(), // Value column
+              0: const pw.FlexColumnWidth(), // Value column
+              1: const pw.FixedColumnWidth(80), // Label column
             },
             headers: [], // No headers for this internal table
             data: <List<String>>[
-              <String>[getLocalizedText('المهندس:', 'Engineer:'), engineer],
-              <String>[getLocalizedText('التاريخ:', 'Date:'), dateStr],
+              <String>[engineer, getLocalizedText('المهندس:', 'Engineer:')],
+              <String>[dateStr, getLocalizedText('التاريخ:', 'Date:')],
               if (note.toString().isNotEmpty)
-                <String>[getLocalizedText('الملاحظات:', 'Notes:'), note.toString()],
+                <String>[note.toString(), getLocalizedText('الملاحظات:', 'Notes:')],
             ],
             cellStyle: regularStyle,
-            headerStyle: labelStyle, // Use labelStyle for cell labels (first column)
+            headerStyle: labelStyle, // Use labelStyle for cell labels (second column)
             defaultColumnWidth: const pw.IntrinsicColumnWidth(),
             tableWidth: pw.TableWidth.min, // Adjust table width based on content
           ),
