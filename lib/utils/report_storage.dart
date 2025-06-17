@@ -23,7 +23,7 @@ class ReportStorage {
           // contentType: MediaType('application', 'pdf'), // قد تحتاج لإضافة هذا إذا كان الخادم يتطلب نوع المحتوى
         ));
 
-      var response = await request.send();
+      var response = await request.send().timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final responseBody = await response.stream.bytesToString();
@@ -35,6 +35,9 @@ class ReportStorage {
         print('Error uploading PDF: ${response.statusCode}, $errorBody');
         return null;
       }
+    } on TimeoutException catch (_) {
+      print('PDF upload timed out');
+      return null;
     } catch (e) {
       print('Exception during PDF upload: $e');
       return null;
@@ -52,13 +55,17 @@ class ReportStorage {
   // دالة لتنزيل تقرير PDF
   static Future<Uint8List?> downloadReportPdf(String url) async {
     try {
-      final response = await http.get(Uri.parse(url));
+      final response =
+          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         return response.bodyBytes;
       } else {
         print('Error downloading PDF: ${response.statusCode}');
         return null;
       }
+    } on TimeoutException catch (_) {
+      print('PDF download timed out');
+      return null;
     } catch (e) {
       print('Exception during PDF download: $e');
       return null;

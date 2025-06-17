@@ -14,6 +14,7 @@ import 'package:mime/mime.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'dart:ui' as ui; // For TextDirection
+import 'dart:async';
 
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -3091,7 +3092,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       }
 
       try {
-        final response = await http.get(Uri.parse(url));
+        final response =
+            await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
           final decoded = img.decodeImage(response.bodyBytes);
@@ -3105,6 +3107,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         } else {
           print('Failed to load image from URL $url');
         }
+      } on TimeoutException catch (_) {
+        print('Timeout fetching image from URL $url');
       } catch (e) {
         print('Error fetching image from URL $url: $e');
       }

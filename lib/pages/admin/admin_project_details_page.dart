@@ -7,6 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
+import 'dart:async';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1989,7 +1990,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       }
 
       try {
-        final response = await http.get(Uri.parse(url));
+        final response =
+            await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
           final decoded = img.decodeImage(response.bodyBytes);
@@ -1999,6 +2001,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             PdfImageCache.put(url, memImg);
           }
         }
+      } on TimeoutException catch (_) {
+        print('Timeout fetching image from URL $url');
       } catch (e) {
         print('Error fetching image from URL $url: $e');
       }
