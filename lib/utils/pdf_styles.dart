@@ -74,6 +74,7 @@ class PdfStyles {
     required List<List<String>> data,
     PdfColor? headerColor,
     PdfColor? borderColor,
+    bool isRtl = false,
   }) {
     final PdfColor primary = headerColor ?? PdfColor.fromHex('#21206C');
     final PdfColor border = borderColor ?? PdfColors.grey300;
@@ -87,11 +88,17 @@ class PdfStyles {
     final pw.TextStyle cellStyle =
         pw.TextStyle(font: font, fontSize: 10, color: PdfColors.black);
 
+    // Reverse columns if right-to-left orientation is requested
+    final headerCells = isRtl ? headers.reversed.toList() : headers;
+    final dataRows = isRtl
+        ? data.map((row) => row.reversed.toList()).toList()
+        : data;
+
     final rows = <pw.TableRow>[];
     rows.add(
       pw.TableRow(
         decoration: pw.BoxDecoration(color: primary),
-        children: headers
+        children: headerCells
             .map((h) => pw.Padding(
                   padding: const pw.EdgeInsets.all(8),
                   child: pw.Text(
@@ -105,7 +112,7 @@ class PdfStyles {
       ),
     );
 
-    for (final row in data) {
+    for (final row in dataRows) {
       rows.add(
         pw.TableRow(
           children: row

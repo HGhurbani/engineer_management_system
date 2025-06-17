@@ -1709,6 +1709,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       font: font,
       headers: ['اسم القطعة', 'الكمية الإجمالية', 'الحالة'],
       data: data,
+      isRtl: true,
     );
   }
 
