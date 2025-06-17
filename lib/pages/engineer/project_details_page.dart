@@ -1282,6 +1282,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           font: _arabicFont!,
           fontFallback: commonFontFallback,
           qrData: qrLink,
+          generatedByText: _currentEngineerName != null
+              ? 'تم إنشاء هذا بواسطة $_currentEngineerName'
+              : null,
         ),
       ),
     );
@@ -1623,6 +1626,38 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           );
         }).toList(),
       ],
+    );
+  }
+
+  pw.Widget _buildPartSummaryTable(List<Map<String, dynamic>> requests, pw.Font font) {
+    final Map<String, int> qtyTotals = {};
+    final Map<String, String> statusMap = {};
+    for (var pr in requests) {
+      final status = pr['status']?.toString() ?? '';
+      final List<dynamic>? items = pr['items'] as List<dynamic>?;
+      if (items != null && items.isNotEmpty) {
+        for (var item in items) {
+          final name = item['name']?.toString() ?? '';
+          final qty = int.tryParse(item['quantity'].toString()) ?? 0;
+          qtyTotals[name] = (qtyTotals[name] ?? 0) + qty;
+          statusMap[name] = status;
+        }
+      } else {
+        final name = pr['partName']?.toString() ?? '';
+        final qty = int.tryParse(pr['quantity'].toString()) ?? 0;
+        qtyTotals[name] = (qtyTotals[name] ?? 0) + qty;
+        statusMap[name] = status;
+      }
+    }
+
+    final data = qtyTotals.entries
+        .map((e) => [e.key, e.value.toString(), statusMap[e.key] ?? ''])
+        .toList();
+
+    return PdfStyles.buildTable(
+      font: font,
+      headers: ['اسم القطعة', 'الكمية الإجمالية', 'الحالة'],
+      data: data,
     );
   }
 
@@ -3204,16 +3239,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     if (partRequests.isNotEmpty) {
       contentWidgets.add(pw.SizedBox(height: 6));
       contentWidgets.add(pw.Text('القطع المطلوبة للمشروع:', style: boldStyle, textDirection: pw.TextDirection.rtl));
-      for (var pr in partRequests) {
-        final List<dynamic>? items = pr['items'];
-        final String itemSummary = (items != null && items.isNotEmpty)
-            ? items.map((e) => '${e['name']} (${e['quantity']})').join('، ')
-            : '${pr['partName'] ?? ''} (${pr['quantity'] ?? '1'})';
-        final String status = pr['status'] ?? '';
-        final Timestamp? ts = pr['requestedAt'] as Timestamp?;
-        final String dt = ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts.toDate()) : '';
-        contentWidgets.add(pw.Bullet(text: '$itemSummary - $status - $dt', textAlign: pw.TextAlign.right, style: smallGreyStyle));
-      }
+      contentWidgets.add(_buildPartSummaryTable(partRequests, _arabicFont!));
     }
     contentWidgets.add(pw.Divider(height: 20, thickness: 1, color: PdfColors.grey400));
 
@@ -3586,8 +3612,14 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               clientName: clientName,
             ),
             build: (context) => contentWidgets,
-            footer: (pw.Context context) => PdfStyles.buildFooter(context,
-                font: _arabicFont!, fontFallback: commonFontFallback, qrData: qrLink),
+            footer: (pw.Context context) => PdfStyles.buildFooter(
+                context,
+                font: _arabicFont!,
+                fontFallback: commonFontFallback,
+                qrData: qrLink,
+                generatedByText: _currentEngineerName != null
+                    ? 'تم إنشاء هذا بواسطة $_currentEngineerName'
+                    : null),
         )
     );
 

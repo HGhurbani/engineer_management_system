@@ -109,7 +109,8 @@ class PdfStyles {
   static pw.Widget buildFooter(pw.Context context,
       {required pw.Font font,
       List<pw.Font> fontFallback = const [],
-      String? qrData}) {
+      String? qrData,
+      String? generatedByText}) {
     return pw.Container(
       height: 80,
       decoration: pw.BoxDecoration(
@@ -142,7 +143,7 @@ class PdfStyles {
                     ),
                     pw.SizedBox(height: 2),
                     pw.Text(
-                      'تم إنشاء هذا التقرير آلياً',
+                      generatedByText ?? 'تم إنشاء هذا التقرير آلياً',
                       style: pw.TextStyle(
                         font: font,
                         color: PdfColor.fromHex('#F5C842'),
