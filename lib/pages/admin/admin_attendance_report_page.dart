@@ -917,6 +917,7 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
               font: _arabicFont!,
               headers: headers,
               data: dataRows,
+              isRtl: true,
             ),
             ...summaryWidgets
           ];
