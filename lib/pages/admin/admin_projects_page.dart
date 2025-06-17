@@ -20,6 +20,9 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
   List<QueryDocumentSnapshot> _availableClients = [];
   bool _isLoadingUsers = true;
 
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
   // --- MODIFICATION START ---
   final Map<String, String> _clientTypeDisplayMap = {
     'individual': 'فردي',
@@ -31,6 +34,12 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
   void initState() {
     super.initState();
     _loadUsers();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUsers() async {
@@ -66,6 +75,56 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
         _showFeedbackSnackBar(context, 'فشل تحميل قائمة المستخدمين: $e', isError: true);
       }
     }
+  }
+
+  List<QueryDocumentSnapshot> _filterProjects(List<QueryDocumentSnapshot> docs) {
+    if (_searchQuery.isEmpty) return docs;
+    final query = _searchQuery.toLowerCase();
+    return docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final name = data['name']?.toString().toLowerCase() ?? '';
+      final clientName = data['clientName']?.toString().toLowerCase() ?? '';
+      return name.contains(query) || clientName.contains(query);
+    }).toList();
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      margin: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        textDirection: ui.TextDirection.rtl,
+        decoration: InputDecoration(
+          hintText: 'البحث في المشاريع...',
+          hintStyle: TextStyle(color: Colors.grey[500]),
+          prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+        onChanged: (value) => setState(() => _searchQuery = value),
+      ),
+    );
   }
 
   Future<void> _deleteProject(String projectId, String projectName) async {
@@ -127,28 +186,35 @@ class _AdminProjectsPageState extends State<AdminProjectsPage> {
         body: _isLoadingUsers
             ? const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor))
             : RefreshIndicator(
-          onRefresh: _loadUsers,
-          color: AppConstants.primaryColor,
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('projects')
-                .orderBy('createdAt', descending: true)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting && !_isLoadingUsers) { // Only show main loader if users are also loading
-                return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
-              }
-              if (snapshot.hasError) {
-                return _buildErrorState('حدث خطأ أثناء جلب المشاريع: ${snapshot.error}');
-              }
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return _buildEmptyState();
-              }
-              final projects = snapshot.data!.docs;
-              return _buildProjectsList(projects);
-            },
-          ),
-        ),
+                onRefresh: _loadUsers,
+                color: AppConstants.primaryColor,
+                child: Column(
+                  children: [
+                    _buildSearchBar(),
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('projects')
+                            .orderBy('createdAt', descending: true)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting && !_isLoadingUsers) {
+                            return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+                          }
+                          if (snapshot.hasError) {
+                            return _buildErrorState('حدث خطأ أثناء جلب المشاريع: ${snapshot.error}');
+                          }
+                          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                            return _buildEmptyState();
+                          }
+                          final projects = _filterProjects(snapshot.data!.docs);
+                          return _buildProjectsList(projects);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
         floatingActionButton: _buildFloatingActionButton(),
       ),
     );
