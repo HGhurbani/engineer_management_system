@@ -898,6 +898,13 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               child: const Text('تقرير اليوم'),
             ),
             SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _generateDailyReportPdf();
+              },
+              child: const Text('تقرير شامل'),
+            ),
+            SimpleDialogOption(
               onPressed: () async {
                 Navigator.pop(ctx);
                 final DateTimeRange? range = await showDateRangePicker(
@@ -949,8 +956,12 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
   Future<void> _generateDailyReportPdf({DateTime? start, DateTime? end}) async {
     DateTime now = DateTime.now();
-    start ??= DateTime(now.year, now.month, now.day);
-    end ??= start.add(const Duration(days: 1)); // Default to end of today if not a range
+    final bool isFullReport = start == null && end == null;
+    bool useRange = !isFullReport;
+    if (useRange) {
+      start ??= DateTime(now.year, now.month, now.day);
+      end ??= start.add(const Duration(days: 1)); // Default to end of today if not a range
+    }
 
     _showLoadingDialog(context, 'جاري إنشاء التقرير...');
 
@@ -1166,8 +1177,12 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final String projectName = projectDataMap?['name'] ?? 'مشروع غير مسمى';
     final String clientName = projectDataMap?['clientName'] ?? 'غير معروف';
 
-    final bool isRange = start!.difference(end!).inDays != -1;
-    final String headerText = isRange ? 'التقرير التراكمي' : 'التقرير اليومي';
+    final bool isRange = useRange && end!.difference(start!).inDays > 1;
+    final String headerText = isFullReport
+        ? 'التقرير الشامل'
+        : isRange
+            ? 'التقرير التراكمي'
+            : 'التقرير اليومي';
 
     pdf.addPage(
       pw.MultiPage(

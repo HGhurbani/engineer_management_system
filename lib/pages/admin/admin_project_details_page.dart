@@ -1554,6 +1554,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
               child: const Text('تقرير اليوم'),
             ),
             SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _generateDailyReportPdf();
+              },
+              child: const Text('تقرير شامل'),
+            ),
+            SimpleDialogOption(
               onPressed: () async {
                 Navigator.pop(ctx);
                 final DateTimeRange? range = await showDateRangePicker(
@@ -1593,9 +1600,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
   Future<void> _generateDailyReportPdf({DateTime? start, DateTime? end}) async {
     DateTime now = DateTime.now();
-    final bool useRange = start != null && end != null;
-    start ??= DateTime(now.year, now.month, now.day);
-    end ??= start.add(const Duration(days: 1));
+    final bool isFullReport = start == null && end == null;
+    bool useRange = !isFullReport;
+    if (useRange) {
+      start ??= DateTime(now.year, now.month, now.day);
+      end ??= start.add(const Duration(days: 1));
+    }
 
     final List<Map<String, dynamic>> dayEntries = [];
     final List<Map<String, dynamic>> dayTests = [];
@@ -1759,7 +1769,11 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16, fontFallback: commonFontFallback);
     final pw.TextStyle smallGrey = pw.TextStyle(
         font: _arabicFont, fontSize: 10, color: PdfColors.grey600, fontFallback: commonFontFallback);
-    final String headerText = useRange ? 'التقرير التراكمي' : 'التقرير اليومي';
+    final String headerText = isFullReport
+        ? 'التقرير الشامل'
+        : useRange
+            ? 'التقرير التراكمي'
+            : 'التقرير اليومي';
 
     final projectDataMap = _projectDataSnapshot?.data() as Map<String, dynamic>?;
     final String projectName = projectDataMap?['name'] ?? 'مشروع غير مسمى';
