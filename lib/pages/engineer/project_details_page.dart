@@ -965,7 +965,15 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       end ??= start.add(const Duration(days: 1)); // Default to end of today if not a range
     }
 
-    _showLoadingDialog(context, 'جاري إنشاء التقرير...');
+    // Determine if the current locale is Arabic for conditional text
+    final bool isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    // Helper function to get localized text
+    String getLocalizedText(String arabicText, String englishText) {
+      return isArabic ? arabicText : englishText;
+    }
+
+    _showLoadingDialog(context, getLocalizedText('جاري إنشاء التقرير...', 'Generating Report...'));
 
     final List<Map<String, dynamic>> dayEntries = [];
     final List<Map<String, dynamic>> dayTests = [];
@@ -1095,7 +1103,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       await _loadArabicFont();
       if (_arabicFont == null) {
         _hideLoadingDialog(context);
-        _showFeedbackSnackBar(context, 'فشل تحميل الخط العربي. لا يمكن إنشاء PDF.', isError: true);
+        _showFeedbackSnackBar(context, getLocalizedText('فشل تحميل الخط العربي. لا يمكن إنشاء PDF.', 'Failed to load Arabic font. Cannot create PDF.'), isError: true);
         return;
       }
     }
@@ -1130,7 +1138,10 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final borderColor = PdfColor.fromHex('#E0E0E0'); // Light Grey for borders
 
     // Define a common font fallback list (empty if emojiFont is null)
-    final List<pw.Font> commonFontFallback = emojiFont != null ? [emojiFont!] : [];
+    final List<pw.Font> commonFontFallback = (emojiFont != null && _arabicFont != null) ? [emojiFont!, _arabicFont!] : [];
+    if (emojiFont == null && _arabicFont != null) commonFontFallback.add(_arabicFont!);
+    // If no Arabic font is loaded, consider adding a default sans-serif for Latin characters.
+    // For `pdf` package, often it falls back to a basic font if none is specified or loaded.
 
     // Define professional typography with font fallbacks
     final pw.TextStyle titleStyle = pw.TextStyle(
@@ -1175,22 +1186,22 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     );
 
     final projectDataMap =
-        _projectDataSnapshot?.data() as Map<String, dynamic>?;
-    final String projectName = projectDataMap?['name'] ?? 'مشروع غير مسمى';
-    final String clientName = projectDataMap?['clientName'] ?? 'غير معروف';
+    _projectDataSnapshot?.data() as Map<String, dynamic>?;
+    final String projectName = projectDataMap?['name'] ?? getLocalizedText('مشروع غير مسمى', 'Unnamed Project');
+    final String clientName = projectDataMap?['clientName'] ?? getLocalizedText('غير معروف', 'Unknown');
 
     final bool isRange = useRange && end!.difference(start!).inDays > 1;
     final String headerText = isFullReport
-        ? 'التقرير الشامل'
+        ? getLocalizedText('التقرير الشامل', 'Comprehensive Report')
         : isRange
-            ? 'التقرير التراكمي'
-            : 'التقرير اليومي';
+        ? getLocalizedText('التقرير التراكمي', 'Cumulative Report')
+        : getLocalizedText('التقرير اليومي', 'Daily Report');
 
     pdf.addPage(
       pw.MultiPage(
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4, // Ensures a consistent page size
-          textDirection: pw.TextDirection.rtl,
+          textDirection: pw.TextDirection.rtl, // Entire page is RTL
           // Apply font fallback to the general theme as well
           theme: pw.ThemeData.withFont(base: _arabicFont, fontFallback: commonFontFallback),
           margin: const pw.EdgeInsets.all(50), // Increased margins for cleaner look
@@ -1214,14 +1225,17 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               headerStyle,
               regularStyle,
               primaryColor,
-              lightGrey));
+              lightGrey,
+              isArabic: isArabic, // Pass language preference
+              getLocalizedText: getLocalizedText // Pass helper
+          ));
           widgets.add(pw.SizedBox(height: 30));
 
           // Entries Section
-          widgets.add(_buildSectionHeader('الملاحظات والتحديثات', headerStyle, primaryColor));
+          widgets.add(_buildSectionHeader(getLocalizedText('الملاحظات والتحديثات', 'Notes & Updates'), headerStyle, primaryColor));
           widgets.add(pw.SizedBox(height: 15));
           if (dayEntries.isEmpty) {
-            widgets.add(_buildEmptyState('لا توجد ملاحظات مسجلة في هذه الفترة', regularStyle, lightGrey));
+            widgets.add(_buildEmptyState(getLocalizedText('لا توجد ملاحظات مسجلة في هذه الفترة', 'No notes recorded for this period'), regularStyle, lightGrey));
           } else {
             for (int i = 0; i < dayEntries.length; i++) {
               final entry = dayEntries[i];
@@ -1234,17 +1248,20 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                   labelStyle,
                   metaStyle,
                   borderColor,
-                  lightGrey));
+                  lightGrey,
+                  isArabic: isArabic, // Pass language preference
+                  getLocalizedText: getLocalizedText // Pass helper
+              ));
               widgets.add(pw.SizedBox(height: 15));
             }
           }
 
           // Tests Section
           widgets.add(pw.SizedBox(height: 20));
-          widgets.add(_buildSectionHeader('الاختبارات والفحوصات', headerStyle, primaryColor));
+          widgets.add(_buildSectionHeader(getLocalizedText('الاختبارات والفحوصات', 'Tests & Inspections'), headerStyle, primaryColor));
           widgets.add(pw.SizedBox(height: 15));
           if (dayTests.isEmpty) {
-            widgets.add(_buildEmptyState('لا توجد اختبارات محدثة في هذه الفترة', regularStyle, lightGrey));
+            widgets.add(_buildEmptyState(getLocalizedText('لا توجد اختبارات محدثة في هذه الفترة', 'No tests updated for this period'), regularStyle, lightGrey));
           } else {
             for (int i = 0; i < dayTests.length; i++) {
               final test = dayTests[i];
@@ -1257,24 +1274,35 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                   labelStyle,
                   metaStyle,
                   borderColor,
-                  lightGrey));
+                  lightGrey,
+                  isArabic: isArabic, // Pass language preference
+                  getLocalizedText: getLocalizedText // Pass helper
+              ));
               widgets.add(pw.SizedBox(height: 15));
             }
           }
 
           // Part Requests Section
           widgets.add(pw.SizedBox(height: 20));
-          widgets.add(_buildSectionHeader('طلبات المواد والمعدات', headerStyle, primaryColor));
+          widgets.add(_buildSectionHeader(getLocalizedText('طلبات المواد والمعدات', 'Material & Equipment Requests'), headerStyle, primaryColor));
           widgets.add(pw.SizedBox(height: 15));
           if (dayRequests.isEmpty) {
-            widgets.add(_buildEmptyState('لا توجد طلبات مواد في هذه الفترة', regularStyle, lightGrey));
+            widgets.add(_buildEmptyState(getLocalizedText('لا توجد طلبات مواد في هذه الفترة', 'No material requests for this period'), regularStyle, lightGrey));
           } else {
-            widgets.add(_buildRequestsTable(dayRequests, regularStyle, labelStyle, borderColor, lightGrey));
+            widgets.add(_buildRequestsTable(
+                dayRequests,
+                regularStyle,
+                labelStyle,
+                borderColor,
+                lightGrey,
+                isArabic: isArabic, // Pass language preference
+                getLocalizedText: getLocalizedText // Pass helper
+            ));
           }
 
           // Important Notice
           widgets.add(pw.SizedBox(height: 30));
-          widgets.add(_buildImportantNotice(regularStyle));
+          widgets.add(_buildImportantNotice(regularStyle, isArabic: isArabic, getLocalizedText: getLocalizedText));
           return widgets;
         },
         footer: (context) => PdfStyles.buildFooter(
@@ -1283,8 +1311,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           fontFallback: commonFontFallback,
           qrData: qrLink,
           generatedByText: _currentEngineerName != null
-              ? 'تم إنشاء هذا بواسطة $_currentEngineerName'
+              ? getLocalizedText('تم إنشاء هذا بواسطة $_currentEngineerName', 'Generated by $_currentEngineerName')
               : null,
+
         ),
       ),
     );
@@ -1293,21 +1322,22 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       final pdfBytes = await pdf.save();
       await uploadReportPdf(pdfBytes, fileName, token);
       _hideLoadingDialog(context);
-      _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
+      _showFeedbackSnackBar(context, getLocalizedText('تم إنشاء التقرير بنجاح.', 'Report generated successfully.'), isError: false);
       _openPdfPreview(
         pdfBytes,
         fileName,
-        'يرجى الإطلاع على $headerText للمشروع.',
+        getLocalizedText('يرجى الإطلاع على $headerText للمشروع.', 'Please review the $headerText for the project.'),
       );
     } catch (e) {
       _hideLoadingDialog(context);
-      _showFeedbackSnackBar(context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
+      _showFeedbackSnackBar(context, getLocalizedText('فشل إنشاء أو مشاركة التقرير: $e', 'Failed to generate or share report: $e'), isError: true);
       print('Error generating daily report PDF: $e');
     }
   }
 
+// --- Helper Widgets (modified to accept isArabic and getLocalizedText) ---
 
-  pw.Widget _buildSummaryCard(int entriesCount, int testsCount, int requestsCount, pw.TextStyle headerStyle, pw.TextStyle regularStyle, PdfColor primaryColor, PdfColor lightGrey) {
+  pw.Widget _buildSummaryCard(int entriesCount, int testsCount, int requestsCount, pw.TextStyle headerStyle, pw.TextStyle regularStyle, PdfColor primaryColor, PdfColor lightGrey, {required bool isArabic, required String Function(String, String) getLocalizedText}) {
     return pw.Container(
       padding: const pw.EdgeInsets.all(20),
       decoration: pw.BoxDecoration(
@@ -1316,16 +1346,16 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         border: pw.Border.all(color: primaryColor, width: 1),
       ),
       child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        crossAxisAlignment: isArabic ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
         children: [
-          pw.Text('ملخص التقرير', style: headerStyle),
+          pw.Text(getLocalizedText('ملخص التقرير', 'Report Summary'), style: headerStyle),
           pw.SizedBox(height: 15),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
             children: [
-              _buildSummaryItem('الملاحظات', entriesCount.toString(), regularStyle, primaryColor),
-              _buildSummaryItem('الاختبارات', testsCount.toString(), regularStyle, primaryColor),
-              _buildSummaryItem('طلبات المواد', requestsCount.toString(), regularStyle, primaryColor),
+              _buildSummaryItem(getLocalizedText('الملاحظات', 'Notes'), entriesCount.toString(), regularStyle, primaryColor, isArabic: isArabic, getLocalizedText: getLocalizedText),
+              _buildSummaryItem(getLocalizedText('الاختبارات', 'Tests'), testsCount.toString(), regularStyle, primaryColor, isArabic: isArabic, getLocalizedText: getLocalizedText),
+              _buildSummaryItem(getLocalizedText('طلبات المواد', 'Material Requests'), requestsCount.toString(), regularStyle, primaryColor, isArabic: isArabic, getLocalizedText: getLocalizedText),
             ],
           ),
         ],
@@ -1333,7 +1363,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     );
   }
 
-  pw.Widget _buildSummaryItem(String label, String value, pw.TextStyle regularStyle, PdfColor primaryColor) {
+  pw.Widget _buildSummaryItem(String label, String value, pw.TextStyle regularStyle, PdfColor primaryColor, {required bool isArabic, required String Function(String, String) getLocalizedText}) {
     return pw.Column(
       children: [
         pw.Container(
@@ -1351,6 +1381,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 color: PdfColors.white,
                 fontWeight: pw.FontWeight.bold,
                 fontSize: 16,
+                fontFallback: regularStyle.fontFallback, // Use the same fallback as regularStyle
               ),
             ),
           ),
@@ -1375,6 +1406,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           color: PdfColors.white,
           fontWeight: pw.FontWeight.bold,
           fontSize: 16,
+          fontFallback: headerStyle.fontFallback, // Ensure font fallback
         ),
       ),
     );
@@ -1393,11 +1425,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     );
   }
 
-  pw.Widget _buildEntryCard(Map<String, dynamic> entry, Map<String, pw.MemoryImage> fetchedImages, int index, pw.TextStyle subHeaderStyle, pw.TextStyle regularStyle, pw.TextStyle labelStyle, pw.TextStyle metaStyle, PdfColor borderColor, PdfColor lightGrey) {
+  pw.Widget _buildEntryCard(Map<String, dynamic> entry, Map<String, pw.MemoryImage> fetchedImages, int index, pw.TextStyle subHeaderStyle, pw.TextStyle regularStyle, pw.TextStyle labelStyle, pw.TextStyle metaStyle, PdfColor borderColor, PdfColor lightGrey, {required bool isArabic, required String Function(String, String) getLocalizedText}) {
     final note = entry['note'] ?? '';
-    final engineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
+    final engineer = entry['employeeName'] ?? entry['engineerName'] ?? getLocalizedText('مهندس', 'Engineer');
     final ts = (entry['timestamp'] as Timestamp?)?.toDate();
-    final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
+    final dateStr = ts != null ? DateFormat(getLocalizedText('dd/MM/yy HH:mm', 'MM/dd/yy HH:mm'), isArabic ? 'ar' : 'en').format(ts) : '';
     final phaseName = entry['phaseName'] ?? '';
     final subName = entry['subPhaseName'];
     final imageUrls = (entry['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
@@ -1409,7 +1441,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         borderRadius: pw.BorderRadius.circular(8),
       ),
       child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        crossAxisAlignment: isArabic ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
         children: [
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -1424,29 +1456,43 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               ),
               pw.Expanded(
                 child: pw.Text(
-                  subName != null ? '$phaseName > $subName' : phaseName,
+                  subName != null
+                      ? (isArabic ? '$phaseName > $subName' : '$phaseName > $subName') // Phase and sub-phase names might already be localized
+                      : phaseName,
                   style: subHeaderStyle,
-                  textAlign: pw.TextAlign.right,
+                  textAlign: isArabic ? pw.TextAlign.right : pw.TextAlign.left,
                 ),
               ),
             ],
           ),
-          if (note.toString().isNotEmpty) ...[
-            pw.SizedBox(height: 10),
-            pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Expanded(
-                  child: pw.Text(note.toString(), style: regularStyle, textAlign: pw.TextAlign.right),
-                ),
-                pw.SizedBox(width: 10),
-                pw.Text('الملاحظة:', style: labelStyle),
-              ],
-            ),
-          ],
+          pw.SizedBox(height: 10),
+          // Using pw.Table for textual details
+          pw.Table.fromTextArray(
+            border: null, // No border for inner table
+            cellPadding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 8),
+            cellAlignment: isArabic ? pw.Alignment.centerRight : pw.Alignment.centerLeft,
+            headerDecoration: null,
+            rowDecoration: null,
+            columnWidths: {
+              0: const pw.FixedColumnWidth(80), // Label column
+              1: const pw.FlexColumnWidth(), // Value column
+            },
+            headers: [], // No headers for this internal table
+            data: <List<String>>[
+              <String>[getLocalizedText('المهندس:', 'Engineer:'), engineer],
+              <String>[getLocalizedText('التاريخ:', 'Date:'), dateStr],
+              if (note.toString().isNotEmpty)
+                <String>[getLocalizedText('الملاحظة:', 'Note:'), note.toString()],
+            ],
+            cellStyle: regularStyle,
+            headerStyle: labelStyle, // Use labelStyle for cell labels (first column)
+            defaultColumnWidth: const pw.IntrinsicColumnWidth(),
+            defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+            tableWidth: pw.TableWidth.min, // Adjust table width based on content
+          ),
           if (imageUrls.isNotEmpty) ...[
             pw.SizedBox(height: 10),
-            pw.Text('الصور المرفقة:', style: labelStyle),
+            pw.Text(getLocalizedText('الصور المرفقة:', 'Attached Images:'), style: labelStyle),
             pw.SizedBox(height: 5),
             pw.Wrap(
               spacing: 10,
@@ -1458,7 +1504,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       borderRadius: pw.BorderRadius.circular(5),
                     ),
                     child: pw.ClipRRect(
-                      // borderRadius: pw.BorderRadius.circular(5),
                       child: pw.Image(
                         fetchedImages[url]!,
                         width: 120,
@@ -1470,20 +1515,16 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               ).toList(),
             ),
           ],
-          pw.SizedBox(height: 10),
-          pw.Divider(color: borderColor),
-          pw.SizedBox(height: 5),
-          pw.Text('$engineer - $dateStr', style: metaStyle),
         ],
       ),
     );
   }
 
-  pw.Widget _buildTestCard(Map<String, dynamic> test, Map<String, pw.MemoryImage> fetchedImages, int index, pw.TextStyle subHeaderStyle, pw.TextStyle regularStyle, pw.TextStyle labelStyle, pw.TextStyle metaStyle, PdfColor borderColor, PdfColor lightGrey) {
+  pw.Widget _buildTestCard(Map<String, dynamic> test, Map<String, pw.MemoryImage> fetchedImages, int index, pw.TextStyle subHeaderStyle, pw.TextStyle regularStyle, pw.TextStyle labelStyle, pw.TextStyle metaStyle, PdfColor borderColor, PdfColor lightGrey, {required bool isArabic, required String Function(String, String) getLocalizedText}) {
     final note = test['note'] ?? '';
-    final engineer = test['lastUpdatedByName'] ?? 'مهندس';
+    final engineer = test['lastUpdatedByName'] ?? getLocalizedText('مهندس', 'Engineer');
     final ts = (test['lastUpdatedAt'] as Timestamp?)?.toDate();
-    final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
+    final dateStr = ts != null ? DateFormat(getLocalizedText('dd/MM/yy HH:mm', 'MM/dd/yy HH:mm'), isArabic ? 'ar' : 'en').format(ts) : '';
     final section = test['sectionName'] ?? '';
     final name = test['testName'] ?? '';
     final imageUrl = test['imageUrl'];
@@ -1495,7 +1536,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         borderRadius: pw.BorderRadius.circular(8),
       ),
       child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        crossAxisAlignment: isArabic ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
         children: [
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -1509,26 +1550,42 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 child: pw.Text('#$index', style: metaStyle),
               ),
               pw.Expanded(
-                child: pw.Text('$section - $name', style: subHeaderStyle, textAlign: pw.TextAlign.right),
+                child: pw.Text(
+                  (isArabic ? '$section - $name' : '$section - $name'), // Section and test names might already be localized
+                  style: subHeaderStyle,
+                  textAlign: isArabic ? pw.TextAlign.right : pw.TextAlign.left,
+                ),
               ),
             ],
           ),
-          if (note.toString().isNotEmpty) ...[
-            pw.SizedBox(height: 10),
-            pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Expanded(
-                  child: pw.Text(note.toString(), style: regularStyle, textAlign: pw.TextAlign.right),
-                ),
-                pw.SizedBox(width: 10),
-                pw.Text('الملاحظات:', style: labelStyle),
-              ],
-            ),
-          ],
+          pw.SizedBox(height: 10),
+          // Using pw.Table for textual details
+          pw.Table.fromTextArray(
+            border: null, // No border for inner table
+            cellPadding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 8),
+            cellAlignment: isArabic ? pw.Alignment.centerRight : pw.Alignment.centerLeft,
+            headerDecoration: null,
+            rowDecoration: null,
+            columnWidths: {
+              0: const pw.FixedColumnWidth(80), // Label column
+              1: const pw.FlexColumnWidth(), // Value column
+            },
+            headers: [], // No headers for this internal table
+            data: <List<String>>[
+              <String>[getLocalizedText('المهندس:', 'Engineer:'), engineer],
+              <String>[getLocalizedText('التاريخ:', 'Date:'), dateStr],
+              if (note.toString().isNotEmpty)
+                <String>[getLocalizedText('الملاحظات:', 'Notes:'), note.toString()],
+            ],
+            cellStyle: regularStyle,
+            headerStyle: labelStyle, // Use labelStyle for cell labels (first column)
+            defaultColumnWidth: const pw.IntrinsicColumnWidth(),
+            defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+            tableWidth: pw.TableWidth.min, // Adjust table width based on content
+          ),
           if (imageUrl != null && fetchedImages.containsKey(imageUrl)) ...[
             pw.SizedBox(height: 10),
-            pw.Text('الصورة المرفقة:', style: labelStyle),
+            pw.Text(getLocalizedText('الصورة المرفقة:', 'Attached Image:'), style: labelStyle),
             pw.SizedBox(height: 5),
             pw.Container(
               decoration: pw.BoxDecoration(
@@ -1536,7 +1593,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 borderRadius: pw.BorderRadius.circular(5),
               ),
               child: pw.ClipRRect(
-                // borderRadius: pw.BorderRadius.circular(5),
                 child: pw.Image(
                   fetchedImages[imageUrl]!,
                   width: 150,
@@ -1546,16 +1602,12 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               ),
             ),
           ],
-          pw.SizedBox(height: 10),
-          pw.Divider(color: borderColor),
-          pw.SizedBox(height: 5),
-          pw.Text('$engineer - $dateStr', style: metaStyle),
         ],
       ),
     );
   }
 
-  pw.Widget _buildRequestsTable(List<Map<String, dynamic>> requests, pw.TextStyle regularStyle, pw.TextStyle labelStyle, PdfColor borderColor, PdfColor lightGrey) {
+  pw.Widget _buildRequestsTable(List<Map<String, dynamic>> requests, pw.TextStyle regularStyle, pw.TextStyle labelStyle, PdfColor borderColor, PdfColor lightGrey, {required bool isArabic, required String Function(String, String) getLocalizedText}) {
     return pw.Table(
       border: pw.TableBorder.all(color: borderColor),
       children: [
@@ -1564,23 +1616,23 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           children: [
             pw.Padding(
               padding: const pw.EdgeInsets.all(8),
-              child: pw.Text('التاريخ', style: labelStyle, textAlign: pw.TextAlign.center),
+              child: pw.Text(getLocalizedText('التاريخ', 'Date'), style: labelStyle, textAlign: pw.TextAlign.center),
             ),
             pw.Padding(
               padding: const pw.EdgeInsets.all(8),
-              child: pw.Text('المهندس', style: labelStyle, textAlign: pw.TextAlign.center),
+              child: pw.Text(getLocalizedText('المهندس', 'Engineer'), style: labelStyle, textAlign: pw.TextAlign.center),
             ),
             pw.Padding(
               padding: const pw.EdgeInsets.all(8),
-              child: pw.Text('الحالة', style: labelStyle, textAlign: pw.TextAlign.center),
+              child: pw.Text(getLocalizedText('الحالة', 'Status'), style: labelStyle, textAlign: pw.TextAlign.center),
             ),
             pw.Padding(
               padding: const pw.EdgeInsets.all(8),
-              child: pw.Text('الكمية', style: labelStyle, textAlign: pw.TextAlign.center),
+              child: pw.Text(getLocalizedText('الكمية', 'Quantity'), style: labelStyle, textAlign: pw.TextAlign.center),
             ),
             pw.Padding(
               padding: const pw.EdgeInsets.all(8),
-              child: pw.Text('اسم المادة', style: labelStyle, textAlign: pw.TextAlign.center),
+              child: pw.Text(getLocalizedText('اسم المادة', 'Item Name'), style: labelStyle, textAlign: pw.TextAlign.center),
             ),
           ],
         ),
@@ -1589,7 +1641,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           String name;
           String qty;
           if (items != null && items.isNotEmpty) {
-            name = items.map((e) => '${e['name']} (${e['quantity']})').join('، ');
+            name = items.map((e) => '${e['name']} (${e['quantity']})').join(getLocalizedText('، ', ', '));
             qty = '-';
           } else {
             name = pr['partName'] ?? '';
@@ -1598,7 +1650,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           final status = pr['status'] ?? '';
           final eng = pr['engineerName'] ?? '';
           final ts = (pr['requestedAt'] as Timestamp?)?.toDate();
-          final dateStr = ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts) : '';
+          final dateStr = ts != null ? DateFormat(getLocalizedText('dd/MM/yy', 'MM/dd/yy'), isArabic ? 'ar' : 'en').format(ts) : '';
 
           return pw.TableRow(
             children: [
@@ -1620,7 +1672,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               ),
               pw.Padding(
                 padding: const pw.EdgeInsets.all(8),
-                child: pw.Text(name, style: regularStyle, textAlign: pw.TextAlign.right),
+                child: pw.Text(name, style: regularStyle, textAlign: isArabic ? pw.TextAlign.right : pw.TextAlign.left),
               ),
             ],
           );
@@ -1629,6 +1681,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     );
   }
 
+// _buildPartSummaryTable is not called in the main _generateDailyReportPdf logic, so it's kept as is (no localization parameters added for it).
   pw.Widget _buildPartSummaryTable(List<Map<String, dynamic>> requests, pw.Font font) {
     final Map<String, int> qtyTotals = {};
     final Map<String, String> statusMap = {};
@@ -1661,7 +1714,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     );
   }
 
-  pw.Widget _buildImportantNotice(pw.TextStyle regularStyle) {
+  pw.Widget _buildImportantNotice(pw.TextStyle regularStyle, {required bool isArabic, required String Function(String, String) getLocalizedText}) {
     return pw.Container(
       padding: const pw.EdgeInsets.all(15),
       decoration: pw.BoxDecoration(
@@ -1673,22 +1726,23 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         children: [
           pw.Expanded(
             child: pw.Text(
-              'ملاحظة هامة: في حال مضى 24 ساعة يعتبر هذا التقرير مكتمل وغير قابل للتعديل.',
+              getLocalizedText('ملاحظة هامة: في حال مضى 24 ساعة يعتبر هذا التقرير مكتمل وغير قابل للتعديل.', 'Important Note: This report will be considered complete and uneditable after 24 hours.'),
               style: pw.TextStyle(
                 font: _arabicFont,
                 color: PdfColor.fromHex('#E65100'),
                 fontWeight: pw.FontWeight.bold,
                 fontSize: 12,
+                fontFallback: regularStyle.fontFallback, // Ensure font fallback
               ),
-              textDirection: pw.TextDirection.rtl,
-              textAlign: pw.TextAlign.right,
+              textDirection: isArabic ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+              textAlign: isArabic ? pw.TextAlign.right : pw.TextAlign.left,
             ),
           ),
           pw.SizedBox(width: 10),
           pw.Container(
             width: 30,
             height: 30,
-            decoration: pw.BoxDecoration(
+            decoration: pw.BoxBoxDecoration(
               color: PdfColor.fromHex('#FF9800'),
               borderRadius: pw.BorderRadius.circular(15),
             ),
@@ -1696,10 +1750,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               child: pw.Text(
                 '!',
                 style: pw.TextStyle(
-                  font: _arabicFont,
+                  font: _arabicFont, // Use Arabic font for '!' as it's a character often included in Arabic font sets, or a common fallback.
                   color: PdfColors.white,
                   fontWeight: pw.FontWeight.bold,
                   fontSize: 16,
+                  fontFallback: regularStyle.fontFallback, // Ensure font fallback
                 ),
               ),
             ),
@@ -1708,9 +1763,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       ),
     );
   }
-
-
-
   Future<void> _fetchInitialData() async {
     // ... (no changes in this function)
     if (!mounted) return;

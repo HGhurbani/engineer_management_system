@@ -73,7 +73,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
       ),
       child: TextField(
         controller: _projectSearchController,
-        textDirection: TextDirection.rtl,
+        textDirection: ui.TextDirection.rtl,
         decoration: InputDecoration(
           hintText: 'البحث في المشاريع...',
           hintStyle: TextStyle(color: Colors.grey[500]),
@@ -1212,7 +1212,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
           },
         );
       },
-    );
+    ),),]);
   }
 
   Widget _buildProjectInfoRow(IconData icon, String label, String value, {Color? valueColor}) {
