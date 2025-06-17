@@ -1109,7 +1109,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final qrLink = buildReportDownloadUrl(fileName, token);
 
     // Define professional color scheme
-    final primaryColor = PdfColor.fromHex('#1B4D3E'); // Dark Green
+    final primaryColor = PdfColor.fromHex('#21206C'); // Navy
     final secondaryColor = PdfColor.fromHex('#2E8B57'); // Medium Green
     final accentColor = PdfColor.fromHex('#4CAF50'); // Lighter Green (used if needed)
     final lightGrey = PdfColor.fromHex('#F5F5F5'); // Very Light Grey for backgrounds
@@ -1382,7 +1382,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   //                         font: _arabicFont,
   //                         fontSize: 24,
   //                         fontWeight: pw.FontWeight.bold,
-  //                         color: PdfColor.fromHex('#1B4D3E'),
+  //                         color: PdfColor.fromHex('#21206C'),
   //                       ),
   //                     ),
   //                     pw.SizedBox(height: 5),
@@ -1410,7 +1410,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   //                         width: 60,
   //                         height: 60,
   //                         decoration: pw.BoxDecoration(
-  //                           color: PdfColor.fromHex('#1B4D3E'),
+  //                           color: PdfColor.fromHex('#21206C'),
   //                           borderRadius: pw.BorderRadius.circular(8),
   //                         ),
   //                         child: pw.Center(
@@ -1448,7 +1448,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   //                               font: _arabicFont,
   //                               fontSize: 11,
   //                               fontWeight: pw.FontWeight.bold,
-  //                               color: PdfColor.fromHex('#1B4D3E'),
+  //                               color: PdfColor.fromHex('#21206C'),
   //                             ),
   //                           ),
   //                           pw.SizedBox(height: 2),
@@ -1858,7 +1858,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       height: 80,
       decoration: pw.BoxDecoration(
         gradient: pw.LinearGradient(
-          colors: [PdfColor.fromHex('#1B4D3E'), PdfColor.fromHex('#2E8B57')],
+          colors: [PdfColor.fromHex('#21206C'), PdfColor.fromHex('#21206C')],
           begin: pw.Alignment.topLeft,
           end: pw.Alignment.bottomRight,
         ),
@@ -2020,7 +2020,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                 'QR',
                                 style: pw.TextStyle(
                                   font: _arabicFont,
-                                  color: PdfColor.fromHex('#1B4D3E'),
+                                  color: PdfColor.fromHex('#21206C'),
                                   fontSize: 8,
                                   fontWeight: pw.FontWeight.bold,
                                   fontFallback: fontFallback,
