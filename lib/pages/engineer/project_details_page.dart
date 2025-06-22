@@ -2451,8 +2451,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('الكمية: $quantity',
-                          style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                      // Text('الكمية: $quantity',
+                      //     style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
                       Row(
                         children: [
                           Icon(Icons.circle, color: statusColor, size: 10),

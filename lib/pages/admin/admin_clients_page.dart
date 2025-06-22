@@ -146,7 +146,7 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     }
   }
 
-  Future<void> _createProjectForClient(DocumentSnapshot clientDoc) async {
+  Future<void> _createProjectForClient(QueryDocumentSnapshot clientDoc) async {
     try {
       final engSnap = await FirebaseFirestore.instance
           .collection('users')

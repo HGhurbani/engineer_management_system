@@ -964,16 +964,20 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         ),
       ],
       bottom: TabBar(
-        controller: _tabController, // Ensure this is using your state's _tabController
+        // controller: _tabController, // Ensure this is using your state's _tabController
+        // indicatorColor: Colors.white,
+        // indicatorWeight: 3.0,
+        // labelColor: Colors.white,
+        // isScrollable: true,
+        // labelPadding: EdgeInsets.symmetric(horizontal: 12.0), // يمكنك الإبقاء على هذا أو تعديله
+        // tabAlignment: TabAlignment.start,
+        // unselectedLabelColor: Colors.white.withOpacity(0.7),
+        // labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.5, fontFamily: 'Tajawal'),
+        // unselectedLabelStyle: const TextStyle(fontSize: 16, fontFamily: 'Tajawal'),
+        controller: _tabController,
         indicatorColor: Colors.white,
-        indicatorWeight: 3.0,
         labelColor: Colors.white,
-        isScrollable: true,
-        labelPadding: EdgeInsets.symmetric(horizontal: 12.0), // يمكنك الإبقاء على هذا أو تعديله
-        tabAlignment: TabAlignment.start,
-        unselectedLabelColor: Colors.white.withOpacity(0.7),
-        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.5, fontFamily: 'Tajawal'),
-        unselectedLabelStyle: const TextStyle(fontSize: 16, fontFamily: 'Tajawal'),
+        unselectedLabelColor: Colors.white70,
         tabs: const [
           Tab(text: 'مشاريعي', icon: Icon(Icons.business_center_outlined)),
           Tab(text: 'جدولي اليومي', icon: Icon(Icons.calendar_today_rounded)),
