@@ -567,15 +567,41 @@ class _AdminEmployeesPageState extends State<AdminEmployeesPage> {
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, color: AppConstants.infoColor, size: 26),
-                  onPressed: () => _showEditEmployeeDialog(emp),
-                  tooltip: 'تعديل الموظف',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: AppConstants.deleteColor, size: 26),
-                  onPressed: () => _deleteEmployee(uid, email), //
-                  tooltip: 'حذف الموظف',
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  tooltip: 'خيارات',
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'edit':
+                        _showEditEmployeeDialog(emp);
+                        break;
+                      case 'delete':
+                        _deleteEmployee(uid, email);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.edit_outlined, color: AppConstants.infoColor, size: 26),
+                          SizedBox(width: 8),
+                          Text('تعديل الموظف'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.delete_outline_rounded, color: AppConstants.deleteColor, size: 26),
+                          SizedBox(width: 8),
+                          Text('حذف الموظف'),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

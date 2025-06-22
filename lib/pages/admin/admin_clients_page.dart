@@ -668,16 +668,41 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                   onPressed: () => _createProjectForClient(clientDoc),
                   tooltip: 'إنشاء مشروع لهذا العميل',
                 ),
-                // Edit Button
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, color: AppConstants.infoColor),
-                  onPressed: () => _showEditClientDialog(clientDoc), // Pass the DocumentSnapshot
-                  tooltip: 'تعديل العميل',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: AppConstants.deleteColor),
-                  onPressed: () => _deleteClient(uid, email),
-                  tooltip: 'حذف العميل',
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  tooltip: 'خيارات',
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'edit':
+                        _showEditClientDialog(clientDoc);
+                        break;
+                      case 'delete':
+                        _deleteClient(uid, email);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.edit_outlined, color: AppConstants.infoColor),
+                          SizedBox(width: 8),
+                          Text('تعديل العميل'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.delete_outline, color: AppConstants.deleteColor),
+                          SizedBox(width: 8),
+                          Text('حذف العميل'),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

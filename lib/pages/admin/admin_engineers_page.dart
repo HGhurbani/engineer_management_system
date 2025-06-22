@@ -504,15 +504,41 @@ class _AdminEngineersPageState extends State<AdminEngineersPage> {
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, color: AppConstants.infoColor),
-                  onPressed: () => _showEditEngineerDialog(engineer),
-                  tooltip: 'تعديل المهندس',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: AppConstants.deleteColor),
-                  onPressed: () => _deleteEngineer(uid, email),
-                  tooltip: 'حذف المهندس',
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  tooltip: 'خيارات',
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'edit':
+                        _showEditEngineerDialog(engineer);
+                        break;
+                      case 'delete':
+                        _deleteEngineer(uid, email);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.edit_outlined, color: AppConstants.infoColor),
+                          SizedBox(width: 8),
+                          Text('تعديل المهندس'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.delete_outline, color: AppConstants.deleteColor),
+                          SizedBox(width: 8),
+                          Text('حذف المهندس'),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
