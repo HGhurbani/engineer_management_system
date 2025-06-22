@@ -99,10 +99,10 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    // There are four tabs in the engineer home page, so the controller
-    // length should match that count to avoid assertion errors when the
-    // page is built.
-    _tabController = TabController(length: 4, vsync: this);
+    // There are three tabs in the engineer home page after removing the
+    // material requests tab, so the controller length should match that
+    // count to avoid assertion errors when the page is built.
+    _tabController = TabController(length: 3, vsync: this);
     _fadeController = AnimationController(duration: const Duration(milliseconds: 700), vsync: this);
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut));
 
@@ -611,7 +611,6 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
             controller: _tabController,
             children: [
               _buildMyProjectsTab(),
-              _buildMaterialRequestsTab(),
               _buildDailyScheduleTab(),
               _buildMeetingLogsTab(),
             ],
@@ -875,111 +874,6 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     }
   }
 
-  Widget _buildMaterialRequestsTab() {
-    if (_currentEngineerUid == null) {
-      return _buildErrorState('لا يمكن تحميل طلبات المواد بدون معرّف مهندس.');
-    }
-    return Scaffold(
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('partRequests')
-            .where('engineerId', isEqualTo: _currentEngineerUid)
-            .orderBy('requestedAt', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
-          }
-          if (snapshot.hasError) {
-          return _buildErrorState('حدث خطأ في تحميل طلبات المواد: ${snapshot.error}');
-          }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return _buildEmptyState('لا توجد طلبات مواد حالياً.', icon: Icons.list_alt_outlined);
-          }
-
-          final requests = snapshot.data!.docs;
-          return ListView.builder(
-            padding: const EdgeInsets.all(AppConstants.paddingMedium),
-            itemCount: requests.length,
-            itemBuilder: (context, index) {
-              final requestDoc = requests[index];
-              final data = requestDoc.data() as Map<String, dynamic>;
-              final List<dynamic>? itemsData = data['items'];
-              String partName;
-              String quantity;
-              if (itemsData != null && itemsData.isNotEmpty) {
-                partName = itemsData
-                    .map((e) => '${e['name']} (${e['quantity']})')
-                    .join('، ');
-                quantity = '-';
-              } else {
-                partName = data['partName'] ?? 'مادة غير مسماة';
-                quantity = data['quantity']?.toString() ?? 'N/A';
-              }
-              final projectName = data['projectName'] ?? 'مشروع غير محدد';
-              final status = data['status'] ?? 'غير معروف';
-              final requestedAt = (data['requestedAt'] as Timestamp?)?.toDate();
-              final formattedDate = requestedAt != null
-                  ? DateFormat('yyyy/MM/dd hh:mm a', 'ar').format(requestedAt)
-                  : 'غير معروف';
-
-              Color statusColor;
-              switch (status) {
-                case 'معلق':
-                  statusColor = AppConstants.warningColor;
-                  break;
-                case 'تمت الموافقة':
-                  statusColor = AppConstants.successColor;
-                  break;
-                case 'مرفوض':
-                  statusColor = AppConstants.errorColor;
-                  break;
-                case 'تم الطلب':
-                  statusColor = AppConstants.infoColor;
-                  break;
-                case 'تم الاستلام':
-                  statusColor = AppConstants.primaryColor;
-                  break;
-                default:
-                  statusColor = AppConstants.textSecondary;
-              }
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
-                elevation: 1.5,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
-                child: ListTile(
-                  title: Text('اسم المادة: $partName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('الكمية: $quantity', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
-                      Text('المشروع: $projectName', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
-                      Row(
-                        children: [
-                          Icon(Icons.circle, color: statusColor, size: 10),
-                          const SizedBox(width: 4),
-                          Text(status, style: TextStyle(fontSize: 14, color: statusColor, fontWeight: FontWeight.w500)),
-                        ],
-                      ),
-                      Text('تاريخ الطلب: $formattedDate', style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
-                    ],
-                  ),
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (val) => _updatePartRequestStatus(requestDoc.id, val),
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(value: 'تم الطلب', child: Text('تم الطلب')),
-                      PopupMenuItem(value: 'تم الاستلام', child: Text('تم الاستلام')),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -1082,7 +976,6 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         unselectedLabelStyle: const TextStyle(fontSize: 16, fontFamily: 'Tajawal'),
         tabs: const [
           Tab(text: 'مشاريعي', icon: Icon(Icons.business_center_outlined)),
-          Tab(text: 'طلبات المواد', icon: Icon(Icons.build_circle_outlined)),
           Tab(text: 'جدولي اليومي', icon: Icon(Icons.calendar_today_rounded)),
           Tab(text: 'محاضر الاجتماعات', icon: Icon(Icons.event_note_outlined)),
         ],

@@ -334,7 +334,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _currentEngineerUid = FirebaseAuth.instance.currentUser?.uid;
     if (widget.notificationType != null && widget.highlightItemId != null) {
       final type = widget.notificationType!;
@@ -1924,6 +1924,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         tabs: const [
           Tab(text: 'مراحل المشروع', icon: Icon(Icons.list_alt_rounded)),
           Tab(text: 'اختبارات التشغيل', icon: Icon(Icons.checklist_rtl_rounded)),
+          Tab(text: 'طلبات المواد', icon: Icon(Icons.build_circle_outlined)),
           Tab(text: 'عمال المشروع', icon: Icon(Icons.group)),
           Tab(text: 'مرفقات', icon: Icon(Icons.attach_file_outlined)),
           Tab(text: 'ملاحظات هامة', icon: Icon(Icons.notes)),
@@ -1988,32 +1989,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             if (_clientPhone != null && _clientPhone!.isNotEmpty)
               _buildPhoneRow(_clientPhone!),
             _buildDetailRow(statusIcon, 'حالة المشروع:', projectStatus, valueColor: statusColor),
-            const SizedBox(height: AppConstants.itemSpacing),
-            ElevatedButton.icon(
-              onPressed: () {
-                if (_currentEngineerUid != null && _currentEngineerName != null) {
-                  Navigator.pushNamed(
-                    context,
-                    '/engineer/request_material',
-                    arguments: {
-                      'engineerId': _currentEngineerUid,
-                      'engineerName': _currentEngineerName,
-                      'projectId': widget.projectId,
-                      'projectName': projectDataMap['name'],
-                    },
-                  );
-                } else {
-                  _showFeedbackSnackBar(context, 'بيانات المهندس غير متوفرة.', isError: true);
-                }
-              },
-              icon: const Icon(Icons.add_shopping_cart_rounded, color: Colors.white),
-              label: const Text('طلب مواد', style: TextStyle(color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppConstants.primaryColor,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
-              ),
-            ),
           ],
         ),
       ),
@@ -2379,6 +2354,125 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     );
   }
 
+  Widget _buildMaterialRequestsTab() {
+    if (_currentEngineerUid == null) {
+      return const Center(child: Text('لا يمكن تحميل طلبات المواد.'));
+    }
+    return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          if (_currentEngineerUid != null && _currentEngineerName != null) {
+            Navigator.pushNamed(
+              context,
+              '/engineer/request_material',
+              arguments: {
+                'engineerId': _currentEngineerUid,
+                'engineerName': _currentEngineerName,
+                'projectId': widget.projectId,
+                'projectName': (_projectDataSnapshot?.data() as Map<String, dynamic>?)?['name'],
+              },
+            );
+          } else {
+            _showFeedbackSnackBar(context, 'بيانات المهندس غير متوفرة.', isError: true);
+          }
+        },
+        backgroundColor: AppConstants.primaryColor,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('partRequests')
+            .where('projectId', isEqualTo: widget.projectId)
+            .orderBy('requestedAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor));
+          }
+          if (snapshot.hasError) {
+            return const Center(child: Text('فشل تحميل طلبات المواد'));
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text('لا توجد طلبات مواد حالياً'));
+          }
+
+          final requests = snapshot.data!.docs;
+          return ListView.builder(
+            padding: const EdgeInsets.all(AppConstants.paddingMedium),
+            itemCount: requests.length,
+            itemBuilder: (context, index) {
+              final requestDoc = requests[index];
+              final data = requestDoc.data() as Map<String, dynamic>;
+              final List<dynamic>? itemsData = data['items'];
+              String partName;
+              String quantity;
+              if (itemsData != null && itemsData.isNotEmpty) {
+                partName = itemsData.map((e) => '${e['name']} (${e['quantity']})').join('، ');
+                quantity = '-';
+              } else {
+                partName = data['partName'] ?? 'مادة غير مسماة';
+                quantity = data['quantity']?.toString() ?? 'N/A';
+              }
+              final status = data['status'] ?? 'غير معروف';
+              final requestedAt = (data['requestedAt'] as Timestamp?)?.toDate();
+              final formattedDate = requestedAt != null
+                  ? DateFormat('yyyy/MM/dd hh:mm a', 'ar').format(requestedAt)
+                  : 'غير معروف';
+
+              Color statusColor;
+              switch (status) {
+                case 'معلق':
+                  statusColor = AppConstants.warningColor;
+                  break;
+                case 'تمت الموافقة':
+                  statusColor = AppConstants.successColor;
+                  break;
+                case 'مرفوض':
+                  statusColor = AppConstants.errorColor;
+                  break;
+                case 'تم الطلب':
+                  statusColor = AppConstants.infoColor;
+                  break;
+                case 'تم الاستلام':
+                  statusColor = AppConstants.primaryColor;
+                  break;
+                default:
+                  statusColor = AppConstants.textSecondary;
+              }
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
+                elevation: 1.5,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
+                child: ListTile(
+                  title: Text('اسم المادة: $partName',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('الكمية: $quantity',
+                          style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                      Row(
+                        children: [
+                          Icon(Icons.circle, color: statusColor, size: 10),
+                          const SizedBox(width: 4),
+                          Text(status, style: TextStyle(fontSize: 14, color: statusColor, fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                      Text('تاريخ الطلب: $formattedDate',
+                          style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // ... (no changes in this function)
@@ -2401,6 +2495,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 children: [
                   _buildPhasesTab(),
                   _buildTestsTab(),
+                  _buildMaterialRequestsTab(),
                   _buildEmployeesTab(),
                   _buildAttachmentsTab(),
                   _buildImportantNotesTab(),
