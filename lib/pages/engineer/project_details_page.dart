@@ -2464,6 +2464,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                           style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
                     ],
                   ),
+                  onTap: () => _showPartRequestDetailsDialog(requestDoc),
                 ),
               );
             },
@@ -3340,6 +3341,99 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       print('Error fetching part requests for PDF: $e');
     }
     return requests;
+  }
+
+  Future<void> _updatePartRequestStatus(String requestId, String newStatus) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('partRequests')
+          .doc(requestId)
+          .update({'status': newStatus});
+      if (mounted) {
+        _showFeedbackSnackBar(context, 'تم تحديث حالة الطلب.', isError: false);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showFeedbackSnackBar(context, 'فشل تحديث الطلب: $e', isError: true);
+      }
+    }
+  }
+
+  Future<void> _deletePartRequest(String docId) async {
+    try {
+      await FirebaseFirestore.instance.collection('partRequests').doc(docId).delete();
+      if (mounted) {
+        _showFeedbackSnackBar(context, 'تم حذف الطلب بنجاح', isError: false);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showFeedbackSnackBar(context, 'فشل حذف الطلب: $e', isError: true);
+      }
+    }
+  }
+
+  Future<void> _showPartRequestDetailsDialog(DocumentSnapshot requestDoc) async {
+    final data = requestDoc.data() as Map<String, dynamic>?;
+    if (data == null) return;
+    String status = data['status'] ?? 'معلق';
+    final List<dynamic>? items = data['items'];
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (stfCtx, setState) {
+          return Directionality(
+            textDirection: ui.TextDirection.rtl,
+            child: AlertDialog(
+              title: const Text('تفاصيل طلب المواد'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (items != null && items.isNotEmpty)
+                      ...items.map((e) => Text('${e['name']} - ${e['quantity']}')).toList()
+                    else
+                      Text('${data['partName'] ?? ''} - ${data['quantity'] ?? ''}'),
+                    const SizedBox(height: AppConstants.itemSpacing),
+                    DropdownButtonFormField<String>(
+                      value: status,
+                      decoration: const InputDecoration(labelText: 'الحالة'),
+                      items: const [
+                        DropdownMenuItem(value: 'معلق', child: Text('معلق')),
+                        DropdownMenuItem(value: 'تمت الموافقة', child: Text('تمت الموافقة')),
+                        DropdownMenuItem(value: 'مرفوض', child: Text('مرفوض')),
+                        DropdownMenuItem(value: 'تم الطلب', child: Text('تم الطلب')),
+                        DropdownMenuItem(value: 'تم الاستلام', child: Text('تم الاستلام')),
+                      ],
+                      onChanged: (val) => setState(() => status = val ?? status),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+                TextButton(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await _deletePartRequest(requestDoc.id);
+                  },
+                  style: TextButton.styleFrom(foregroundColor: AppConstants.errorColor),
+                  child: const Text('حذف'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await _updatePartRequestStatus(requestDoc.id, status);
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, foregroundColor: Colors.white),
+                  child: const Text('حفظ'),
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
   }
 
   // Helper to fetch remote images for use in PDFs
