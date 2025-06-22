@@ -17,11 +17,17 @@ import '../../main.dart'; // Assuming helper functions are in main.dart
 class AddProjectPage extends StatefulWidget {
   final List<QueryDocumentSnapshot> availableEngineers;
   final List<QueryDocumentSnapshot> availableClients;
+  final String? initialClientId;
+  final String? defaultProjectName;
+  final bool lockClientSelection;
 
   const AddProjectPage({
     super.key,
     required this.availableEngineers,
     required this.availableClients,
+    this.initialClientId,
+    this.defaultProjectName,
+    this.lockClientSelection = false,
   });
 
   @override
@@ -43,6 +49,12 @@ class _AddProjectPageState extends State<AddProjectPage> {
   void initState() { // --- MODIFICATION: Added initState ---
     super.initState();
     _getCurrentAdminName(); // Fetch admin name when the page loads
+    if (widget.initialClientId != null) {
+      _selectedClientId = widget.initialClientId;
+    }
+    if (widget.defaultProjectName != null) {
+      _nameController.text = widget.defaultProjectName!;
+    }
   }
 
   // --- MODIFICATION START: Function to get current admin's name ---
@@ -334,11 +346,13 @@ class _AddProjectPageState extends State<AddProjectPage> {
                         child: Text(user['name'] ?? 'عميل غير مسمى'),
                       );
                     }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedClientId = value;
-                      });
-                    },
+                    onChanged: widget.lockClientSelection
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _selectedClientId = value;
+                            });
+                          },
                     validator: (value) {
                       if (value == null) {
                         return 'الرجاء اختيار العميل.';
@@ -347,6 +361,15 @@ class _AddProjectPageState extends State<AddProjectPage> {
                     },
                     isExpanded: true,
                     menuMaxHeight: MediaQuery.of(context).size.height * 0.3,
+                    disabledHint: Text(
+                      (widget.availableClients
+                                  .firstWhere(
+                                    (d) => d.id == _selectedClientId,
+                                    orElse: () => widget.availableClients.first,
+                                  )
+                                  .data() as Map<String, dynamic>)['name'] ??
+                          'عميل',
+                    ),
                   ),
 
                 const SizedBox(height: AppConstants.paddingLarge * 1.5),
