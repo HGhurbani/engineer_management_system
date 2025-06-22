@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
 import 'dart:ui' as ui; // For TextDirection
+import 'add_project_page.dart';
 
 class AdminClientsPage extends StatefulWidget {
   const AdminClientsPage({super.key});
@@ -141,6 +142,38 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
         _showFeedbackSnackBar(context, 'تم حذف العميل $email من قاعدة البيانات بنجاح.', isError: false);
       } catch (e) {
         _showFeedbackSnackBar(context, 'فشل حذف العميل: $e', isError: true);
+      }
+    }
+  }
+
+  Future<void> _createProjectForClient(DocumentSnapshot clientDoc) async {
+    try {
+      final engSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'engineer')
+          .orderBy('name')
+          .get();
+
+      if (!mounted) return;
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AddProjectPage(
+            availableEngineers: engSnap.docs,
+            availableClients: [clientDoc],
+            initialClientId: clientDoc.id,
+            defaultProjectName:
+                (clientDoc.data() as Map<String, dynamic>)['name'] ?? '',
+            lockClientSelection: true,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        _showFeedbackSnackBar(
+            context, 'فشل تحميل بيانات المهندسين: $e',
+            isError: true);
       }
     }
   }
@@ -629,6 +662,11 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_business_outlined, color: AppConstants.primaryColor),
+                  onPressed: () => _createProjectForClient(clientDoc),
+                  tooltip: 'إنشاء مشروع لهذا العميل',
                 ),
                 // Edit Button
                 IconButton(
