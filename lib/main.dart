@@ -163,6 +163,8 @@ class MyApp extends StatelessWidget {
             return RequestMaterialPage(
               engineerId: args['engineerId'] as String,
               engineerName: args['engineerName'] as String,
+              initialProjectId: args['projectId'] as String?,
+              initialProjectName: args['projectName'] as String?,
             );
           }
           print('Error: Missing arguments for /engineer/request_material route.');

@@ -978,25 +978,6 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          if (_currentEngineerUid != null && _engineerName != null) {
-            Navigator.pushNamed(
-              context,
-              '/engineer/request_material',
-              arguments: {
-                'engineerId': _currentEngineerUid,
-                'engineerName': _engineerName,
-              },
-            );
-          } else {
-            _showFeedbackSnackBar(context, 'بيانات المهندس غير متوفرة.', isError: true);
-          }
-        },
-        label: const Text('طلب مواد جديد', style: TextStyle(color: Colors.white)),
-        icon: const Icon(Icons.add_shopping_cart_rounded, color: Colors.white),
-        backgroundColor: AppConstants.primaryColor,
-      ),
     );
   }
 

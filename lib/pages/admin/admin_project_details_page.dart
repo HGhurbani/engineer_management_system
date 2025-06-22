@@ -86,6 +86,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
   String? _clientTypeKeyFromFirestore;
   String? _clientTypeDisplayString;
+  String? _clientPhone;
   pw.Font? _arabicFont;
 
   // ... (predefinedPhasesStructure and finalCommissioningTests remain the same) ...
@@ -477,9 +478,11 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             if (clientDoc.exists && mounted) {
               final clientDataMap = clientDoc.data() as Map<String, dynamic>?;
               final String? fetchedClientTypeKey = clientDataMap?['clientType'] as String?;
+              final String? fetchedPhone = clientDataMap?['phone'] as String?;
               setState(() {
                 _clientTypeKeyFromFirestore = fetchedClientTypeKey;
                 _clientTypeDisplayString = _getClientTypeDisplayValue(fetchedClientTypeKey);
+                _clientPhone = fetchedPhone;
               });
             } else {
               if (mounted) setState(() => _clientTypeDisplayString = "نوع العميل غير متوفر");
@@ -697,6 +700,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         .join('، ')
                     : 'لا يوجد'),
             _buildDetailRow(Icons.person_rounded, 'العميل:', clientName),
+            if (_clientPhone != null && _clientPhone!.isNotEmpty)
+              _buildPhoneRow(_clientPhone!),
             // Conditionally display client type
             if (_clientTypeDisplayString != null &&
                 _clientTypeDisplayString != "لا يوجد عميل مرتبط" &&
@@ -746,6 +751,44 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
               value,
               style: TextStyle(fontSize: 15, color: valueColor ?? AppConstants.textPrimary, fontWeight: FontWeight.w600),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhoneRow(String phone) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall / 1.2),
+      child: Row(
+        children: [
+          const Icon(Icons.phone, size: 20, color: AppConstants.primaryLight),
+          const SizedBox(width: AppConstants.paddingSmall),
+          Expanded(
+            child: Text(phone,
+                style: const TextStyle(fontSize: 15, color: AppConstants.textPrimary, fontWeight: FontWeight.w600)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.call, color: AppConstants.primaryColor, size: 22),
+            onPressed: () async {
+              final uri = Uri.parse('tel:$phone');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.message, color: Colors.green, size: 22),
+            onPressed: () async {
+              var normalized = phone.replaceAll(RegExp(r'[^0-9]'), '');
+              if (normalized.startsWith('0')) {
+                normalized = '966${normalized.substring(1)}';
+              }
+              final uri = Uri.parse('https://wa.me/$normalized');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
           ),
         ],
       ),

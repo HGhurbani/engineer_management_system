@@ -34,6 +34,20 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     }).toList();
   }
 
+  Future<bool> _isPhoneNumberUnique(String phone, {String? excludeUid}) async {
+    if (phone.isEmpty) return true;
+    final snap = await FirebaseFirestore.instance
+        .collection('users')
+        .where('role', isEqualTo: 'client')
+        .where('phone', isEqualTo: phone)
+        .get();
+    if (snap.docs.isEmpty) return true;
+    if (excludeUid != null) {
+      return snap.docs.every((doc) => doc.id == excludeUid);
+    }
+    return false;
+  }
+
   Widget _buildSearchBar() {
     return Container(
       margin: const EdgeInsets.all(AppConstants.paddingMedium),
@@ -251,6 +265,18 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
 
                           setDialogState(() => isLoading = true);
 
+                          final phone = phoneController.text.trim();
+                          if (phone.isNotEmpty &&
+                              !await _isPhoneNumberUnique(phone)) {
+                            _showFeedbackSnackBar(
+                                dialogContext, 'رقم الهاتف مستخدم بالفعل.',
+                                isError: true);
+                            if (mounted) {
+                              setDialogState(() => isLoading = false);
+                            }
+                            return;
+                          }
+
                           try {
                             if (emailController.text.trim().isNotEmpty &&
                                 passwordController.text.trim().isNotEmpty) {
@@ -427,6 +453,18 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                     onPressed: isLoading ? null : () async {
                       if (!formKey.currentState!.validate()) return;
                       setDialogState(() => isLoading = true);
+
+                      final phone = phoneController.text.trim();
+                      if (phone.isNotEmpty &&
+                          !await _isPhoneNumberUnique(phone, excludeUid: currentUid)) {
+                        _showFeedbackSnackBar(
+                            dialogContext, 'رقم الهاتف مستخدم بالفعل.',
+                            isError: true);
+                        if (mounted) {
+                          setDialogState(() => isLoading = false);
+                        }
+                        return;
+                      }
                       try {
                         await FirebaseFirestore.instance.collection('users').doc(currentUid).update({
                           'name': nameController.text.trim(),

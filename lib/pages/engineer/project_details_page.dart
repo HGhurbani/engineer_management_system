@@ -59,6 +59,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   String? _currentEngineerName;
   bool _isPageLoading = true;
   DocumentSnapshot? _projectDataSnapshot;
+  String? _clientPhone;
 
   String? _highlightPhaseId;
   String? _highlightSubPhaseId;
@@ -1788,10 +1789,26 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   Future<void> _fetchProjectData() async {
     // ... (no changes in this function)
     try {
-      final doc = await FirebaseFirestore.instance.collection('projects').doc(widget.projectId).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .get();
       if (mounted && doc.exists) {
+        final data = doc.data() as Map<String, dynamic>?;
+        String? phone;
+        final clientId = data?['clientId'] as String?;
+        if (clientId != null && clientId.isNotEmpty) {
+          try {
+            final clientDoc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(clientId)
+                .get();
+            phone = (clientDoc.data() as Map<String, dynamic>?)?['phone'] as String?;
+          } catch (_) {}
+        }
         setState(() {
           _projectDataSnapshot = doc;
+          _clientPhone = phone;
         });
       } else if (mounted) {
         _showFeedbackSnackBar(context, 'المشروع غير موجود.', isError: true);
@@ -1968,7 +1985,35 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               },
             ),
             _buildDetailRow(Icons.person_rounded, 'العميل:', clientName),
+            if (_clientPhone != null && _clientPhone!.isNotEmpty)
+              _buildPhoneRow(_clientPhone!),
             _buildDetailRow(statusIcon, 'حالة المشروع:', projectStatus, valueColor: statusColor),
+            const SizedBox(height: AppConstants.itemSpacing),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (_currentEngineerUid != null && _currentEngineerName != null) {
+                  Navigator.pushNamed(
+                    context,
+                    '/engineer/request_material',
+                    arguments: {
+                      'engineerId': _currentEngineerUid,
+                      'engineerName': _currentEngineerName,
+                      'projectId': widget.projectId,
+                      'projectName': projectDataMap['name'],
+                    },
+                  );
+                } else {
+                  _showFeedbackSnackBar(context, 'بيانات المهندس غير متوفرة.', isError: true);
+                }
+              },
+              icon: const Icon(Icons.add_shopping_cart_rounded, color: Colors.white),
+              label: const Text('طلب مواد', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.primaryColor,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
+              ),
+            ),
           ],
         ),
       ),
@@ -1990,6 +2035,44 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               value,
               style: TextStyle(fontSize: 14, color: valueColor ?? AppConstants.textPrimary, fontWeight: FontWeight.w600),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhoneRow(String phone) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingSmall / 1.5),
+      child: Row(
+        children: [
+          const Icon(Icons.phone, size: 18, color: AppConstants.primaryLight),
+          const SizedBox(width: AppConstants.paddingSmall),
+          Expanded(
+            child: Text(phone,
+                style: const TextStyle(fontSize: 14, color: AppConstants.textPrimary, fontWeight: FontWeight.w600)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.call, color: AppConstants.primaryColor, size: 20),
+            onPressed: () async {
+              final uri = Uri.parse('tel:$phone');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.message, color: Colors.green, size: 20),
+            onPressed: () async {
+              var normalized = phone.replaceAll(RegExp(r'[^0-9]'), '');
+              if (normalized.startsWith('0')) {
+                normalized = '966${normalized.substring(1)}';
+              }
+              final uri = Uri.parse('https://wa.me/$normalized');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
           ),
         ],
       ),
