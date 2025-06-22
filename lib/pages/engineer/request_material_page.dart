@@ -11,11 +11,15 @@ import '../../theme/app_constants.dart';
 class RequestMaterialPage extends StatefulWidget {
   final String engineerId;
   final String engineerName;
+  final String? initialProjectId;
+  final String? initialProjectName;
 
   const RequestMaterialPage({
     super.key,
     required this.engineerId,
     required this.engineerName,
+    this.initialProjectId,
+    this.initialProjectName,
   });
 
   @override
@@ -38,7 +42,13 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
   @override
   void initState() {
     super.initState();
-    _fetchAssignedProjects();
+    if (widget.initialProjectId != null) {
+      _selectedProjectId = widget.initialProjectId;
+      _selectedProjectName = widget.initialProjectName;
+      _isLoadingProjects = false;
+    } else {
+      _fetchAssignedProjects();
+    }
   }
 
   Future<void> _fetchAssignedProjects() async {
@@ -253,7 +263,9 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
                   ),
                 ),
                 const SizedBox(height: AppConstants.itemSpacing),
-                if (_assignedProjects.isEmpty && !_isLoadingProjects)
+                if (widget.initialProjectId == null &&
+                    _assignedProjects.isEmpty &&
+                    !_isLoadingProjects)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: AppConstants.paddingMedium),
                     child: Text(
@@ -262,7 +274,8 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
                       style: TextStyle(color: AppConstants.textSecondary),
                     ),
                   )
-                else if (_assignedProjects.isNotEmpty)
+                else if (widget.initialProjectId == null &&
+                    _assignedProjects.isNotEmpty)
                   DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       labelText: 'اختر المشروع',
@@ -298,7 +311,11 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
                   ),
                 const SizedBox(height: AppConstants.paddingLarge * 1.5),
                 ElevatedButton.icon(
-                  onPressed: _isSubmitting || _assignedProjects.isEmpty ? null : _submitRequest,
+                  onPressed: _isSubmitting ||
+                          (widget.initialProjectId == null &&
+                              _assignedProjects.isEmpty)
+                      ? null
+                      : _submitRequest,
                   icon: _isSubmitting
                       ? const SizedBox.shrink()
                       : const Icon(Icons.send_rounded, color: Colors.white),
