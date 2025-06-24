@@ -39,6 +39,7 @@ import 'edit_assigned_engineers_page.dart';
 // --- MODIFICATION START: Import notification helper functions ---
 // Make sure the path to your main.dart (or a dedicated notification service file) is correct.
 import '../../main.dart'; // Assuming helper functions are in main.dart
+import '../engineer/edit_phase_page.dart';
 // --- MODIFICATION END ---
 
 
@@ -846,13 +847,38 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                   trailing: Row( // Combine icons in a Row
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Admin can always add notes/images
-                      if (_currentUserRole == 'admin')
+                      // Admin can add notes/images or edit phase
+                      if (_currentUserRole == 'admin') ...[
                         IconButton(
                           icon: const Icon(Icons.add_comment_outlined, color: AppConstants.primaryLight),
                           tooltip: 'إضافة ملاحظة/صورة للمرحلة الرئيسية',
                           onPressed: () => _showAddNoteOrImageDialog(phaseId, phaseActualName),
                         ),
+                        IconButton(
+                          icon: const Icon(Icons.edit_note_outlined, color: AppConstants.primaryLight),
+                          tooltip: 'تعديل بيانات المرحلة',
+                          onPressed: () async {
+                            final snapshot = await FirebaseFirestore.instance
+                                .collection('projects')
+                                .doc(widget.projectId)
+                                .collection('phases')
+                                .doc(phaseId)
+                                .get();
+                            final data = snapshot.data() as Map<String, dynamic>? ?? {};
+                            if (!mounted) return;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => EditPhasePage(
+                                  projectId: widget.projectId,
+                                  phaseId: phaseId,
+                                  phaseData: data,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                       // Admin can always toggle
                       if (_currentUserRole == 'admin')
                         Checkbox(
