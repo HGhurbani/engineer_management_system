@@ -39,7 +39,6 @@ import 'edit_assigned_engineers_page.dart';
 // --- MODIFICATION START: Import notification helper functions ---
 // Make sure the path to your main.dart (or a dedicated notification service file) is correct.
 import '../../main.dart'; // Assuming helper functions are in main.dart
-import '../engineer/edit_phase_page.dart';
 // --- MODIFICATION END ---
 
 
@@ -847,36 +846,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                   trailing: Row( // Combine icons in a Row
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Admin can add notes/images or edit phase
+                      // Admin can add notes/images
                       if (_currentUserRole == 'admin') ...[
                         IconButton(
                           icon: const Icon(Icons.add_comment_outlined, color: AppConstants.primaryLight),
                           tooltip: 'إضافة ملاحظة/صورة للمرحلة الرئيسية',
                           onPressed: () => _showAddNoteOrImageDialog(phaseId, phaseActualName),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.edit_note_outlined, color: AppConstants.primaryLight),
-                          tooltip: 'تعديل بيانات المرحلة',
-                          onPressed: () async {
-                            final snapshot = await FirebaseFirestore.instance
-                                .collection('projects')
-                                .doc(widget.projectId)
-                                .collection('phases')
-                                .doc(phaseId)
-                                .get();
-                            final data = snapshot.data() as Map<String, dynamic>? ?? {};
-                            if (!mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => EditPhasePage(
-                                  projectId: widget.projectId,
-                                  phaseId: phaseId,
-                                  phaseData: data,
-                                ),
-                              ),
-                            );
-                          },
                         ),
                       ],
                       // Admin can always toggle
@@ -949,14 +924,25 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                                           isSubCompleted ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
                                           color: isSubCompleted ? AppConstants.successColor : AppConstants.textSecondary, size: 20,
                                         ),
-                                        title: Text(subPhaseActualName, style: TextStyle(fontSize: 13.5, color: AppConstants.textSecondary, decoration: null)),                                        trailing: (_currentUserRole == 'admin')
-                                            ? Checkbox( // Admin can mark sub-phase
-                                          value: isSubCompleted,
-                                          activeColor: AppConstants.successColor,
-                                          visualDensity: VisualDensity.compact,
-                                          onChanged: (value) {
-                                            _updateSubPhaseCompletionStatus(phaseId, subPhaseId, subPhaseActualName, value ?? false);
-                                          },
+                                      title: Text(subPhaseActualName, style: TextStyle(fontSize: 13.5, color: AppConstants.textSecondary, decoration: null)),
+                                      trailing: (_currentUserRole == 'admin')
+                                            ? Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.add_comment_outlined, color: AppConstants.primaryLight),
+                                              tooltip: 'إضافة ملاحظة/صورة للمرحلة الفرعية',
+                                              onPressed: () => _showAddNoteOrImageDialog(phaseId, subPhaseActualName, subPhaseId: subPhaseId),
+                                            ),
+                                            Checkbox(
+                                              value: isSubCompleted,
+                                              activeColor: AppConstants.successColor,
+                                              visualDensity: VisualDensity.compact,
+                                              onChanged: (value) {
+                                                _updateSubPhaseCompletionStatus(phaseId, subPhaseId, subPhaseActualName, value ?? false);
+                                              },
+                                            ),
+                                          ],
                                         )
                                             : null,
                                         children: [
@@ -2312,6 +2298,40 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     );
   }
 
+  void _showSingleImageSourceActionSheet(BuildContext context, Function(XFile?) onImageSelected) {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_camera, color: AppConstants.primaryColor),
+                title: const Text('التقاط صورة بالكاميرا'),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  final picker = ImagePicker();
+                  final XFile? image = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                  onImageSelected(image);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: AppConstants.primaryColor),
+                title: const Text('اختيار صورة من المعرض'),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  final picker = ImagePicker();
+                  final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+                  onImageSelected(image);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // --- MODIFICATION START: _showAddNoteOrImageDialog - Send notifications ---
   Future<void> _showAddNoteOrImageDialog(String phaseId, String phaseOrSubPhaseName, {String? subPhaseId}) async {
     if (!mounted) return;
@@ -2367,16 +2387,16 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                           child: Image.file(pickedImageFile!, height: 120, fit: BoxFit.contain),
                         ),
                       TextButton.icon(
-                        icon: const Icon(Icons.camera_alt_outlined, color: AppConstants.primaryColor),
+                        icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
                         label: Text(pickedImageFile == null ? 'إضافة صورة (اختياري)' : 'تغيير الصورة', style: const TextStyle(color: AppConstants.primaryColor)),
-                        onPressed: () async {
-                          final picker = ImagePicker();
-                          final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
-                          if (picked != null) {
-                            setDialogState(() {
-                              pickedImageFile = File(picked.path);
-                            });
-                          }
+                        onPressed: () {
+                          _showSingleImageSourceActionSheet(context, (xFile) {
+                            if (xFile != null) {
+                              setDialogState(() {
+                                pickedImageFile = File(xFile.path);
+                              });
+                            }
+                          });
                         },
                       ),
                     ],
@@ -2776,16 +2796,16 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                       if (pickedImageFile != null)
                         Image.file(pickedImageFile!, height: 80, fit: BoxFit.cover),
                       TextButton.icon(
-                        icon: const Icon(Icons.camera_alt_outlined, color: AppConstants.primaryColor),
+                        icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
                         label: Text(pickedImageFile == null && tempImageUrl == null ? 'إضافة صورة (اختياري)' : (pickedImageFile == null ? 'تغيير الصورة الحالية' : 'تغيير الصورة المختارة'), style: const TextStyle(color: AppConstants.primaryColor)),
-                        onPressed: () async {
-                          final picker = ImagePicker();
-                          final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 60);
-                          if (picked != null) {
-                            setDialogState(() {
-                              pickedImageFile = File(picked.path);
-                            });
-                          }
+                        onPressed: () {
+                          _showSingleImageSourceActionSheet(context, (xFile) {
+                            if (xFile != null) {
+                              setDialogState(() {
+                                pickedImageFile = File(xFile.path);
+                              });
+                            }
+                          });
                         },
                       ),
                     ],
