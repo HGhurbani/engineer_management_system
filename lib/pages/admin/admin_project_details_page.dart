@@ -1081,18 +1081,19 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         if (snapshot.hasError) {
           return _buildErrorState('حدث خطأ في تحميل طلبات المواد: ${snapshot.error}');
         }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState('لا توجد طلبات مواد لهذا المشروع حالياً.', icon: Icons.build_circle_outlined);
-        }
 
-        final requests = snapshot.data!.docs;
-        return ListView.builder(
-          key: const PageStorageKey<String>('adminPartRequestsTab'),
-          padding: const EdgeInsets.all(AppConstants.paddingMedium),
-          itemCount: requests.length,
-          itemBuilder: (context, index) {
-            final requestDoc = requests[index];
-            final data = requestDoc.data() as Map<String, dynamic>;
+        final requests = snapshot.data?.docs ?? [];
+        Widget listContent;
+        if (requests.isEmpty) {
+          listContent = _buildEmptyState('لا توجد طلبات مواد لهذا المشروع حالياً.', icon: Icons.build_circle_outlined);
+        } else {
+          listContent = ListView.builder(
+            key: const PageStorageKey<String>('adminPartRequestsTab'),
+            padding: const EdgeInsets.all(AppConstants.paddingMedium),
+            itemCount: requests.length,
+            itemBuilder: (context, index) {
+              final requestDoc = requests[index];
+              final data = requestDoc.data() as Map<String, dynamic>;
             final List<dynamic>? itemsData = data['items'];
             String partName;
             String quantity;
@@ -1179,6 +1180,26 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
               ),
             );
           },
+          );
+        }
+
+        return Column(
+          children: [
+            if (_currentUserRole == 'admin')
+              Padding(
+                padding: const EdgeInsets.all(AppConstants.paddingSmall),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.add_shopping_cart, color: Colors.white, size: 18),
+                    label: const Text('إضافة طلب مواد', style: TextStyle(color: Colors.white)),
+                    onPressed: _openAddPartRequestPage,
+                    style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+                  ),
+                ),
+              ),
+            Expanded(child: listContent),
+          ],
         );
       },
     );
@@ -1320,6 +1341,23 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             ],
           ),
         );
+      },
+    );
+  }
+
+  Future<void> _openAddPartRequestPage() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final projectName =
+        (_projectDataSnapshot?.data() as Map<String, dynamic>?)?['name'] as String?;
+    await Navigator.pushNamed(
+      context,
+      '/engineer/request_material',
+      arguments: {
+        'engineerId': user.uid,
+        'engineerName': _currentAdminName ?? 'المسؤول',
+        'projectId': widget.projectId,
+        'projectName': projectName,
       },
     );
   }
