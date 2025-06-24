@@ -32,6 +32,7 @@ import 'package:printing/printing.dart';
 import '../../utils/pdf_styles.dart';
 import '../../utils/pdf_image_cache.dart';
 import '../../utils/report_storage.dart';
+import '../../utils/pdf_report_generator.dart';
 // --- End PDF Imports ---
 
 import '../../main.dart'; // Assuming helper functions are in main.dart
@@ -963,371 +964,32 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     bool useRange = !isFullReport;
     if (useRange) {
       start ??= DateTime(now.year, now.month, now.day);
-      end ??= start.add(const Duration(days: 1)); // Default to end of today if not a range
+      end ??= start.add(const Duration(days: 1));
     }
 
-    // Determine if the current locale is Arabic for conditional text
     final bool isArabic = Localizations.localeOf(context).languageCode == 'ar';
-
-    // Helper function to get localized text
-    String getLocalizedText(String arabicText, String englishText) {
-      return isArabic ? arabicText : englishText;
-    }
+    String getLocalizedText(String ar, String en) => isArabic ? ar : en;
 
     _showLoadingDialog(context, getLocalizedText('جاري إنشاء التقرير...', 'Generating Report...'));
 
-    final List<Map<String, dynamic>> dayEntries = [];
-    final List<Map<String, dynamic>> dayTests = [];
-    final List<Map<String, dynamic>> dayRequests = [];
-    final Set<String> imageUrls = {};
-
-    try {
-      List<Future<void>> fetchTasks = [];
-
-      // Fetch entries from phases and sub-phases
-      for (var phase in predefinedPhasesStructure) {
-        final phaseId = phase['id'];
-        final phaseName = phase['name'];
-        fetchTasks.add(
-          FirebaseFirestore.instance
-              .collection('projects')
-              .doc(widget.projectId)
-              .collection('phases_status')
-              .doc(phaseId)
-              .collection('entries')
-              .where('timestamp', isGreaterThanOrEqualTo: start)
-              .where('timestamp', isLessThan: end)
-              .orderBy('timestamp')
-              .get()
-              .then((snap) {
-            for (var doc in snap.docs) {
-              final data = doc.data();
-              final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-              imageUrls.addAll(imgs);
-              dayEntries.add({
-                ...data,
-                'phaseName': phaseName,
-                'subPhaseName': null,
-              });
-            }
-          }),
-        );
-        for (var sub in phase['subPhases']) {
-          final subId = sub['id'];
-          final subName = sub['name'];
-          fetchTasks.add(
-            FirebaseFirestore.instance
-                .collection('projects')
-                .doc(widget.projectId)
-                .collection('subphases_status')
-                .doc(subId)
-                .collection('entries')
-                .where('timestamp', isGreaterThanOrEqualTo: start)
-                .where('timestamp', isLessThan: end)
-                .orderBy('timestamp')
-                .get()
-                .then((subSnap) {
-              for (var doc in subSnap.docs) {
-                final data = doc.data();
-                final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-                imageUrls.addAll(imgs);
-                dayEntries.add({
-                  ...data,
-                  'phaseName': phaseName,
-                  'subPhaseName': subName,
-                });
-              }
-            }),
-          );
-        }
-      }
-
-      // Prepare test info for easier lookup
-      final Map<String, Map<String, String>> testInfo = {};
-      for (var section in finalCommissioningTests) {
-        final sectionName = section['section_name'] as String;
-        for (var t in section['tests'] as List) {
-          testInfo[(t as Map)['id']] = {
-            'name': t['name'] as String,
-            'section': sectionName,
-          };
-        }
-      }
-
-      // Fetch tests data
-      fetchTasks.add(
-        FirebaseFirestore.instance
-            .collection('projects')
-            .doc(widget.projectId)
-            .collection('tests_status')
-            .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
-            .where('lastUpdatedAt', isLessThan: end)
-            .get()
-            .then((testsSnap) {
-          for (var doc in testsSnap.docs) {
-            final data = doc.data();
-            final info = testInfo[doc.id];
-            final imgUrl = data['imageUrl'] as String?;
-            if (imgUrl != null) imageUrls.add(imgUrl);
-            dayTests.add({
-              ...data,
-              'testId': doc.id,
-              'testName': info?['name'] ?? doc.id,
-              'sectionName': info?['section'] ?? '',
-            });
-          }
-        }),
-      );
-
-      // Fetch part requests data
-      fetchTasks.add(
-        FirebaseFirestore.instance
-            .collection('partRequests')
-            .where('projectId', isEqualTo: widget.projectId)
-            .where('requestedAt', isGreaterThanOrEqualTo: start)
-            .where('requestedAt', isLessThan: end)
-            .get()
-            .then((reqSnap) {
-          for (var doc in reqSnap.docs) {
-            dayRequests.add(doc.data());
-          }
-        }),
-      );
-
-      await Future.wait(fetchTasks);
-    } catch (e) {
-      print('Error preparing daily report details: $e');
-    }
-
-    // Ensure Arabic font is loaded
-    if (_arabicFont == null) {
-      await _loadArabicFont();
-      if (_arabicFont == null) {
-        _hideLoadingDialog(context);
-        _showFeedbackSnackBar(context, getLocalizedText('فشل تحميل الخط العربي. لا يمكن إنشاء PDF.', 'Failed to load Arabic font. Cannot create PDF.'), isError: true);
-        return;
-      }
-    }
-
-    // Load the emoji fallback font for special characters (like 📍, 📞)
-    pw.Font? emojiFont;
-    try {
-      emojiFont = await PdfGoogleFonts.notoColorEmoji(); // Corrected method name
-    } catch (e) {
-      print('Error loading NotoColorEmoji font: $e. Emojis might not display.');
-    }
-
-    // Load the app logo from assets
-    final ByteData logoByteData = await rootBundle.load('assets/images/app_logo.png');
-    final Uint8List logoBytes = logoByteData.buffer.asUint8List();
-    final pw.MemoryImage appLogo = pw.MemoryImage(logoBytes);
-
-    // Fetch images from URLs (for entries/tests)
-    final fetchedImages = await _fetchImagesForUrls(imageUrls.toList());
-    final pdf = pw.Document();
-
     final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
-    final token = generateReportToken();
-    final qrLink = buildReportDownloadUrl(fileName, token);
-
-    // Define professional color scheme
-    final primaryColor = PdfColor.fromHex('#21206C'); // Navy
-    final secondaryColor = PdfColor.fromHex('#2E8B57'); // Medium Green
-    final accentColor = PdfColor.fromHex('#4CAF50'); // Lighter Green (used if needed)
-    final lightGrey = PdfColor.fromHex('#F5F5F5'); // Very Light Grey for backgrounds
-    final darkGrey = PdfColor.fromHex('#424242'); // Dark Grey for main text
-    final borderColor = PdfColor.fromHex('#E0E0E0'); // Light Grey for borders
-
-    // Define a common font fallback list (empty if emojiFont is null)
-    final List<pw.Font> commonFontFallback = (emojiFont != null && _arabicFont != null) ? [emojiFont!, _arabicFont!] : [];
-    if (emojiFont == null && _arabicFont != null) commonFontFallback.add(_arabicFont!);
-    // If no Arabic font is loaded, consider adding a default sans-serif for Latin characters.
-    // For `pdf` package, often it falls back to a basic font if none is specified or loaded.
-
-    // Define professional typography with font fallbacks
-    final pw.TextStyle titleStyle = pw.TextStyle(
-      font: _arabicFont,
-      fontWeight: pw.FontWeight.bold,
-      fontSize: 24,
-      color: primaryColor,
-      fontFallback: commonFontFallback, // Apply fallback
-    );
-    final pw.TextStyle headerStyle = pw.TextStyle(
-      font: _arabicFont,
-      fontWeight: pw.FontWeight.bold,
-      fontSize: 16,
-      color: primaryColor,
-      fontFallback: commonFontFallback, // Apply fallback
-    );
-    final pw.TextStyle subHeaderStyle = pw.TextStyle(
-      font: _arabicFont,
-      fontWeight: pw.FontWeight.bold,
-      fontSize: 14,
-      color: secondaryColor,
-      fontFallback: commonFontFallback, // Apply fallback
-    );
-    final pw.TextStyle regularStyle = pw.TextStyle(
-      font: _arabicFont,
-      fontSize: 12,
-      color: darkGrey,
-      fontFallback: commonFontFallback, // Apply fallback
-    );
-    final pw.TextStyle metaStyle = pw.TextStyle(
-      font: _arabicFont,
-      fontSize: 10,
-      color: PdfColors.grey600,
-      fontFallback: commonFontFallback, // Apply fallback
-    );
-    final pw.TextStyle labelStyle = pw.TextStyle(
-      font: _arabicFont,
-      fontSize: 11,
-      fontWeight: pw.FontWeight.bold,
-      color: secondaryColor,
-      fontFallback: commonFontFallback, // Apply fallback
-    );
-
-    final projectDataMap =
-    _projectDataSnapshot?.data() as Map<String, dynamic>?;
-    final String projectName = projectDataMap?['name'] ?? getLocalizedText('مشروع غير مسمى', 'Unnamed Project');
-    final String clientName = projectDataMap?['clientName'] ?? getLocalizedText('غير معروف', 'Unknown');
-
-    final bool isRange = useRange && end!.difference(start!).inDays > 1;
-    final String headerText = isFullReport
-        ? getLocalizedText('التقرير الشامل', 'Comprehensive Report')
-        : isRange
-        ? getLocalizedText('التقرير التراكمي', 'Cumulative Report')
-        : getLocalizedText('التقرير اليومي', 'Daily Report');
-
-    pdf.addPage(
-      pw.MultiPage(
-        pageTheme: pw.PageTheme(
-          pageFormat: PdfPageFormat.a4, // Ensures a consistent page size
-          textDirection: pw.TextDirection.rtl, // Entire page is RTL
-          // Apply font fallback to the general theme as well
-          theme: pw.ThemeData.withFont(base: _arabicFont, fontFallback: commonFontFallback),
-          margin: PdfStyles.pageMargins,
-        ),
-        header: (context) => PdfStyles.buildHeader(
-          font: _arabicFont!,
-          logo: appLogo,
-          headerText: headerText,
-          now: now,
-          projectName: projectName,
-          clientName: clientName,
-        ),
-        build: (context) {
-          final widgets = <pw.Widget>[];
-
-          // Executive Summary Card
-          widgets.add(_buildSummaryCard(
-              dayEntries.length,
-              dayTests.length,
-              dayRequests.length,
-              headerStyle,
-              regularStyle,
-              primaryColor,
-              lightGrey,
-              isArabic: isArabic, // Pass language preference
-              getLocalizedText: getLocalizedText // Pass helper
-          ));
-          widgets.add(pw.SizedBox(height: 30));
-
-          // Entries Section
-          widgets.add(_buildSectionHeader(getLocalizedText('الملاحظات والتحديثات', 'Notes & Updates'), headerStyle, primaryColor));
-          widgets.add(pw.SizedBox(height: 15));
-          if (dayEntries.isEmpty) {
-            widgets.add(_buildEmptyState(getLocalizedText('لا توجد ملاحظات مسجلة في هذه الفترة', 'No notes recorded for this period'), regularStyle, lightGrey));
-          } else {
-            for (int i = 0; i < dayEntries.length; i++) {
-              final entry = dayEntries[i];
-              widgets.add(_buildEntryCard(
-                  entry,
-                  fetchedImages,
-                  i + 1,
-                  subHeaderStyle,
-                  regularStyle,
-                  labelStyle,
-                  metaStyle,
-                  borderColor,
-                  lightGrey,
-                  isArabic: isArabic, // Pass language preference
-                  getLocalizedText: getLocalizedText // Pass helper
-              ));
-              widgets.add(pw.SizedBox(height: 15));
-            }
-          }
-
-          // Tests Section
-          widgets.add(pw.SizedBox(height: 20));
-          widgets.add(_buildSectionHeader(getLocalizedText('الاختبارات والفحوصات', 'Tests & Inspections'), headerStyle, primaryColor));
-          widgets.add(pw.SizedBox(height: 15));
-          if (dayTests.isEmpty) {
-            widgets.add(_buildEmptyState(getLocalizedText('لا توجد اختبارات محدثة في هذه الفترة', 'No tests updated for this period'), regularStyle, lightGrey));
-          } else {
-            for (int i = 0; i < dayTests.length; i++) {
-              final test = dayTests[i];
-              widgets.add(_buildTestCard(
-                  test,
-                  fetchedImages,
-                  i + 1,
-                  subHeaderStyle,
-                  regularStyle,
-                  labelStyle,
-                  metaStyle,
-                  borderColor,
-                  lightGrey,
-                  isArabic: isArabic, // Pass language preference
-                  getLocalizedText: getLocalizedText // Pass helper
-              ));
-              widgets.add(pw.SizedBox(height: 15));
-            }
-          }
-
-          // Part Requests Section
-          widgets.add(pw.SizedBox(height: 20));
-          widgets.add(_buildSectionHeader(getLocalizedText('طلبات المواد والمعدات', 'Material & Equipment Requests'), headerStyle, primaryColor));
-          widgets.add(pw.SizedBox(height: 15));
-          if (dayRequests.isEmpty) {
-            widgets.add(_buildEmptyState(getLocalizedText('لا توجد طلبات مواد في هذه الفترة', 'No material requests for this period'), regularStyle, lightGrey));
-          } else {
-            widgets.add(_buildRequestsTable(
-                dayRequests,
-                regularStyle,
-                labelStyle,
-                borderColor,
-                lightGrey,
-                isArabic: isArabic, // Pass language preference
-                getLocalizedText: getLocalizedText // Pass helper
-            ));
-          }
-
-          // Important Notice
-          widgets.add(pw.SizedBox(height: 30));
-          widgets.add(_buildImportantNotice(regularStyle, isArabic: isArabic, getLocalizedText: getLocalizedText));
-          return widgets;
-        },
-        footer: (context) => PdfStyles.buildFooter(
-          context,
-          font: _arabicFont!,
-          fontFallback: commonFontFallback,
-          qrData: qrLink,
-          generatedByText: _currentEngineerName != null
-              ? getLocalizedText('تم إنشاء هذا بواسطة $_currentEngineerName', 'Generated by $_currentEngineerName')
-              : null,
-
-        ),
-      ),
-    );
-
     try {
-      final pdfBytes = await pdf.save();
-      await uploadReportPdf(pdfBytes, fileName, token);
+      final pdfBytes = await PdfReportGenerator.generate(
+        projectId: widget.projectId,
+        projectSnapshot: _projectDataSnapshot,
+        phases: predefinedPhasesStructure,
+        testsStructure: finalCommissioningTests,
+        generatedBy: _currentEngineerName,
+        start: start,
+        end: end,
+      );
+
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, getLocalizedText('تم إنشاء التقرير بنجاح.', 'Report generated successfully.'), isError: false);
       _openPdfPreview(
         pdfBytes,
         fileName,
-        getLocalizedText('يرجى الإطلاع على $headerText للمشروع.', 'Please review the $headerText for the project.'),
+        getLocalizedText('يرجى الإطلاع على التقرير للمشروع.', 'Please review the project report.'),
       );
     } catch (e) {
       _hideLoadingDialog(context);
