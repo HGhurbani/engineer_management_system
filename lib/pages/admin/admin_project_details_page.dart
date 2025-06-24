@@ -28,9 +28,8 @@ import 'package:printing/printing.dart';
 import '../../utils/pdf_styles.dart';
 import '../../utils/pdf_image_cache.dart';
 import '../../utils/report_storage.dart';
-import '../../utils/pdf_report_generator.dart';
 import 'package:engineer_management_system/html_stub.dart'
-    if (dart.library.html) 'dart:html' as html;
+if (dart.library.html) 'dart:html' as html;
 // import 'package:url_launcher/url_launcher.dart'; // Not used directly for notifications
 // import 'package:share_plus/share_plus.dart'; // Not used directly for notifications
 import 'dart:ui' as ui;
@@ -697,9 +696,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 'الموظفون:',
                 _projectAssignedEmployees.isNotEmpty
                     ? _projectAssignedEmployees
-                        .map((e) => (e.data() as Map<String, dynamic>)['employeeName'] ?? '')
-                        .toSet()
-                        .join('، ')
+                    .map((e) => (e.data() as Map<String, dynamic>)['employeeName'] ?? '')
+                    .toSet()
+                    .join('، ')
                     : 'لا يوجد'),
             _buildDetailRow(Icons.person_rounded, 'العميل:', clientName),
             if (_clientPhone != null && _clientPhone!.isNotEmpty)
@@ -856,30 +855,30 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                           tooltip: 'إضافة ملاحظة/صورة للمرحلة الرئيسية',
                           onPressed: () => _showAddNoteOrImageDialog(phaseId, phaseActualName),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.edit_note_outlined, color: AppConstants.primaryLight),
-                          tooltip: 'تعديل بيانات المرحلة',
-                          onPressed: () async {
-                            final snapshot = await FirebaseFirestore.instance
-                                .collection('projects')
-                                .doc(widget.projectId)
-                                .collection('phases')
-                                .doc(phaseId)
-                                .get();
-                            final data = snapshot.data() as Map<String, dynamic>? ?? {};
-                            if (!mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => EditPhasePage(
-                                  projectId: widget.projectId,
-                                  phaseId: phaseId,
-                                  phaseData: data,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                        // IconButton(
+                        //   icon: const Icon(Icons.edit_note_outlined, color: AppConstants.primaryLight),
+                        //   tooltip: 'تعديل بيانات المرحلة',
+                        //   onPressed: () async {
+                        //     final snapshot = await FirebaseFirestore.instance
+                        //         .collection('projects')
+                        //         .doc(widget.projectId)
+                        //         .collection('phases')
+                        //         .doc(phaseId)
+                        //         .get();
+                        //     final data = snapshot.data() as Map<String, dynamic>? ?? {};
+                        //     if (!mounted) return;
+                        //     Navigator.push(
+                        //       context,
+                        //       MaterialPageRoute(
+                        //         builder: (_) => EditPhasePage(
+                        //           projectId: widget.projectId,
+                        //           phaseId: phaseId,
+                        //           phaseData: data,
+                        //         ),
+                        //       ),
+                        //     );
+                        //   },
+                        // ),
                       ],
                       // Admin can always toggle
                       if (_currentUserRole == 'admin')
@@ -951,8 +950,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                                           isSubCompleted ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
                                           color: isSubCompleted ? AppConstants.successColor : AppConstants.textSecondary, size: 20,
                                         ),
-                                      title: Text(subPhaseActualName, style: TextStyle(fontSize: 13.5, color: AppConstants.textSecondary, decoration: null)),
-                                      trailing: (_currentUserRole == 'admin')
+                                        title: Text(subPhaseActualName, style: TextStyle(fontSize: 13.5, color: AppConstants.textSecondary, decoration: null)),
+                                        trailing: (_currentUserRole == 'admin')
                                             ? Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
@@ -1133,92 +1132,92 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             itemBuilder: (context, index) {
               final requestDoc = requests[index];
               final data = requestDoc.data() as Map<String, dynamic>;
-            final List<dynamic>? itemsData = data['items'];
-            String partName;
-            String quantity;
-            if (itemsData != null && itemsData.isNotEmpty) {
-              partName = itemsData
-                  .map((e) => '${e['name']} (${e['quantity']})')
-                  .join('، ');
-              quantity = '-';
-            } else {
-              partName = data['partName'] ?? 'مادة غير مسماة';
-              quantity = data['quantity']?.toString() ?? 'N/A';
-            }
-            final engineerName = data['engineerName'] ?? 'مهندس غير معروف';
-            final status = data['status'] ?? 'غير معروف';
-            final requestedAt = (data['requestedAt'] as Timestamp?)?.toDate();
-            final formattedDate = requestedAt != null
-                ? DateFormat('yyyy/MM/dd hh:mm a', 'ar').format(requestedAt)
-                : 'غير معروف';
+              final List<dynamic>? itemsData = data['items'];
+              String partName;
+              String quantity;
+              if (itemsData != null && itemsData.isNotEmpty) {
+                partName = itemsData
+                    .map((e) => '${e['name']} (${e['quantity']})')
+                    .join('، ');
+                quantity = '-';
+              } else {
+                partName = data['partName'] ?? 'مادة غير مسماة';
+                quantity = data['quantity']?.toString() ?? 'N/A';
+              }
+              final engineerName = data['engineerName'] ?? 'مهندس غير معروف';
+              final status = data['status'] ?? 'غير معروف';
+              final requestedAt = (data['requestedAt'] as Timestamp?)?.toDate();
+              final formattedDate = requestedAt != null
+                  ? DateFormat('yyyy/MM/dd hh:mm a', 'ar').format(requestedAt)
+                  : 'غير معروف';
 
-            Color statusColor;
-            IconData statusIcon;
-            switch (status) {
-              case 'معلق':
-                statusColor = AppConstants.warningColor;
-                statusIcon = Icons.pending_actions_rounded;
-                break;
-              case 'تمت الموافقة':
-                statusColor = AppConstants.successColor;
-                statusIcon = Icons.check_circle_outline_rounded;
-                break;
-              case 'مرفوض':
-                statusColor = AppConstants.errorColor;
-                statusIcon = Icons.cancel_outlined;
-                break;
-              case 'تم الطلب':
-                statusColor = AppConstants.infoColor;
-                statusIcon = Icons.shopping_cart_checkout_rounded;
-                break;
-              case 'تم الاستلام':
-                statusColor = AppConstants.primaryColor;
-                statusIcon = Icons.inventory_2_outlined;
-                break;
-              default:
-                statusColor = AppConstants.textSecondary;
-                statusIcon = Icons.help_outline_rounded;
-            }
+              Color statusColor;
+              IconData statusIcon;
+              switch (status) {
+                case 'معلق':
+                  statusColor = AppConstants.warningColor;
+                  statusIcon = Icons.pending_actions_rounded;
+                  break;
+                case 'تمت الموافقة':
+                  statusColor = AppConstants.successColor;
+                  statusIcon = Icons.check_circle_outline_rounded;
+                  break;
+                case 'مرفوض':
+                  statusColor = AppConstants.errorColor;
+                  statusIcon = Icons.cancel_outlined;
+                  break;
+                case 'تم الطلب':
+                  statusColor = AppConstants.infoColor;
+                  statusIcon = Icons.shopping_cart_checkout_rounded;
+                  break;
+                case 'تم الاستلام':
+                  statusColor = AppConstants.primaryColor;
+                  statusIcon = Icons.inventory_2_outlined;
+                  break;
+                default:
+                  statusColor = AppConstants.textSecondary;
+                  statusIcon = Icons.help_outline_rounded;
+              }
 
-            return Card(
-              margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
-              elevation: 1.5,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
-              child: ListTile(
-                title: Text('اسم المادة: $partName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('الكمية: $quantity', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
-                    Text('مقدم الطلب: $engineerName', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
-                    Row(
-                      children: [
-                        Icon(statusIcon, color: statusColor, size: 16),
-                        const SizedBox(width: 4),
-                        Text(status, style: TextStyle(fontSize: 14, color: statusColor, fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                    Text('تاريخ الطلب: $formattedDate', style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
-                  ],
+              return Card(
+                margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
+                elevation: 1.5,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
+                child: ListTile(
+                  title: Text('اسم المادة: $partName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('الكمية: $quantity', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                      Text('مقدم الطلب: $engineerName', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                      Row(
+                        children: [
+                          Icon(statusIcon, color: statusColor, size: 16),
+                          const SizedBox(width: 4),
+                          Text(status, style: TextStyle(fontSize: 14, color: statusColor, fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                      Text('تاريخ الطلب: $formattedDate', style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
+                    ],
+                  ),
+                  // trailing: (_currentUserRole == 'admin')
+                  //     ? PopupMenuButton<String>(
+                  //         onSelected: (val) {
+                  //           if (val == 'edit') {
+                  //             _showEditPartRequestDialog(requestDoc);
+                  //           } else if (val == 'delete') {
+                  //             _deletePartRequest(requestDoc.id);
+                  //           }
+                  //         },
+                  //         itemBuilder: (context) => const [
+                  //           PopupMenuItem(value: 'edit', child: Text('تعديل')),
+                  //           PopupMenuItem(value: 'delete', child: Text('حذف')),
+                  //         ],
+                  //       )
+                  //     : null,
                 ),
-                // trailing: (_currentUserRole == 'admin')
-                //     ? PopupMenuButton<String>(
-                //         onSelected: (val) {
-                //           if (val == 'edit') {
-                //             _showEditPartRequestDialog(requestDoc);
-                //           } else if (val == 'delete') {
-                //             _deletePartRequest(requestDoc.id);
-                //           }
-                //         },
-                //         itemBuilder: (context) => const [
-                //           PopupMenuItem(value: 'edit', child: Text('تعديل')),
-                //           PopupMenuItem(value: 'delete', child: Text('حذف')),
-                //         ],
-                //       )
-                //     : null,
-              ),
-            );
-          },
+              );
+            },
           );
         }
 
@@ -1388,7 +1387,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     final projectName =
-        (_projectDataSnapshot?.data() as Map<String, dynamic>?)?['name'] as String?;
+    (_projectDataSnapshot?.data() as Map<String, dynamic>?)?['name'] as String?;
     await Navigator.pushNamed(
       context,
       '/engineer/request_material',
@@ -1521,7 +1520,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     if (result == null || result.files.isEmpty) return;
 
     final pickedFiles =
-        result.files.where((f) => f.path != null).toList(growable: false);
+    result.files.where((f) => f.path != null).toList(growable: false);
     if (pickedFiles.isEmpty) return;
 
     await showDialog(
@@ -1598,7 +1597,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
               child: ListView(
                 shrinkWrap: true,
                 children:
-                    pickedFiles.map((f) => ListTile(title: Text(f.name))).toList(),
+                pickedFiles.map((f) => ListTile(title: Text(f.name))).toList(),
               ),
             ),
             actions: [
@@ -1611,7 +1610,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 style: ElevatedButton.styleFrom(
                     backgroundColor: AppConstants.primaryColor),
                 child:
-                    isLoading ? const CircularProgressIndicator() : const Text('رفع'),
+                isLoading ? const CircularProgressIndicator() : const Text('رفع'),
               ),
             ],
           );
@@ -1729,33 +1728,327 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       end ??= start.add(const Duration(days: 1));
     }
 
-    _showLoadingDialog(context, 'جاري إنشاء التقرير...');
-    final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
+    final List<Map<String, dynamic>> dayEntries = [];
+    final List<Map<String, dynamic>> dayTests = [];
+    final List<Map<String, dynamic>> dayRequests = [];
+    final Set<String> imageUrls = {};
+
     try {
-      final pdfBytes = await PdfReportGenerator.generate(
-        projectId: widget.projectId,
-        projectSnapshot: _projectDataSnapshot,
-        phases: predefinedPhasesStructure,
-        testsStructure: finalCommissioningTests,
-        generatedBy: _currentAdminName,
-        start: start,
-        end: end,
+      List<Future<void>> fetchTasks = [];
+      for (var phase in predefinedPhasesStructure) {
+        final phaseId = phase['id'];
+        final phaseName = phase['name'];
+
+        fetchTasks.add(
+          (() async {
+            Query<Map<String, dynamic>> q = FirebaseFirestore.instance
+                .collection('projects')
+                .doc(widget.projectId)
+                .collection('phases_status')
+                .doc(phaseId)
+                .collection('entries');
+            if (useRange) {
+              q = q
+                  .where('timestamp', isGreaterThanOrEqualTo: start)
+                  .where('timestamp', isLessThan: end);
+            }
+            final snap = await q.orderBy('timestamp').get();
+            for (var doc in snap.docs) {
+              final data = doc.data();
+              final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              imageUrls.addAll(imgs);
+              dayEntries.add({
+                ...data,
+                'phaseName': phaseName,
+                'subPhaseName': null,
+              });
+            }
+          })(),
+        );
+
+        for (var sub in phase['subPhases']) {
+          final subId = sub['id'];
+          final subName = sub['name'];
+          fetchTasks.add(
+            (() async {
+              Query<Map<String, dynamic>> qSub = FirebaseFirestore.instance
+                  .collection('projects')
+                  .doc(widget.projectId)
+                  .collection('subphases_status')
+                  .doc(subId)
+                  .collection('entries');
+              if (useRange) {
+                qSub = qSub
+                    .where('timestamp', isGreaterThanOrEqualTo: start)
+                    .where('timestamp', isLessThan: end);
+              }
+              final subSnap = await qSub.orderBy('timestamp').get();
+              for (var doc in subSnap.docs) {
+                final data = doc.data();
+                final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                imageUrls.addAll(imgs);
+                dayEntries.add({
+                  ...data,
+                  'phaseName': phaseName,
+                  'subPhaseName': subName,
+                });
+              }
+            })(),
+          );
+        }
+      }
+
+      final Map<String, Map<String, String>> testInfo = {};
+      for (var section in finalCommissioningTests) {
+        final sectionName = section['section_name'] as String;
+        for (var t in section['tests'] as List) {
+          testInfo[(t as Map)['id']] = {
+            'name': t['name'] as String,
+            'section': sectionName,
+          };
+        }
+      }
+
+      fetchTasks.add(
+        (() async {
+          Query<Map<String, dynamic>> qTests = FirebaseFirestore.instance
+              .collection('projects')
+              .doc(widget.projectId)
+              .collection('tests_status');
+          if (useRange) {
+            qTests = qTests
+                .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
+                .where('lastUpdatedAt', isLessThan: end);
+          }
+          final testsSnap = await qTests.get();
+          for (var doc in testsSnap.docs) {
+            final data = doc.data();
+            final info = testInfo[doc.id];
+            final imgUrl = data['imageUrl'] as String?;
+            if (imgUrl != null) imageUrls.add(imgUrl);
+            dayTests.add({
+              ...data,
+              'testId': doc.id,
+              'testName': info?['name'] ?? doc.id,
+              'sectionName': info?['section'] ?? '',
+            });
+          }
+        })(),
       );
+
+      fetchTasks.add(
+        (() async {
+          Query<Map<String, dynamic>> qReq = FirebaseFirestore.instance
+              .collection('partRequests')
+              .where('projectId', isEqualTo: widget.projectId);
+          if (useRange) {
+            qReq = qReq
+                .where('requestedAt', isGreaterThanOrEqualTo: start)
+                .where('requestedAt', isLessThan: end);
+          }
+          final reqSnap = await qReq.get();
+          for (var doc in reqSnap.docs) {
+            dayRequests.add(doc.data());
+          }
+        })(),
+      );
+
+      await Future.wait(fetchTasks);
+    } catch (e) {
+      print('Error preparing daily report details: $e');
+    }
+
+    if (_arabicFont == null) {
+      await _loadArabicFont();
+      if (_arabicFont == null) {
+        _showFeedbackSnackBar(context, 'فشل تحميل الخط العربي. لا يمكن إنشاء PDF.', isError: true);
+        return;
+      }
+    }
+
+    _showLoadingDialog(context, 'جاري إنشاء التقرير...');
+
+    final fetchedImages = await _fetchImagesForUrls(imageUrls.toList());
+
+    // Load emoji fallback font
+    pw.Font? emojiFont;
+    try {
+      emojiFont = await PdfGoogleFonts.notoColorEmoji();
+    } catch (e) {
+      print('Error loading NotoColorEmoji font: $e');
+    }
+
+    final List<pw.Font> commonFontFallback = emojiFont != null ? [emojiFont!] : [];
+
+    final pdf = pw.Document();
+    final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
+    final token = generateReportToken();
+    final qrLink = buildReportDownloadUrl(fileName, token);
+    final pw.TextStyle regularStyle =
+    pw.TextStyle(font: _arabicFont, fontSize: 12, fontFallback: commonFontFallback);
+    final pw.TextStyle headerStyle = pw.TextStyle(
+        font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16, fontFallback: commonFontFallback);
+    final pw.TextStyle smallGrey = pw.TextStyle(
+        font: _arabicFont, fontSize: 10, color: PdfColors.grey600, fontFallback: commonFontFallback);
+    final String headerText = isFullReport
+        ? 'التقرير الشامل'
+        : useRange
+        ? 'التقرير التراكمي'
+        : 'التقرير اليومي';
+
+    final projectDataMap = _projectDataSnapshot?.data() as Map<String, dynamic>?;
+    final String projectName = projectDataMap?['name'] ?? 'مشروع غير مسمى';
+    final String clientName = projectDataMap?['clientName'] ?? 'غير معروف';
+
+    final ByteData logoByteData = await rootBundle.load('assets/images/app_logo.png');
+    final Uint8List logoBytes = logoByteData.buffer.asUint8List();
+    final pw.MemoryImage appLogo = pw.MemoryImage(logoBytes);
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          textDirection: pw.TextDirection.rtl,
+          theme:
+          pw.ThemeData.withFont(base: _arabicFont, fontFallback: commonFontFallback),
+          margin: PdfStyles.pageMargins,
+        ),
+        header: (context) => PdfStyles.buildHeader(
+          font: _arabicFont!,
+          logo: appLogo,
+          headerText: headerText,
+          now: now,
+          projectName: projectName,
+          clientName: clientName,
+        ),
+        build: (context) {
+          final widgets = <pw.Widget>[];
+          widgets.add(pw.Text('عدد الملاحظات المسجلة: ${dayEntries.length}', style: regularStyle));
+          widgets.add(pw.Text('عدد الاختبارات المحدثة: ${dayTests.length}', style: regularStyle));
+          widgets.add(pw.Text('عدد طلبات المواد: ${dayRequests.length}', style: regularStyle));
+          widgets.add(pw.SizedBox(height: 20));
+
+          widgets.add(pw.Text('الملاحظات والصور:', style: headerStyle));
+          if (dayEntries.isEmpty) {
+            widgets.add(pw.Text('لا توجد ملاحظات مسجلة اليوم.', style: regularStyle));
+          } else {
+            for (var entry in dayEntries) {
+              final note = entry['note'] ?? '';
+              final engineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
+              final ts = (entry['timestamp'] as Timestamp?)?.toDate();
+              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
+              final phaseName = entry['phaseName'] ?? '';
+              final subName = entry['subPhaseName'];
+              widgets.add(pw.Container(
+                margin: const pw.EdgeInsets.symmetric(vertical: 4),
+                child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+                  pw.Text(subName != null ? '$phaseName > $subName' : phaseName,
+                      style: pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold)),
+                  if (note.toString().isNotEmpty) pw.Text('ملاحظة: $note', style: regularStyle),
+                  for (var url in (entry['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [])
+                    if (fetchedImages.containsKey(url))
+                      pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                          child: pw.Image(fetchedImages[url]!, width: 150, height: 100, fit: pw.BoxFit.contain)),
+                  pw.Text('بواسطة: $engineer - $dateStr', style: smallGrey),
+                ]),
+              ));
+            }
+          }
+
+          widgets.add(pw.SizedBox(height: 10));
+          widgets.add(pw.Text('الاختبارات:', style: headerStyle));
+          if (dayTests.isEmpty) {
+            widgets.add(pw.Text('لا توجد اختبارات محدثة اليوم.', style: regularStyle));
+          } else {
+            for (var test in dayTests) {
+              final note = test['note'] ?? '';
+              final engineer = test['lastUpdatedByName'] ?? 'مهندس';
+              final ts = (test['lastUpdatedAt'] as Timestamp?)?.toDate();
+              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
+              final section = test['sectionName'] ?? '';
+              final name = test['testName'] ?? '';
+              widgets.add(pw.Container(
+                  margin: const pw.EdgeInsets.symmetric(vertical: 4),
+                  child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+                    pw.Text('$section - $name', style: pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold)),
+                    if (note.toString().isNotEmpty) pw.Text('الملاحظات: $note', style: regularStyle),
+                    if (test['imageUrl'] != null && fetchedImages.containsKey(test['imageUrl']))
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                        child: pw.Image(fetchedImages[test['imageUrl']]!, width: 150, height: 100, fit: pw.BoxFit.contain),
+                      ),
+                    pw.Text('بواسطة: $engineer - $dateStr', style: smallGrey),
+                  ])));
+            }
+          }
+
+          widgets.add(pw.SizedBox(height: 10));
+          widgets.add(pw.Text('طلبات المواد:', style: headerStyle));
+          if (dayRequests.isEmpty) {
+            widgets.add(pw.Text('لا توجد طلبات مواد اليوم.', style: regularStyle));
+          } else {
+            for (var pr in dayRequests) {
+              final List<dynamic>? items = pr['items'];
+              final itemSummary = (items != null && items.isNotEmpty)
+                  ? items.map((e) => '${e['name']} (${e['quantity']})').join('، ')
+                  : '${pr['partName'] ?? ''} (${pr['quantity'] ?? '1'})';
+              final status = pr['status'] ?? '';
+              final eng = pr['engineerName'] ?? '';
+              final ts = (pr['requestedAt'] as Timestamp?)?.toDate();
+              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
+              widgets.add(pw.Bullet(
+                  text: '$itemSummary - $status - $eng - $dateStr',
+                  textAlign: pw.TextAlign.right,
+                  style: regularStyle));
+            }
+          }
+
+          widgets.add(pw.SizedBox(height: 20));
+          widgets.add(pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.red, width: 1.5),
+              borderRadius: pw.BorderRadius.circular(5),
+            ),
+            child: pw.Text(
+              'ملاحظة هامة: في حال مضى 24 ساعة يعتبر هذا التقرير مكتمل وغير قابل للتعديل.',
+              style: pw.TextStyle(font: _arabicFont, color: PdfColors.red, fontWeight: pw.FontWeight.bold, fontSize: 10),
+              textDirection: pw.TextDirection.rtl,
+              textAlign: pw.TextAlign.center,
+            ),
+          ));
+
+          return widgets;
+        },
+        footer: (context) => PdfStyles.buildFooter(
+            context,
+            font: _arabicFont!,
+            fontFallback: commonFontFallback,
+            qrData: qrLink,
+            generatedByText: _currentAdminName != null
+                ? 'تم إنشاء هذا بواسطة $_currentAdminName'
+                : null),
+      ),
+    );
+
+    try {
+      final pdfBytes = await pdf.save();
+      await uploadReportPdf(pdfBytes, fileName, token);
 
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
+
       await _saveOrSharePdf(
         pdfBytes,
         fileName,
-        isFullReport ? 'التقرير الشامل' : useRange ? 'التقرير التراكمي' : 'التقرير اليومي',
-        'يرجى الإطلاع على التقرير للمشروع.',
+        headerText,
+        'يرجى الإطلاع على $headerText للمشروع.',
       );
     } catch (e) {
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
       print('Error generating daily report PDF: $e');
-    }
-  }
     }
   }
 
@@ -1823,7 +2116,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
       try {
         final response =
-            await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+        await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
           final decoded = img.decodeImage(response.bodyBytes);
