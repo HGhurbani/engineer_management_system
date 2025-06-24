@@ -28,6 +28,7 @@ import 'package:printing/printing.dart';
 import '../../utils/pdf_styles.dart';
 import '../../utils/pdf_image_cache.dart';
 import '../../utils/report_storage.dart';
+import '../../utils/pdf_report_generator.dart';
 import 'package:engineer_management_system/html_stub.dart'
     if (dart.library.html) 'dart:html' as html;
 // import 'package:url_launcher/url_launcher.dart'; // Not used directly for notifications
@@ -1728,327 +1729,33 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       end ??= start.add(const Duration(days: 1));
     }
 
-    final List<Map<String, dynamic>> dayEntries = [];
-    final List<Map<String, dynamic>> dayTests = [];
-    final List<Map<String, dynamic>> dayRequests = [];
-    final Set<String> imageUrls = {};
-
-    try {
-      List<Future<void>> fetchTasks = [];
-      for (var phase in predefinedPhasesStructure) {
-        final phaseId = phase['id'];
-        final phaseName = phase['name'];
-
-        fetchTasks.add(
-          (() async {
-            Query<Map<String, dynamic>> q = FirebaseFirestore.instance
-                .collection('projects')
-                .doc(widget.projectId)
-                .collection('phases_status')
-                .doc(phaseId)
-                .collection('entries');
-            if (useRange) {
-              q = q
-                  .where('timestamp', isGreaterThanOrEqualTo: start)
-                  .where('timestamp', isLessThan: end);
-            }
-            final snap = await q.orderBy('timestamp').get();
-            for (var doc in snap.docs) {
-              final data = doc.data();
-              final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-              imageUrls.addAll(imgs);
-              dayEntries.add({
-                ...data,
-                'phaseName': phaseName,
-                'subPhaseName': null,
-              });
-            }
-          })(),
-        );
-
-        for (var sub in phase['subPhases']) {
-          final subId = sub['id'];
-          final subName = sub['name'];
-          fetchTasks.add(
-            (() async {
-              Query<Map<String, dynamic>> qSub = FirebaseFirestore.instance
-                  .collection('projects')
-                  .doc(widget.projectId)
-                  .collection('subphases_status')
-                  .doc(subId)
-                  .collection('entries');
-              if (useRange) {
-                qSub = qSub
-                    .where('timestamp', isGreaterThanOrEqualTo: start)
-                    .where('timestamp', isLessThan: end);
-              }
-              final subSnap = await qSub.orderBy('timestamp').get();
-              for (var doc in subSnap.docs) {
-                final data = doc.data();
-                final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-                imageUrls.addAll(imgs);
-                dayEntries.add({
-                  ...data,
-                  'phaseName': phaseName,
-                  'subPhaseName': subName,
-                });
-              }
-            })(),
-          );
-        }
-      }
-
-      final Map<String, Map<String, String>> testInfo = {};
-      for (var section in finalCommissioningTests) {
-        final sectionName = section['section_name'] as String;
-        for (var t in section['tests'] as List) {
-          testInfo[(t as Map)['id']] = {
-            'name': t['name'] as String,
-            'section': sectionName,
-          };
-        }
-      }
-
-      fetchTasks.add(
-        (() async {
-          Query<Map<String, dynamic>> qTests = FirebaseFirestore.instance
-              .collection('projects')
-              .doc(widget.projectId)
-              .collection('tests_status');
-          if (useRange) {
-            qTests = qTests
-                .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
-                .where('lastUpdatedAt', isLessThan: end);
-          }
-          final testsSnap = await qTests.get();
-          for (var doc in testsSnap.docs) {
-            final data = doc.data();
-            final info = testInfo[doc.id];
-            final imgUrl = data['imageUrl'] as String?;
-            if (imgUrl != null) imageUrls.add(imgUrl);
-            dayTests.add({
-              ...data,
-              'testId': doc.id,
-              'testName': info?['name'] ?? doc.id,
-              'sectionName': info?['section'] ?? '',
-            });
-          }
-        })(),
-      );
-
-      fetchTasks.add(
-        (() async {
-          Query<Map<String, dynamic>> qReq = FirebaseFirestore.instance
-              .collection('partRequests')
-              .where('projectId', isEqualTo: widget.projectId);
-          if (useRange) {
-            qReq = qReq
-                .where('requestedAt', isGreaterThanOrEqualTo: start)
-                .where('requestedAt', isLessThan: end);
-          }
-          final reqSnap = await qReq.get();
-          for (var doc in reqSnap.docs) {
-            dayRequests.add(doc.data());
-          }
-        })(),
-      );
-
-      await Future.wait(fetchTasks);
-    } catch (e) {
-      print('Error preparing daily report details: $e');
-    }
-
-    if (_arabicFont == null) {
-      await _loadArabicFont();
-      if (_arabicFont == null) {
-        _showFeedbackSnackBar(context, 'فشل تحميل الخط العربي. لا يمكن إنشاء PDF.', isError: true);
-        return;
-      }
-    }
-
     _showLoadingDialog(context, 'جاري إنشاء التقرير...');
-
-    final fetchedImages = await _fetchImagesForUrls(imageUrls.toList());
-
-    // Load emoji fallback font
-    pw.Font? emojiFont;
-    try {
-      emojiFont = await PdfGoogleFonts.notoColorEmoji();
-    } catch (e) {
-      print('Error loading NotoColorEmoji font: $e');
-    }
-
-    final List<pw.Font> commonFontFallback = emojiFont != null ? [emojiFont!] : [];
-
-    final pdf = pw.Document();
     final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
-    final token = generateReportToken();
-    final qrLink = buildReportDownloadUrl(fileName, token);
-    final pw.TextStyle regularStyle =
-        pw.TextStyle(font: _arabicFont, fontSize: 12, fontFallback: commonFontFallback);
-    final pw.TextStyle headerStyle = pw.TextStyle(
-        font: _arabicFont, fontWeight: pw.FontWeight.bold, fontSize: 16, fontFallback: commonFontFallback);
-    final pw.TextStyle smallGrey = pw.TextStyle(
-        font: _arabicFont, fontSize: 10, color: PdfColors.grey600, fontFallback: commonFontFallback);
-    final String headerText = isFullReport
-        ? 'التقرير الشامل'
-        : useRange
-            ? 'التقرير التراكمي'
-            : 'التقرير اليومي';
-
-    final projectDataMap = _projectDataSnapshot?.data() as Map<String, dynamic>?;
-    final String projectName = projectDataMap?['name'] ?? 'مشروع غير مسمى';
-    final String clientName = projectDataMap?['clientName'] ?? 'غير معروف';
-
-    final ByteData logoByteData = await rootBundle.load('assets/images/app_logo.png');
-    final Uint8List logoBytes = logoByteData.buffer.asUint8List();
-    final pw.MemoryImage appLogo = pw.MemoryImage(logoBytes);
-
-    pdf.addPage(
-      pw.MultiPage(
-        pageTheme: pw.PageTheme(
-          pageFormat: PdfPageFormat.a4,
-          textDirection: pw.TextDirection.rtl,
-          theme:
-              pw.ThemeData.withFont(base: _arabicFont, fontFallback: commonFontFallback),
-          margin: PdfStyles.pageMargins,
-        ),
-        header: (context) => PdfStyles.buildHeader(
-          font: _arabicFont!,
-          logo: appLogo,
-          headerText: headerText,
-          now: now,
-          projectName: projectName,
-          clientName: clientName,
-        ),
-        build: (context) {
-          final widgets = <pw.Widget>[];
-          widgets.add(pw.Text('عدد الملاحظات المسجلة: ${dayEntries.length}', style: regularStyle));
-          widgets.add(pw.Text('عدد الاختبارات المحدثة: ${dayTests.length}', style: regularStyle));
-          widgets.add(pw.Text('عدد طلبات المواد: ${dayRequests.length}', style: regularStyle));
-          widgets.add(pw.SizedBox(height: 20));
-
-          widgets.add(pw.Text('الملاحظات والصور:', style: headerStyle));
-          if (dayEntries.isEmpty) {
-            widgets.add(pw.Text('لا توجد ملاحظات مسجلة اليوم.', style: regularStyle));
-          } else {
-            for (var entry in dayEntries) {
-              final note = entry['note'] ?? '';
-              final engineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
-              final ts = (entry['timestamp'] as Timestamp?)?.toDate();
-              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
-              final phaseName = entry['phaseName'] ?? '';
-              final subName = entry['subPhaseName'];
-              widgets.add(pw.Container(
-                margin: const pw.EdgeInsets.symmetric(vertical: 4),
-                child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-                  pw.Text(subName != null ? '$phaseName > $subName' : phaseName,
-                      style: pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold)),
-                  if (note.toString().isNotEmpty) pw.Text('ملاحظة: $note', style: regularStyle),
-                  for (var url in (entry['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [])
-                    if (fetchedImages.containsKey(url))
-                      pw.Padding(
-                          padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                          child: pw.Image(fetchedImages[url]!, width: 150, height: 100, fit: pw.BoxFit.contain)),
-                  pw.Text('بواسطة: $engineer - $dateStr', style: smallGrey),
-                ]),
-              ));
-            }
-          }
-
-          widgets.add(pw.SizedBox(height: 10));
-          widgets.add(pw.Text('الاختبارات:', style: headerStyle));
-          if (dayTests.isEmpty) {
-            widgets.add(pw.Text('لا توجد اختبارات محدثة اليوم.', style: regularStyle));
-          } else {
-            for (var test in dayTests) {
-              final note = test['note'] ?? '';
-              final engineer = test['lastUpdatedByName'] ?? 'مهندس';
-              final ts = (test['lastUpdatedAt'] as Timestamp?)?.toDate();
-              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
-              final section = test['sectionName'] ?? '';
-              final name = test['testName'] ?? '';
-              widgets.add(pw.Container(
-                  margin: const pw.EdgeInsets.symmetric(vertical: 4),
-                  child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-                    pw.Text('$section - $name', style: pw.TextStyle(font: _arabicFont, fontWeight: pw.FontWeight.bold)),
-                    if (note.toString().isNotEmpty) pw.Text('الملاحظات: $note', style: regularStyle),
-                    if (test['imageUrl'] != null && fetchedImages.containsKey(test['imageUrl']))
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                        child: pw.Image(fetchedImages[test['imageUrl']]!, width: 150, height: 100, fit: pw.BoxFit.contain),
-                      ),
-                    pw.Text('بواسطة: $engineer - $dateStr', style: smallGrey),
-                  ])));
-            }
-          }
-
-          widgets.add(pw.SizedBox(height: 10));
-          widgets.add(pw.Text('طلبات المواد:', style: headerStyle));
-          if (dayRequests.isEmpty) {
-            widgets.add(pw.Text('لا توجد طلبات مواد اليوم.', style: regularStyle));
-          } else {
-            for (var pr in dayRequests) {
-              final List<dynamic>? items = pr['items'];
-              final itemSummary = (items != null && items.isNotEmpty)
-                  ? items.map((e) => '${e['name']} (${e['quantity']})').join('، ')
-                  : '${pr['partName'] ?? ''} (${pr['quantity'] ?? '1'})';
-              final status = pr['status'] ?? '';
-              final eng = pr['engineerName'] ?? '';
-              final ts = (pr['requestedAt'] as Timestamp?)?.toDate();
-              final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
-              widgets.add(pw.Bullet(
-                  text: '$itemSummary - $status - $eng - $dateStr',
-                  textAlign: pw.TextAlign.right,
-                  style: regularStyle));
-            }
-          }
-
-          widgets.add(pw.SizedBox(height: 20));
-          widgets.add(pw.Container(
-            padding: const pw.EdgeInsets.all(8),
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfColors.red, width: 1.5),
-              borderRadius: pw.BorderRadius.circular(5),
-            ),
-            child: pw.Text(
-              'ملاحظة هامة: في حال مضى 24 ساعة يعتبر هذا التقرير مكتمل وغير قابل للتعديل.',
-              style: pw.TextStyle(font: _arabicFont, color: PdfColors.red, fontWeight: pw.FontWeight.bold, fontSize: 10),
-              textDirection: pw.TextDirection.rtl,
-              textAlign: pw.TextAlign.center,
-            ),
-          ));
-
-          return widgets;
-        },
-        footer: (context) => PdfStyles.buildFooter(
-            context,
-            font: _arabicFont!,
-            fontFallback: commonFontFallback,
-            qrData: qrLink,
-            generatedByText: _currentAdminName != null
-                ? 'تم إنشاء هذا بواسطة $_currentAdminName'
-                : null),
-      ),
-    );
-
     try {
-      final pdfBytes = await pdf.save();
-      await uploadReportPdf(pdfBytes, fileName, token);
+      final pdfBytes = await PdfReportGenerator.generate(
+        projectId: widget.projectId,
+        projectSnapshot: _projectDataSnapshot,
+        phases: predefinedPhasesStructure,
+        testsStructure: finalCommissioningTests,
+        generatedBy: _currentAdminName,
+        start: start,
+        end: end,
+      );
 
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
-
       await _saveOrSharePdf(
         pdfBytes,
         fileName,
-        headerText,
-        'يرجى الإطلاع على $headerText للمشروع.',
+        isFullReport ? 'التقرير الشامل' : useRange ? 'التقرير التراكمي' : 'التقرير اليومي',
+        'يرجى الإطلاع على التقرير للمشروع.',
       );
     } catch (e) {
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
       print('Error generating daily report PDF: $e');
+    }
+  }
     }
   }
 
