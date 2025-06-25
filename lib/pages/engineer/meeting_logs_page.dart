@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'package:engineer_management_system/theme/app_constants.dart';
@@ -1243,7 +1244,7 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
             font: _arabicFont!,
             fontFallback: commonFontFallback,
             qrData: qrLink,
-            generatedByText: 'المهندس: ${_authUser?.displayName ?? ''}'),
+            generatedByText: 'المهندس: ${FirebaseAuth.instance.currentUser?.displayName ?? ''}'),
       ),
     );
 
