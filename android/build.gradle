@@ -25,10 +25,12 @@ subprojects {
 }
 
 // Workaround for plugins missing a namespace definition when using AGP 8+
-subprojects {
-    afterEvaluate { project ->
-        if (project.name == 'whatsapp_share2' && project.hasProperty('android')) {
-            project.android.namespace = 'com.whatsapp.share2'
+subprojects { project ->
+    if (project.name == 'whatsapp_share2') {
+        project.plugins.withId('com.android.library') {
+            if (project.hasProperty('android')) {
+                project.android.namespace = 'com.whatsapp.share2'
+            }
         }
     }
 }
