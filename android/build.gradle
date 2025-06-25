@@ -24,6 +24,15 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// Workaround for plugins missing a namespace definition when using AGP 8+
+subprojects {
+    afterEvaluate { project ->
+        if (project.name == 'whatsapp_share2' && project.hasProperty('android')) {
+            project.android.namespace = 'com.whatsapp.share2'
+        }
+    }
+}
+
 
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
