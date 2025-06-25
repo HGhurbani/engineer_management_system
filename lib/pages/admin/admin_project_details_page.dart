@@ -1009,30 +1009,30 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                           tooltip: 'إضافة ملاحظة/صورة للمرحلة الرئيسية',
                           onPressed: () => _showAddNoteOrImageDialog(phaseId, phaseActualName),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.edit_note_outlined, color: AppConstants.primaryLight),
-                          tooltip: 'تعديل بيانات المرحلة',
-                          onPressed: () async {
-                            final snapshot = await FirebaseFirestore.instance
-                                .collection('projects')
-                                .doc(widget.projectId)
-                                .collection('phases')
-                                .doc(phaseId)
-                                .get();
-                            final data = snapshot.data() as Map<String, dynamic>? ?? {};
-                            if (!mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => EditPhasePage(
-                                  projectId: widget.projectId,
-                                  phaseId: phaseId,
-                                  phaseData: data,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                        // IconButton(
+                        //   icon: const Icon(Icons.edit_note_outlined, color: AppConstants.primaryLight),
+                        //   tooltip: 'تعديل بيانات المرحلة',
+                        //   onPressed: () async {
+                        //     final snapshot = await FirebaseFirestore.instance
+                        //         .collection('projects')
+                        //         .doc(widget.projectId)
+                        //         .collection('phases')
+                        //         .doc(phaseId)
+                        //         .get();
+                        //     final data = snapshot.data() as Map<String, dynamic>? ?? {};
+                        //     if (!mounted) return;
+                        //     Navigator.push(
+                        //       context,
+                        //       MaterialPageRoute(
+                        //         builder: (_) => EditPhasePage(
+                        //           projectId: widget.projectId,
+                        //           phaseId: phaseId,
+                        //           phaseData: data,
+                        //         ),
+                        //       ),
+                        //     );
+                        //   },
+                        // ),
                       ],
                       // Admin can always toggle
                       if (_currentUserRole == 'admin')

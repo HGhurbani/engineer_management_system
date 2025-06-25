@@ -37,6 +37,8 @@ class PdfPreviewScreen extends StatelessWidget {
     final file = File(path);
     await file.writeAsBytes(pdfBytes, flush: true);
 
+
+
     await Share.shareXFiles([XFile(path)], text: shareText);
   }
 
