@@ -38,7 +38,7 @@ class PdfReportGenerator {
 
     try {
 
-      // Use a slightly bolder font for a more formal look
+      // Load Tajawal font from Google Fonts for Arabic support
       final fontData = await rootBundle.load('assets/fonts/Tajawal-Medium.ttf');
 
       _arabicFont = pw.Font.ttf(fontData);

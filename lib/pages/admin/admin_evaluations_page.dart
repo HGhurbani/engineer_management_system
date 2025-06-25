@@ -1266,8 +1266,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
   Future<void> _loadArabicFont() async {
     try {
-      final fontData = await rootBundle.load(
-          'assets/fonts/Tajawal-Regular.ttf');
+      final fontData = await rootBundle.load('assets/fonts/Tajawal-Regular.ttf');
       _arabicFont = pw.Font.ttf(fontData);
     } catch (e) {
       print('Error loading Arabic font: $e');
