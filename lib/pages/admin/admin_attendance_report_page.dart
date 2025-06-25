@@ -863,7 +863,12 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
           theme: pw.ThemeData.withFont(
-              base: _arabicFont, fontFallback: commonFontFallback),
+            base: _arabicFont,
+            bold: _arabicFont,
+            italic: _arabicFont,
+            boldItalic: _arabicFont,
+            fontFallback: commonFontFallback,
+          ),
           margin: PdfStyles.pageMargins,
         ),
         header: (context) => PdfStyles.buildHeader(
