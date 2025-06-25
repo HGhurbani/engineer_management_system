@@ -225,6 +225,47 @@ class PdfReportGenerator {
     final projectDataMap = projectSnapshot?.data() as Map<String, dynamic>?;
     final String projectName = projectDataMap?['name'] ?? 'مشروع غير مسمى';
     final String clientName = projectDataMap?['clientName'] ?? 'غير معروف';
+    final String projectType = projectDataMap?['projectType'] ?? 'غير محدد';
+    final List<dynamic> assignedEngineersRaw =
+        projectDataMap?['assignedEngineers'] as List<dynamic>? ?? [];
+    String engineerNames = 'لا يوجد';
+    if (assignedEngineersRaw.isNotEmpty) {
+      engineerNames = assignedEngineersRaw
+          .map((e) => e['name'] ?? 'مهندس')
+          .join('، ');
+    }
+    String clientPhone = '';
+    final String? clientUid = projectDataMap?['clientId'] as String?;
+    if (clientUid != null && clientUid.isNotEmpty) {
+      try {
+        final clientDoc =
+            await FirebaseFirestore.instance.collection('users').doc(clientUid).get();
+        if (clientDoc.exists) {
+          clientPhone = (clientDoc.data() as Map<String, dynamic>?)?['phone'] ?? '';
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    String employeeNames = 'لا يوجد';
+    try {
+      final empSnap = await FirebaseFirestore.instance
+          .collection('projects')
+          .doc(projectId)
+          .collection('employeeAssignments')
+          .get();
+      final names = empSnap.docs
+          .map((d) => (d.data()['employeeName'] ?? '') as String)
+          .where((n) => n.isNotEmpty)
+          .toSet()
+          .toList();
+      if (names.isNotEmpty) {
+        employeeNames = names.join('، ');
+      }
+    } catch (e) {
+      // ignore
+    }
 
     final ByteData logoByteData = await rootBundle.load('assets/images/app_logo.png');
     final Uint8List logoBytes = logoByteData.buffer.asUint8List();
@@ -267,6 +308,22 @@ class PdfReportGenerator {
         ),
         build: (context) {
           final widgets = <pw.Widget>[];
+          widgets.add(
+            _buildProjectDetailsTable(
+              {
+                'أسماء الموظفين': employeeNames,
+                'اسم المشروع': projectName,
+                'نوع المشروع': projectType,
+                'المهندسون المسؤولون': engineerNames,
+                'هاتف العميل': clientPhone.isNotEmpty ? clientPhone : 'غير معروف',
+              },
+              headerStyle,
+              regularStyle,
+              PdfColors.blueGrey800,
+              PdfColors.grey400,
+            ),
+          );
+          widgets.add(pw.SizedBox(height: 20));
           widgets.add(_buildSummaryCard(
               dayEntries.length,
               dayTests.length,
@@ -347,6 +404,53 @@ class PdfReportGenerator {
     final pdfBytes = await pdf.save();
     await uploadReportPdf(pdfBytes, fileName, token);
     return pdfBytes;
+  }
+
+  static pw.Widget _buildProjectDetailsTable(
+      Map<String, String> details,
+      pw.TextStyle headerStyle,
+      pw.TextStyle valueStyle,
+      PdfColor headerColor,
+      PdfColor borderColor) {
+    final headers = details.keys.toList();
+    final values = details.values.toList();
+    return pw.Table(
+      border: pw.TableBorder.all(color: borderColor),
+      columnWidths: {
+        for (int i = 0; i < headers.length; i++) i: const pw.FlexColumnWidth()
+      },
+      children: [
+        pw.TableRow(
+          decoration: pw.BoxDecoration(color: headerColor),
+          children: [
+            for (final h in headers)
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(6),
+                child: pw.Text(
+                  h,
+                  style: headerStyle.copyWith(color: PdfColors.white),
+                  textAlign: pw.TextAlign.center,
+                  textDirection: pw.TextDirection.rtl,
+                ),
+              ),
+          ],
+        ),
+        pw.TableRow(
+          children: [
+            for (final v in values)
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(6),
+                child: pw.Text(
+                  v,
+                  style: valueStyle,
+                  textAlign: pw.TextAlign.center,
+                  textDirection: pw.TextDirection.rtl,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
   }
 
   static pw.Widget _buildSummaryCard(
