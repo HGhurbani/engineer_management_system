@@ -177,17 +177,18 @@ class MyApp extends StatelessWidget {
           }
           return const LoginPage();
         },
-        '/pdf_preview': (context) {
-          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
-          if (args != null && args['bytes'] != null && args['fileName'] != null && args['text'] != null) {
-            return PdfPreviewScreen(
-              pdfBytes: args['bytes'] as Uint8List,
-              fileName: args['fileName'] as String,
-              shareText: args['text'] as String,
-            );
-          }
-          return const Scaffold(body: Center(child: Text('لا يمكن عرض الملف')));
-        },
+          '/pdf_preview': (context) {
+            final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+            if (args != null && args['bytes'] != null && args['fileName'] != null && args['text'] != null) {
+              return PdfPreviewScreen(
+                pdfBytes: args['bytes'] as Uint8List,
+                fileName: args['fileName'] as String,
+                shareText: args['text'] as String,
+                clientPhone: args['phone'] as String?,
+              );
+            }
+            return const Scaffold(body: Center(child: Text('لا يمكن عرض الملف')));
+          },
         // --- ADDITION START ---
         '/admin/evaluations': (context) => const AdminEvaluationsPage(), // مسار جديد لصفحة التقييم
         '/admin/meeting_logs': (context) => const AdminMeetingLogsPage(),

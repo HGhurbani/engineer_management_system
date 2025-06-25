@@ -2022,6 +2022,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       'bytes': pdfBytes,
       'fileName': fileName,
       'text': text,
+      'phone': _clientPhone,
     });
   }
 

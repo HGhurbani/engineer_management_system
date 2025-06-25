@@ -3668,6 +3668,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       'bytes': pdfBytes,
       'fileName': fileName,
       'text': text,
+      'phone': _clientPhone,
     });
   }
 
