@@ -30,6 +30,17 @@ subprojects { project ->
         project.plugins.withId('com.android.library') {
             if (project.hasProperty('android')) {
                 project.android.namespace = 'com.whatsapp.share2'
+                // Ensure the plugin is compiled with a recent SDK to avoid
+                // missing attributes like android:attr/lStar.
+                project.android.compileSdkVersion = 33
+                project.android.defaultConfig.with {
+                    if (hasProperty('targetSdk')) {
+                        targetSdk = 33
+                    }
+                    if (hasProperty('targetSdkVersion')) {
+                        targetSdkVersion = 33
+                    }
+                }
             }
         }
     }
