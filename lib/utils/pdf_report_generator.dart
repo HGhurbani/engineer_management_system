@@ -260,7 +260,7 @@ class PdfReportGenerator {
         fontFallback: commonFontFallback);
     final pw.TextStyle subHeaderStyle = pw.TextStyle(
         font: _arabicFont,
-        fontWeight: pw.bold,
+        fontWeight: pw.FontWeight.bold,
         fontSize: 16,
         color: PdfColors.blueGrey800,
         fontFallback: commonFontFallback);
@@ -387,7 +387,7 @@ class PdfReportGenerator {
           borderRadius: pw.BorderRadius.circular(8),
           border: pw.Border.all(color: primaryColor, width: 1),
           boxShadow: [
-            pw.BoxShadow(color: PdfColors.grey300, blurRadius: 5, offset: const pw.Offset(0, 3))
+            pw.BoxShadow(color: PdfColors.grey300, blurRadius: 5, offset: const PdfPoint(0, 3))
           ]
       ),
       child: pw.Column(
@@ -420,7 +420,7 @@ class PdfReportGenerator {
               color: itemColor,
               borderRadius: pw.BorderRadius.circular(25),
               boxShadow: [
-                pw.BoxShadow(color: itemColor.shade(500), blurRadius: 3, offset: const pw.Offset(0, 2))
+                pw.BoxShadow(color: itemColor.shade(500), blurRadius: 3, offset: const PdfPoint(0, 2))
               ]
           ),
           child: pw.Center(
@@ -450,7 +450,7 @@ class PdfReportGenerator {
           color: bgColor,
           borderRadius: pw.BorderRadius.circular(5),
           boxShadow: [
-            pw.BoxShadow(color: bgColor.shade(400), blurRadius: 2, offset: const pw.Offset(0, 2))
+            pw.BoxShadow(color: bgColor.shade(400), blurRadius: 2, offset: const PdfPoint(0, 2))
           ]
       ),
       child: pw.Text(
@@ -561,8 +561,14 @@ class PdfReportGenerator {
           headerDecoration: pw.BoxDecoration(color: headerBgColor),
           headerStyle: labelStyle.copyWith(color: PdfColors.blueGrey800),
           cellStyle: regularStyle,
-          rowDecoration: (index) => pw.BoxDecoration( // تناوب الألوان للصفوف
-            color: index % 2 == 0 ? PdfColors.white : PdfColors.indigo50,
+          oddRowDecoration: pw.BoxDecoration(
+            color: PdfColors.indigo50,
+            border: pw.Border(
+              bottom: pw.BorderSide(color: borderColor, width: 0.5),
+            ),
+          ),
+          evenRowDecoration: pw.BoxDecoration(
+            color: PdfColors.white,
             border: pw.Border(
               bottom: pw.BorderSide(color: borderColor, width: 0.5),
             ),
@@ -664,8 +670,14 @@ class PdfReportGenerator {
           headerDecoration: pw.BoxDecoration(color: headerBgColor),
           headerStyle: labelStyle.copyWith(color: PdfColors.blueGrey800),
           cellStyle: regularStyle,
-          rowDecoration: (index) => pw.BoxDecoration( // تناوب الألوان للصفوف
-            color: index % 2 == 0 ? PdfColors.white : PdfColors.teal50,
+          oddRowDecoration: pw.BoxDecoration(
+            color: PdfColors.teal50,
+            border: pw.Border(
+              bottom: pw.BorderSide(color: borderColor, width: 0.5),
+            ),
+          ),
+          evenRowDecoration: pw.BoxDecoration(
+            color: PdfColors.white,
             border: pw.Border(
               bottom: pw.BorderSide(color: borderColor, width: 0.5),
             ),
