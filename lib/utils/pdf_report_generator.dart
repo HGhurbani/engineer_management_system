@@ -1805,62 +1805,82 @@ class PdfReportGenerator {
     PdfColor headerColor,
     PdfColor borderColor,
   ) {
+
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (final entry in entries) {
+      final phaseName = entry['phaseName'] ?? '';
+      final sub = entry['subPhaseName'];
+      final key = sub != null ? '$phaseName > $sub' : phaseName;
+      grouped.putIfAbsent(key, () => []).add(entry);
+    }
+
+    final List<pw.TableRow> rows = [];
+    grouped.forEach((phase, items) {
+      rows.add(
+        pw.TableRow(children: [
+          pw.TableCell(
+            columnSpan: 2,
+            child: pw.Container(
+              color: headerColor,
+              padding: const pw.EdgeInsets.all(6),
+              alignment: pw.Alignment.center,
+              child: pw.Text(
+                phase,
+                style: headerStyle.copyWith(color: PdfColors.white),
+                textDirection: pw.TextDirection.rtl,
+              ),
+            ),
+          ),
+        ]),
+      );
+
+      rows.add(
+        pw.TableRow(children: [
+          _tableCell('الملاحظة', headerStyle, true),
+          _tableCell('الصور', headerStyle, true),
+        ]),
+      );
+
+      for (final item in items) {
+        final note = item['note']?.toString() ?? '';
+        final imgs =
+            (item['imageUrls'] as List?)?.map((it) => it.toString()).toList() ?? [];
+        final imgWidgets = <pw.Widget>[];
+        for (final url in imgs) {
+          final img = images[url];
+          if (img != null) {
+            imgWidgets.add(
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(2),
+                child: pw.Image(img, width: 40, height: 40, fit: pw.BoxFit.cover),
+              ),
+            );
+          }
+        }
+
+        rows.add(
+          pw.TableRow(children: [
+            _tableCell(note, cellStyle, false),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(4),
+              child: imgWidgets.isEmpty
+                  ? pw.Text('-', style: cellStyle, textAlign: pw.TextAlign.center)
+                  : pw.Wrap(spacing: 4, runSpacing: 4, children: imgWidgets),
+            ),
+          ]),
+        );
+      }
+    });
+
     return pw.Table(
       border: pw.TableBorder.all(color: borderColor),
       columnWidths: const {
-        0: pw.FlexColumnWidth(0.5),
+        0: pw.FlexColumnWidth(3),
         1: pw.FlexColumnWidth(2),
-        2: pw.FlexColumnWidth(1.2),
-        3: pw.FlexColumnWidth(1.2),
-        4: pw.FlexColumnWidth(2.5),
-        5: pw.FlexColumnWidth(1.5),
       },
-      children: [
-        pw.TableRow(
-          decoration: pw.BoxDecoration(color: headerColor),
-          children: [
-            _tableCell('#', headerStyle, true),
-            _tableCell('المرحلة', headerStyle, true),
-            _tableCell('المهندس', headerStyle, true),
-            _tableCell('التاريخ', headerStyle, true),
-            _tableCell('الملاحظات', headerStyle, true),
-            _tableCell('الصور', headerStyle, true),
-          ],
-        ),
-        ...List<pw.TableRow>.generate(entries.length, (i) {
-          final e = entries[i];
-          final engineer = e['employeeName'] ?? e['engineerName'] ?? '';
-          final ts = (e['timestamp'] as Timestamp?)?.toDate();
-          final dateStr =
-              ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts) : '';
-          final phaseName = e['phaseName'] ?? '';
-          final sub = e['subPhaseName'];
-          final phaseText = sub != null ? '$phaseName > $sub' : phaseName;
-          final note = e['note']?.toString() ?? '';
-          final imgs =
-              (e['imageUrls'] as List?)?.map((it) => it.toString()).toList() ?? [];
-          final firstImg =
-              imgs.isNotEmpty && images.containsKey(imgs.first) ? images[imgs.first] : null;
-          return pw.TableRow(
-            children: [
-              _tableCell('${i + 1}', cellStyle, false),
-              _tableCell(phaseText, cellStyle, false),
-              _tableCell(engineer, cellStyle, false),
-              _tableCell(dateStr, cellStyle, false),
-              _tableCell(note, cellStyle, false),
-              firstImg != null
-                  ? pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Image(firstImg, width: 40, height: 40, fit: pw.BoxFit.cover),
-                    )
-                  : _tableCell('-', cellStyle, false),
-            ],
-          );
-        }),
-      ],
+      children: rows,
     );
   }
-
   static pw.Widget _buildSimpleTestsTable(
     List<Map<String, dynamic>> tests,
     Map<String, pw.MemoryImage> images,
@@ -1869,57 +1889,67 @@ class PdfReportGenerator {
     PdfColor headerColor,
     PdfColor borderColor,
   ) {
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (final t in tests) {
+      final name = '${t['sectionName'] ?? ''} - ${t['testName'] ?? ''}';
+      grouped.putIfAbsent(name, () => []).add(t);
+    }
+
+    final List<pw.TableRow> rows = [];
+    grouped.forEach((test, items) {
+      rows.add(
+        pw.TableRow(children: [
+          pw.TableCell(
+            columnSpan: 2,
+            child: pw.Container(
+              color: headerColor,
+              padding: const pw.EdgeInsets.all(6),
+              alignment: pw.Alignment.center,
+              child: pw.Text(
+                test,
+                style: headerStyle.copyWith(color: PdfColors.white),
+                textDirection: pw.TextDirection.rtl,
+              ),
+            ),
+          ),
+        ]),
+      );
+
+      rows.add(
+        pw.TableRow(children: [
+          _tableCell('الملاحظة', headerStyle, true),
+          _tableCell('الصور', headerStyle, true),
+        ]),
+      );
+
+      for (final item in items) {
+        final note = item['note']?.toString() ?? '';
+        final url = item['imageUrl'] as String?;
+        final img = url != null ? images[url] : null;
+        final imgWidget = img != null
+            ? pw.Image(img, width: 40, height: 40, fit: pw.BoxFit.cover)
+            : null;
+
+        rows.add(
+          pw.TableRow(children: [
+            _tableCell(note, cellStyle, false),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(4),
+              child: imgWidget ??
+                  pw.Text('-', style: cellStyle, textAlign: pw.TextAlign.center),
+            ),
+          ]),
+        );
+      }
+    });
+
     return pw.Table(
       border: pw.TableBorder.all(color: borderColor),
       columnWidths: const {
-        0: pw.FlexColumnWidth(0.5),
+        0: pw.FlexColumnWidth(3),
         1: pw.FlexColumnWidth(2),
-        2: pw.FlexColumnWidth(1.2),
-        3: pw.FlexColumnWidth(1.2),
-        4: pw.FlexColumnWidth(2.5),
-        5: pw.FlexColumnWidth(1.5),
       },
-      children: [
-        pw.TableRow(
-          decoration: pw.BoxDecoration(color: headerColor),
-          children: [
-            _tableCell('#', headerStyle, true),
-            _tableCell('الاختبار', headerStyle, true),
-            _tableCell('المهندس', headerStyle, true),
-            _tableCell('التاريخ', headerStyle, true),
-            _tableCell('الملاحظات', headerStyle, true),
-            _tableCell('الصورة', headerStyle, true),
-          ],
-        ),
-        ...List<pw.TableRow>.generate(tests.length, (i) {
-          final t = tests[i];
-          final engineer = t['engineerName'] ?? '';
-          final ts = (t['lastUpdatedAt'] as Timestamp?)?.toDate();
-          final dateStr =
-              ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts) : '';
-          final section = t['sectionName'] ?? '';
-          final name = t['testName'] ?? '';
-          final note = t['note']?.toString() ?? '';
-          final imgUrl = t['imageUrl'] as String?;
-          final img =
-              imgUrl != null && images.containsKey(imgUrl) ? images[imgUrl] : null;
-          return pw.TableRow(
-            children: [
-              _tableCell('${i + 1}', cellStyle, false),
-              _tableCell('$section - $name', cellStyle, false),
-              _tableCell(engineer, cellStyle, false),
-              _tableCell(dateStr, cellStyle, false),
-              _tableCell(note, cellStyle, false),
-              img != null
-                  ? pw.Padding(
-                      padding: const pw.EdgeInsets.all(4),
-                      child: pw.Image(img, width: 40, height: 40, fit: pw.BoxFit.cover),
-                    )
-                  : _tableCell('-', cellStyle, false),
-            ],
-          );
-        }),
-      ],
+      children: rows,
     );
   }
 
