@@ -814,6 +814,14 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
     }
   }
 
+  void _openPdfPreview(Uint8List pdfBytes, String fileName, String text) {
+    Navigator.of(context).pushNamed('/pdf_preview', arguments: {
+      'bytes': pdfBytes,
+      'fileName': fileName,
+      'text': text,
+    });
+  }
+
   Future<void> _generateAttendancePdf() async {
     if (_arabicFont == null) {
       await _loadArabicFont();
@@ -939,10 +947,9 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
 
-      await _saveOrSharePdf(
+      _openPdfPreview(
           pdfBytes,
           fileName,
-          AppConstants.attendanceReportHeader,
           'يرجى الاطلاع على التقرير المرفق.');
     } catch (e) {
       _hideLoadingDialog(context);

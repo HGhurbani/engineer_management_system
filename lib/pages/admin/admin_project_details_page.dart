@@ -1752,10 +1752,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
 
-      await _saveOrSharePdf(
+      _openPdfPreview(
         pdfBytes,
         fileName,
-        headerText,
         'يرجى الإطلاع على $headerText للمشروع.',
       );
     } catch (e) {
@@ -1863,6 +1862,14 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       await file.writeAsBytes(pdfBytes);
       await Share.shareXFiles([XFile(path)], subject: subject, text: text);
     }
+  }
+
+  void _openPdfPreview(Uint8List pdfBytes, String fileName, String text) {
+    Navigator.of(context).pushNamed('/pdf_preview', arguments: {
+      'bytes': pdfBytes,
+      'fileName': fileName,
+      'text': text,
+    });
   }
 
   Widget _buildEmptyState(String message, {IconData icon = Icons.info_outline}) {

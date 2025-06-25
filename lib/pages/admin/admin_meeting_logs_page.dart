@@ -1105,6 +1105,14 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
     }
   }
 
+  void _openPdfPreview(Uint8List pdfBytes, String fileName, String text) {
+    Navigator.of(context).pushNamed('/pdf_preview', arguments: {
+      'bytes': pdfBytes,
+      'fileName': fileName,
+      'text': text,
+    });
+  }
+
   Future<void> _generateMeetingPdf(Map<String, dynamic> data) async {
     final DateTime meetingDate =
         (data['date'] as Timestamp?)?.toDate() ?? DateTime.now();
@@ -1205,10 +1213,9 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء المحضر بنجاح.', isError: false);
 
-      await _saveOrSharePdf(
+      _openPdfPreview(
           pdfBytes,
           fileName,
-          AppConstants.meetingReportHeader,
           'يرجى الاطلاع على المحضر المرفق.');
     } catch (e) {
       _hideLoadingDialog(context);
