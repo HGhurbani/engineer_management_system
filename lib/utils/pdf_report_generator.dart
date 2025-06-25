@@ -964,374 +964,508 @@ class PdfReportGenerator {
 
 
   static pw.Widget _buildEntryCard(
-
       Map<String, dynamic> entry,
-
       Map<String, pw.MemoryImage> fetchedImages,
-
       int index,
-
       pw.TextStyle subHeaderStyle,
-
       pw.TextStyle regularStyle,
-
       pw.TextStyle labelStyle,
-
       pw.TextStyle metaStyle,
-
       PdfColor borderColor,
-
-      PdfColor lightGrey) {
-
+      PdfColor lightGrey,
+      ) {
     final note = entry['note'] ?? '';
-
     final engineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
-
     final ts = (entry['timestamp'] as Timestamp?)?.toDate();
-
     final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
-
     final phaseName = entry['phaseName'] ?? '';
-
     final subName = entry['subPhaseName'];
-
-    final imageUrls =
-
-        (entry['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-
+    final imageUrls = (entry['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
 
     return pw.Container(
-
-      padding: const pw.EdgeInsets.all(15),
-
+      margin: const pw.EdgeInsets.only(bottom: 20),
+      padding: const pw.EdgeInsets.all(20),
       decoration: pw.BoxDecoration(
-
-        border: pw.Border.all(color: borderColor),
-
-        borderRadius: pw.BorderRadius.circular(8),
-
-      ),
-
-      child: pw.Column(
-
-        crossAxisAlignment: pw.CrossAxisAlignment.end,
-
-        children: [
-
-          pw.Row(
-
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-
-            children: [
-
-              pw.Container(
-
-                padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-
-                decoration: pw.BoxDecoration(
-
-                  color: lightGrey,
-
-                  borderRadius: pw.BorderRadius.circular(15),
-
-                ),
-
-                child: pw.Text('#$index', style: metaStyle),
-
-              ),
-
-              pw.Expanded(
-
-                child: pw.Text(
-
-                  subName != null ? '$phaseName > $subName' : phaseName,
-
-                  style: subHeaderStyle,
-
-                  textAlign: pw.TextAlign.right,
-
-                ),
-
-              ),
-
-            ],
-
+        color: PdfColors.white,
+        border: pw.Border.all(color: borderColor, width: 1.5),
+        borderRadius: pw.BorderRadius.circular(12),
+        boxShadow: [
+          pw.BoxShadow(
+            color: PdfColors.grey300,
+            blurRadius: 4,
           ),
-
-          pw.SizedBox(height: 10),
-
-          pw.Table.fromTextArray(
-
-            border: null,
-
-            cellPadding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 8),
-
-            cellAlignment: pw.Alignment.centerRight,
-
-            headerDecoration: null,
-
-            rowDecoration: null,
-
-            columnWidths: const {
-
-              0: pw.FlexColumnWidth(1.5),
-
-              1: pw.FlexColumnWidth(1),
-
-            },
-
-            headers: [],
-
-            data: <List<String>>[
-
-              <String>[engineer, 'المهندس:'],
-
-              <String>[dateStr, 'التاريخ:'],
-
-              if (note.toString().isNotEmpty) <String>[note.toString(), 'الملاحظات:'],
-
-            ],
-
-            cellStyle: regularStyle,
-
-            headerStyle: labelStyle,
-
-            defaultColumnWidth: const pw.IntrinsicColumnWidth(),
-
-            tableWidth: pw.TableWidth.min,
-
-          ),
-
-          for (var imageUrl in imageUrls)
-
-            if (fetchedImages.containsKey(imageUrl)) ...[
-
-              pw.SizedBox(height: 10),
-
-              pw.Text('الصورة المرفقة:', style: labelStyle),
-
-              pw.SizedBox(height: 5),
-
-              pw.Container(
-
-                decoration: pw.BoxDecoration(
-
-                  border: pw.Border.all(color: borderColor),
-
-                  borderRadius: pw.BorderRadius.circular(5),
-
-                ),
-
-                child: pw.ClipRRect(
-
-                  child: pw.Image(
-
-                    fetchedImages[imageUrl]!,
-
-                    width: 250,
-
-                    height: 350,
-
-                    fit: pw.BoxFit.cover,
-
-                  ),
-
-                ),
-
-              ),
-
-            ],
-
         ],
-
       ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: [
+          // Header Section
+          pw.Container(
+            padding: const pw.EdgeInsets.only(bottom: 15),
+            decoration: const pw.BoxDecoration(
+              border: pw.Border(
+                bottom: pw.BorderSide(color: PdfColors.grey300, width: 1),
+              ),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: pw.BoxDecoration(
+                    color: borderColor,
+                    borderRadius: pw.BorderRadius.circular(20),
+                  ),
+                  child: pw.Text(
+                    'رقم الإدخال #$index',
+                    style: pw.TextStyle(
+                      color: PdfColors.white,
+                      fontSize: 10,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+                pw.Expanded(
+                  child: pw.Text(
+                    subName != null ? '$phaseName > $subName' : phaseName,
+                    style: pw.TextStyle(
+                      fontSize: 14,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.black,
+                    ),
+                    textAlign: pw.TextAlign.right,
+                    textDirection: pw.TextDirection.rtl,
+                  ),
+                ),
+              ],
+            ),
+          ),
 
+          pw.SizedBox(height: 15),
+
+          // Information Section
+          pw.Container(
+            width: double.infinity,
+            child: pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+              columnWidths: const {
+                0: pw.FlexColumnWidth(2),
+                1: pw.FlexColumnWidth(1),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: lightGrey),
+                  children: [
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(12),
+                      child: pw.Text(
+                        engineer,
+                        style: regularStyle,
+                        textAlign: pw.TextAlign.right,
+                        textDirection: pw.TextDirection.rtl,
+                      ),
+                    ),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(12),
+                      child: pw.Text(
+                        'المهندس المسؤول:',
+                        style: pw.TextStyle(
+                          fontSize: 12,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.black,
+                        ),
+                        textAlign: pw.TextAlign.right,
+                        textDirection: pw.TextDirection.rtl,
+                      ),
+                    ),
+                  ],
+                ),
+                pw.TableRow(
+                  children: [
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(12),
+                      child: pw.Text(
+                        dateStr,
+                        style: regularStyle,
+                        textAlign: pw.TextAlign.right,
+                        textDirection: pw.TextDirection.rtl,
+                      ),
+                    ),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(12),
+                      decoration: pw.BoxDecoration(color: lightGrey),
+                      child: pw.Text(
+                        'تاريخ التسجيل:',
+                        style: pw.TextStyle(
+                          fontSize: 12,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.black,
+                        ),
+                        textAlign: pw.TextAlign.right,
+                        textDirection: pw.TextDirection.rtl,
+                      ),
+                    ),
+                  ],
+                ),
+                if (note.toString().isNotEmpty)
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(color: lightGrey),
+                    children: [
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(12),
+                        child: pw.Text(
+                          note.toString(),
+                          style: regularStyle,
+                          textAlign: pw.TextAlign.right,
+                          textDirection: pw.TextDirection.rtl,
+                        ),
+                      ),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(12),
+                        child: pw.Text(
+                          'الملاحظات:',
+                          style: pw.TextStyle(
+                            fontSize: 12,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.black,
+                          ),
+                          textAlign: pw.TextAlign.right,
+                          textDirection: pw.TextDirection.rtl,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+
+          // Images Section
+          if (imageUrls.isNotEmpty) ...[
+            pw.SizedBox(height: 20),
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.only(bottom: 10),
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(
+                  bottom: pw.BorderSide(color: PdfColors.grey300, width: 1),
+                ),
+              ),
+              child: pw.Text(
+                'الصور المرفقة (${imageUrls.where((url) => fetchedImages.containsKey(url)).length}):',
+                style: pw.TextStyle(
+                  fontSize: 13,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.black,
+                ),
+                textAlign: pw.TextAlign.right,
+                textDirection: pw.TextDirection.rtl,
+              ),
+            ),
+            pw.SizedBox(height: 10),
+
+            // عرض الصور في صفوف، كل صف يحتوي على 3 صور
+            ...() {
+              final availableImages = imageUrls
+                  .where((imageUrl) => fetchedImages.containsKey(imageUrl))
+                  .toList();
+
+              List<pw.Widget> imageRows = [];
+
+              for (int i = 0; i < availableImages.length; i += 3) {
+                final rowImages = availableImages.skip(i).take(3).toList();
+
+                imageRows.add(
+                  pw.Container(
+                    margin: const pw.EdgeInsets.only(bottom: 15),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+                      children: rowImages.map((imageUrl) =>
+                          pw.Container(
+                            width: 150,
+                            height: 180,
+                            decoration: pw.BoxDecoration(
+                              border: pw.Border.all(color: borderColor, width: 1.5),
+                              borderRadius: pw.BorderRadius.circular(8),
+                              boxShadow: [
+                                pw.BoxShadow(
+                                  color: PdfColors.grey300,
+                                  blurRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: pw.ClipRRect(
+                              horizontalRadius: 8,
+                              verticalRadius: 8,
+                              child: pw.Image(
+                                fetchedImages[imageUrl]!,
+                                fit: pw.BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                      ).toList(),
+                    ),
+                  ),
+                );
+              }
+
+              return imageRows;
+            }(),
+
+            if (imageUrls.where((url) => fetchedImages.containsKey(url)).length > 9)
+              pw.Container(
+                padding: const pw.EdgeInsets.all(8),
+                decoration: pw.BoxDecoration(
+                  color: lightGrey,
+                  borderRadius: pw.BorderRadius.circular(5),
+                ),
+                child: pw.Text(
+                  'وعدد ${imageUrls.where((url) => fetchedImages.containsKey(url)).length - 9} صورة إضافية غير معروضة...',
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    color: PdfColors.grey700,
+                    fontStyle: pw.FontStyle.italic,
+                  ),
+                  textAlign: pw.TextAlign.right,
+                  textDirection: pw.TextDirection.rtl,
+                ),
+              ),
+          ],
+        ],
+      ),
     );
-
   }
 
 
   static pw.Widget _buildTestCard(
-
       Map<String, dynamic> test,
-
       Map<String, pw.MemoryImage> fetchedImages,
-
       int index,
-
       pw.TextStyle subHeaderStyle,
-
       pw.TextStyle regularStyle,
-
       pw.TextStyle labelStyle,
-
       pw.TextStyle metaStyle,
-
       PdfColor borderColor,
-
-      PdfColor lightGrey) {
-
+      PdfColor lightGrey,
+      ) {
     final note = test['note'] ?? '';
-
     final engineer = test['engineerName'] ?? 'مهندس';
-
     final ts = (test['lastUpdatedAt'] as Timestamp?)?.toDate();
-
     final dateStr = ts != null ? DateFormat('dd/MM/yy HH:mm', 'ar').format(ts) : '';
-
     final section = test['sectionName'] ?? '';
-
     final name = test['testName'] ?? '';
-
     final imgUrl = test['imageUrl'];
 
-
     return pw.Container(
-
-      padding: const pw.EdgeInsets.all(15),
-
+      margin: const pw.EdgeInsets.only(bottom: 20),
+      padding: const pw.EdgeInsets.all(20),
       decoration: pw.BoxDecoration(
-
-        border: pw.Border.all(color: borderColor),
-
-        borderRadius: pw.BorderRadius.circular(8),
-
+        color: PdfColors.white,
+        border: pw.Border.all(color: borderColor, width: 1.5),
+        borderRadius: pw.BorderRadius.circular(12),
+        boxShadow: [
+          pw.BoxShadow(
+            color: PdfColors.grey300,
+            blurRadius: 4,
+          ),
+        ],
       ),
-
       child: pw.Column(
-
         crossAxisAlignment: pw.CrossAxisAlignment.end,
-
         children: [
-
-          pw.Row(
-
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-
-            children: [
-
-              pw.Container(
-
-                padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-
-                decoration: pw.BoxDecoration(
-
-                  color: lightGrey,
-
-                  borderRadius: pw.BorderRadius.circular(15),
-
-                ),
-
-                child: pw.Text('#$index', style: metaStyle),
-
+          // Header Section
+          pw.Container(
+            padding: const pw.EdgeInsets.only(bottom: 15),
+            decoration: const pw.BoxDecoration(
+              border: pw.Border(
+                bottom: pw.BorderSide(color: PdfColors.grey300, width: 1),
               ),
-
-              pw.Expanded(
-
-                child: pw.Text(
-
-                  '$section - $name',
-
-                  style: subHeaderStyle,
-
-                  textAlign: pw.TextAlign.right,
-
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: pw.BoxDecoration(
+                    color: borderColor,
+                    borderRadius: pw.BorderRadius.circular(20),
+                  ),
+                  child: pw.Text(
+                    'رقم الاختبار #$index',
+                    style: pw.TextStyle(
+                      color: PdfColors.white,
+                      fontSize: 10,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
                 ),
-
-              ),
-
-            ],
-
+                pw.Expanded(
+                  child: pw.Text(
+                    '$section - $name',
+                    style: pw.TextStyle(
+                      fontSize: 14,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.black,
+                    ),
+                    textAlign: pw.TextAlign.right,
+                    textDirection: pw.TextDirection.rtl,
+                  ),
+                ),
+              ],
+            ),
           ),
 
-          pw.SizedBox(height: 10),
+          pw.SizedBox(height: 15),
 
-          pw.Table.fromTextArray(
-
-            border: null,
-
-            cellPadding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 8),
-
-            cellAlignment: pw.Alignment.centerRight,
-
-            headerDecoration: null,
-
-            rowDecoration: null,
-
-            columnWidths: const {
-
-              0: pw.FlexColumnWidth(1.5),
-
-              1: pw.FlexColumnWidth(1),
-
-            },
-
-            headers: [],
-
-            data: <List<String>>[
-
-              <String>[engineer, 'المهندس:'],
-
-              <String>[dateStr, 'التاريخ:'],
-
-              if (note.toString().isNotEmpty) <String>[note.toString(), 'الملاحظات:'],
-
-            ],
-
-            cellStyle: regularStyle,
-
-            headerStyle: labelStyle,
-
-            defaultColumnWidth: const pw.IntrinsicColumnWidth(),
-
-            tableWidth: pw.TableWidth.min,
-
+          // Information Section
+          pw.Container(
+            width: double.infinity,
+            child: pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+              columnWidths: const {
+                0: pw.FlexColumnWidth(2),
+                1: pw.FlexColumnWidth(1),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: lightGrey),
+                  children: [
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(12),
+                      child: pw.Text(
+                        engineer,
+                        style: regularStyle,
+                        textAlign: pw.TextAlign.right,
+                        textDirection: pw.TextDirection.rtl,
+                      ),
+                    ),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(12),
+                      child: pw.Text(
+                        'المهندس المسؤول:',
+                        style: pw.TextStyle(
+                          fontSize: 12,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.black,
+                        ),
+                        textAlign: pw.TextAlign.right,
+                        textDirection: pw.TextDirection.rtl,
+                      ),
+                    ),
+                  ],
+                ),
+                pw.TableRow(
+                  children: [
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(12),
+                      child: pw.Text(
+                        dateStr,
+                        style: regularStyle,
+                        textAlign: pw.TextAlign.right,
+                        textDirection: pw.TextDirection.rtl,
+                      ),
+                    ),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(12),
+                      decoration: pw.BoxDecoration(color: lightGrey),
+                      child: pw.Text(
+                        'آخر تحديث:',
+                        style: pw.TextStyle(
+                          fontSize: 12,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.black,
+                        ),
+                        textAlign: pw.TextAlign.right,
+                        textDirection: pw.TextDirection.rtl,
+                      ),
+                    ),
+                  ],
+                ),
+                if (note.toString().isNotEmpty)
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(color: lightGrey),
+                    children: [
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(12),
+                        child: pw.Text(
+                          note.toString(),
+                          style: regularStyle,
+                          textAlign: pw.TextAlign.right,
+                          textDirection: pw.TextDirection.rtl,
+                        ),
+                      ),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(12),
+                        child: pw.Text(
+                          'الملاحظات:',
+                          style: pw.TextStyle(
+                            fontSize: 12,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.black,
+                          ),
+                          textAlign: pw.TextAlign.right,
+                          textDirection: pw.TextDirection.rtl,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
           ),
 
+          // Image Section
           if (imgUrl != null && fetchedImages.containsKey(imgUrl)) ...[
-
+            pw.SizedBox(height: 20),
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.only(bottom: 10),
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(
+                  bottom: pw.BorderSide(color: PdfColors.grey300, width: 1),
+                ),
+              ),
+              child: pw.Text(
+                'الصورة المرفقة:',
+                style: pw.TextStyle(
+                  fontSize: 13,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.black,
+                ),
+                textAlign: pw.TextAlign.right,
+                textDirection: pw.TextDirection.rtl,
+              ),
+            ),
             pw.SizedBox(height: 10),
 
-            pw.Text('الصورة المرفقة:', style: labelStyle),
-
-            pw.SizedBox(height: 5),
-
-            pw.Container(
-
-              decoration: pw.BoxDecoration(
-
-                border: pw.Border.all(color: borderColor),
-
-                borderRadius: pw.BorderRadius.circular(5),
-
-              ),
-
-              child: pw.ClipRRect(
-
-                child: pw.Image(
-
-                  fetchedImages[imgUrl]!,
-
-                  width: 250,
-
-                  height: 350,
-
-                  fit: pw.BoxFit.cover,
-
+            pw.Center(
+              child: pw.Container(
+                width: 200,
+                height: 250,
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: borderColor, width: 1.5),
+                  borderRadius: pw.BorderRadius.circular(8),
+                  boxShadow: [
+                    pw.BoxShadow(
+                      color: PdfColors.grey300,
+                      blurRadius: 2,
+                    ),
+                  ],
                 ),
-
+                child: pw.ClipRRect(
+                  horizontalRadius: 8,
+                  verticalRadius: 8,
+                  child: pw.Image(
+                    fetchedImages[imgUrl]!,
+                    fit: pw.BoxFit.cover,
+                  ),
+                ),
               ),
-
             ),
-
           ],
-
         ],
-
       ),
-
     );
-
   }
 
 
