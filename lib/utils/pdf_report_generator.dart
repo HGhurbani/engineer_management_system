@@ -1605,4 +1605,296 @@ class PdfReportGenerator {
 
   }
 
+  // Generates a simplified PDF report that lists phase entries and tests in
+  // simple tables without headers or footers.
+  static Future<Uint8List> generateSimpleTables({
+    required String projectId,
+    required List<Map<String, dynamic>> phases,
+    required List<Map<String, dynamic>> testsStructure,
+    DateTime? start,
+    DateTime? end,
+  }) async {
+    DateTime now = DateTime.now();
+    bool useRange = start != null || end != null;
+    if (useRange) {
+      start ??= DateTime(now.year, now.month, now.day);
+      end ??= start.add(const Duration(days: 1));
+    }
+
+    final List<Map<String, dynamic>> dayEntries = [];
+    final List<Map<String, dynamic>> dayTests = [];
+
+    try {
+      List<Future<void>> fetchTasks = [];
+      for (var phase in phases) {
+        final phaseId = phase['id'];
+        final phaseName = phase['name'];
+        fetchTasks.add(() async {
+          Query<Map<String, dynamic>> q = FirebaseFirestore.instance
+              .collection('projects')
+              .doc(projectId)
+              .collection('phases_status')
+              .doc(phaseId)
+              .collection('entries');
+          if (useRange) {
+            q = q
+                .where('timestamp', isGreaterThanOrEqualTo: start)
+                .where('timestamp', isLessThan: end);
+          }
+          final snap = await q.orderBy('timestamp').get();
+          for (var doc in snap.docs) {
+            final data = doc.data();
+            dayEntries.add({
+              ...data,
+              'phaseName': phaseName,
+              'subPhaseName': null,
+            });
+          }
+        }());
+
+        for (var sub in phase['subPhases']) {
+          final subId = sub['id'];
+          final subName = sub['name'];
+          fetchTasks.add(() async {
+            Query<Map<String, dynamic>> qSub = FirebaseFirestore.instance
+                .collection('projects')
+                .doc(projectId)
+                .collection('subphases_status')
+                .doc(subId)
+                .collection('entries');
+            if (useRange) {
+              qSub = qSub
+                  .where('timestamp', isGreaterThanOrEqualTo: start)
+                  .where('timestamp', isLessThan: end);
+            }
+            final subSnap = await qSub.orderBy('timestamp').get();
+            for (var doc in subSnap.docs) {
+              final data = doc.data();
+              dayEntries.add({
+                ...data,
+                'phaseName': phaseName,
+                'subPhaseName': subName,
+              });
+            }
+          }());
+        }
+      }
+
+      final Map<String, Map<String, String>> testInfo = {};
+      for (var section in testsStructure) {
+        final sectionName = section['section_name'] as String;
+        for (var t in section['tests'] as List) {
+          testInfo[(t as Map)['id']] = {
+            'name': t['name'] as String,
+            'section': sectionName,
+          };
+        }
+      }
+
+      fetchTasks.add(() async {
+        Query<Map<String, dynamic>> qTests = FirebaseFirestore.instance
+            .collection('projects')
+            .doc(projectId)
+            .collection('tests_status');
+        if (useRange) {
+          qTests = qTests
+              .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
+              .where('lastUpdatedAt', isLessThan: end);
+        }
+        final testsSnap = await qTests.get();
+        for (var doc in testsSnap.docs) {
+          final data = doc.data();
+          final info = testInfo[doc.id];
+          dayTests.add({
+            ...data,
+            'testId': doc.id,
+            'testName': info?['name'] ?? doc.id,
+            'sectionName': info?['section'] ?? '',
+          });
+        }
+      }());
+
+      await Future.wait(fetchTasks);
+    } catch (e) {
+      print('Error preparing simple report details: $e');
+    }
+
+    await _loadArabicFont();
+    if (_arabicFont == null) {
+      throw Exception('Arabic font not available');
+    }
+
+    final pdf = pw.Document();
+    final fileName =
+        'simple_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
+    final token = generateReportToken();
+
+    final pw.TextStyle headerStyle = pw.TextStyle(
+      font: _arabicFont,
+      fontSize: 14,
+      fontWeight: pw.FontWeight.bold,
+    );
+    final pw.TextStyle cellStyle = pw.TextStyle(
+      font: _arabicFont,
+      fontSize: 12,
+    );
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          textDirection: pw.TextDirection.rtl,
+          theme: pw.ThemeData.withFont(base: _arabicFont),
+          margin: const pw.EdgeInsets.symmetric(horizontal: 15, vertical: 20),
+        ),
+        build: (context) => [
+          pw.Text('الملاحظات والتحديثات', style: headerStyle),
+          pw.SizedBox(height: 10),
+          dayEntries.isEmpty
+              ? pw.Text('لا توجد بيانات', style: cellStyle)
+              : _buildSimpleEntriesTable(
+                  dayEntries,
+                  headerStyle,
+                  cellStyle,
+                  PdfColors.grey300,
+                  PdfColors.grey400,
+                ),
+          pw.SizedBox(height: 20),
+          pw.Text('الاختبارات والفحوصات', style: headerStyle),
+          pw.SizedBox(height: 10),
+          dayTests.isEmpty
+              ? pw.Text('لا توجد بيانات', style: cellStyle)
+              : _buildSimpleTestsTable(
+                  dayTests,
+                  headerStyle,
+                  cellStyle,
+                  PdfColors.grey300,
+                  PdfColors.grey400,
+                ),
+        ],
+      ),
+    );
+
+    final bytes = await pdf.save();
+    await uploadReportPdf(bytes, fileName, token);
+    return bytes;
+  }
+
+  static pw.Widget _buildSimpleEntriesTable(
+    List<Map<String, dynamic>> entries,
+    pw.TextStyle headerStyle,
+    pw.TextStyle cellStyle,
+    PdfColor headerColor,
+    PdfColor borderColor,
+  ) {
+    return pw.Table(
+      border: pw.TableBorder.all(color: borderColor),
+      columnWidths: const {
+        0: pw.FlexColumnWidth(0.5),
+        1: pw.FlexColumnWidth(2),
+        2: pw.FlexColumnWidth(1.2),
+        3: pw.FlexColumnWidth(1.2),
+        4: pw.FlexColumnWidth(2.5),
+      },
+      children: [
+        pw.TableRow(
+          decoration: pw.BoxDecoration(color: headerColor),
+          children: [
+            _tableCell('#', headerStyle, true),
+            _tableCell('المرحلة', headerStyle, true),
+            _tableCell('المهندس', headerStyle, true),
+            _tableCell('التاريخ', headerStyle, true),
+            _tableCell('الملاحظات', headerStyle, true),
+          ],
+        ),
+        ...List<pw.TableRow>.generate(entries.length, (i) {
+          final e = entries[i];
+          final engineer = e['employeeName'] ?? e['engineerName'] ?? '';
+          final ts = (e['timestamp'] as Timestamp?)?.toDate();
+          final dateStr =
+              ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts) : '';
+          final phaseName = e['phaseName'] ?? '';
+          final sub = e['subPhaseName'];
+          final phaseText = sub != null ? '$phaseName > $sub' : phaseName;
+          final note = e['note']?.toString() ?? '';
+          return pw.TableRow(
+            children: [
+              _tableCell('${i + 1}', cellStyle, false),
+              _tableCell(phaseText, cellStyle, false),
+              _tableCell(engineer, cellStyle, false),
+              _tableCell(dateStr, cellStyle, false),
+              _tableCell(note, cellStyle, false),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  static pw.Widget _buildSimpleTestsTable(
+    List<Map<String, dynamic>> tests,
+    pw.TextStyle headerStyle,
+    pw.TextStyle cellStyle,
+    PdfColor headerColor,
+    PdfColor borderColor,
+  ) {
+    return pw.Table(
+      border: pw.TableBorder.all(color: borderColor),
+      columnWidths: const {
+        0: pw.FlexColumnWidth(0.5),
+        1: pw.FlexColumnWidth(2),
+        2: pw.FlexColumnWidth(1.2),
+        3: pw.FlexColumnWidth(1.2),
+        4: pw.FlexColumnWidth(2.5),
+      },
+      children: [
+        pw.TableRow(
+          decoration: pw.BoxDecoration(color: headerColor),
+          children: [
+            _tableCell('#', headerStyle, true),
+            _tableCell('الاختبار', headerStyle, true),
+            _tableCell('المهندس', headerStyle, true),
+            _tableCell('التاريخ', headerStyle, true),
+            _tableCell('الملاحظات', headerStyle, true),
+          ],
+        ),
+        ...List<pw.TableRow>.generate(tests.length, (i) {
+          final t = tests[i];
+          final engineer = t['engineerName'] ?? '';
+          final ts = (t['lastUpdatedAt'] as Timestamp?)?.toDate();
+          final dateStr =
+              ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts) : '';
+          final section = t['sectionName'] ?? '';
+          final name = t['testName'] ?? '';
+          final note = t['note']?.toString() ?? '';
+          return pw.TableRow(
+            children: [
+              _tableCell('${i + 1}', cellStyle, false),
+              _tableCell('$section - $name', cellStyle, false),
+              _tableCell(engineer, cellStyle, false),
+              _tableCell(dateStr, cellStyle, false),
+              _tableCell(note, cellStyle, false),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  static pw.Widget _tableCell(
+    String text,
+    pw.TextStyle style,
+    bool isHeader,
+  ) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(4),
+      child: pw.Text(
+        text,
+        style: isHeader ? style.copyWith(color: PdfColors.white) : style,
+        textAlign: pw.TextAlign.center,
+        textDirection: pw.TextDirection.rtl,
+      ),
+    );
+  }
+
 } 
