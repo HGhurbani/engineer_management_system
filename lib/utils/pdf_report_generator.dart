@@ -726,6 +726,10 @@ class PdfReportGenerator {
       pw.TextStyle valueStyle,
       PdfColor headerColor,
       PdfColor borderColor) {
+    if (details.isEmpty) {
+      return pw.SizedBox.shrink();
+    }
+
     final headers = details.keys.toList();
     final values = details.values.toList();
     return pw.Table(
