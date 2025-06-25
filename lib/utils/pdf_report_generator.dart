@@ -561,14 +561,14 @@ class PdfReportGenerator {
           headerDecoration: pw.BoxDecoration(color: headerBgColor),
           headerStyle: labelStyle.copyWith(color: PdfColors.blueGrey800),
           cellStyle: regularStyle,
-          oddRowDecoration: pw.BoxDecoration(
-            color: PdfColors.indigo50,
+          rowDecoration: pw.BoxDecoration(
+            color: PdfColors.white,
             border: pw.Border(
               bottom: pw.BorderSide(color: borderColor, width: 0.5),
             ),
           ),
-          evenRowDecoration: pw.BoxDecoration(
-            color: PdfColors.white,
+          oddRowDecoration: pw.BoxDecoration(
+            color: PdfColors.indigo50,
             border: pw.Border(
               bottom: pw.BorderSide(color: borderColor, width: 0.5),
             ),
@@ -670,14 +670,14 @@ class PdfReportGenerator {
           headerDecoration: pw.BoxDecoration(color: headerBgColor),
           headerStyle: labelStyle.copyWith(color: PdfColors.blueGrey800),
           cellStyle: regularStyle,
-          oddRowDecoration: pw.BoxDecoration(
-            color: PdfColors.teal50,
+          rowDecoration: pw.BoxDecoration(
+            color: PdfColors.white,
             border: pw.Border(
               bottom: pw.BorderSide(color: borderColor, width: 0.5),
             ),
           ),
-          evenRowDecoration: pw.BoxDecoration(
-            color: PdfColors.white,
+          oddRowDecoration: pw.BoxDecoration(
+            color: PdfColors.teal50,
             border: pw.Border(
               bottom: pw.BorderSide(color: borderColor, width: 0.5),
             ),
