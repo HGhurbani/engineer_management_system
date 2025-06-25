@@ -1817,21 +1817,11 @@ class PdfReportGenerator {
     final List<pw.TableRow> rows = [];
     grouped.forEach((phase, items) {
       rows.add(
-        pw.TableRow(children: [
-          pw.TableCell(
-            columnSpan: 2,
-            child: pw.Container(
-              color: headerColor,
-              padding: const pw.EdgeInsets.all(6),
-              alignment: pw.Alignment.center,
-              child: pw.Text(
-                phase,
-                style: headerStyle.copyWith(color: PdfColors.white),
-                textDirection: pw.TextDirection.rtl,
-              ),
-            ),
-          ),
-        ]),
+        _headerRow(
+          phase,
+          headerStyle,
+          headerColor,
+        ),
       );
 
       rows.add(
@@ -1898,21 +1888,11 @@ class PdfReportGenerator {
     final List<pw.TableRow> rows = [];
     grouped.forEach((test, items) {
       rows.add(
-        pw.TableRow(children: [
-          pw.TableCell(
-            columnSpan: 2,
-            child: pw.Container(
-              color: headerColor,
-              padding: const pw.EdgeInsets.all(6),
-              alignment: pw.Alignment.center,
-              child: pw.Text(
-                test,
-                style: headerStyle.copyWith(color: PdfColors.white),
-                textDirection: pw.TextDirection.rtl,
-              ),
-            ),
-          ),
-        ]),
+        _headerRow(
+          test,
+          headerStyle,
+          headerColor,
+        ),
       );
 
       rows.add(
@@ -1966,6 +1946,28 @@ class PdfReportGenerator {
         textAlign: pw.TextAlign.center,
         textDirection: pw.TextDirection.rtl,
       ),
+    );
+  }
+
+  static pw.TableRow _headerRow(
+    String title,
+    pw.TextStyle style,
+    PdfColor color,
+  ) {
+    return pw.TableRow(
+      children: [
+        pw.Container(
+          padding: const pw.EdgeInsets.all(6),
+          alignment: pw.Alignment.center,
+          color: color,
+          child: pw.Text(
+            title,
+            style: style.copyWith(color: PdfColors.white),
+            textDirection: pw.TextDirection.rtl,
+          ),
+        ),
+        pw.Container(),
+      ],
     );
   }
 
