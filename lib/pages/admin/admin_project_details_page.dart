@@ -423,6 +423,156 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   }
   // --- MODIFICATION END ---
 
+  Future<void> _showEditEntryDialog(String phaseId, String entryId, Map<String, dynamic> entryData, {String? subPhaseId}) async {
+    if (!mounted) return;
+
+    final noteController = TextEditingController(text: entryData['note'] ?? '');
+    String? tempImageUrl = entryData['imageUrl'] as String?;
+    File? pickedImageFile;
+    bool isUploading = false;
+
+    String collectionPath = subPhaseId == null
+        ? 'projects/${widget.projectId}/phases_status/$phaseId/entries'
+        : 'projects/${widget.projectId}/subphases_status/$subPhaseId/entries';
+
+    await showDialog(
+      context: context,
+      barrierDismissible: !isUploading,
+      builder: (dialogContext) {
+        return StatefulBuilder(builder: (stfContext, setDialogState) {
+          return Directionality(
+            textDirection: ui.TextDirection.rtl,
+            child: AlertDialog(
+              title: Text(subPhaseId == null ? 'تعديل إدخال المرحلة' : 'تعديل إدخال المرحلة الفرعية',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: noteController,
+                      decoration: const InputDecoration(labelText: 'الملاحظة', border: OutlineInputBorder()),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: AppConstants.itemSpacing),
+                    if (tempImageUrl != null && pickedImageFile == null)
+                      Column(
+                        children: [
+                          Image.network(tempImageUrl!, height: 120, fit: BoxFit.contain),
+                          TextButton.icon(
+                            icon: const Icon(Icons.delete_outline, color: AppConstants.errorColor, size: 18),
+                            label: const Text('إزالة الصورة الحالية', style: TextStyle(color: AppConstants.errorColor)),
+                            onPressed: () => setDialogState(() => tempImageUrl = null),
+                          ),
+                        ],
+                      ),
+                    if (pickedImageFile != null)
+                      Image.file(pickedImageFile!, height: 120, fit: BoxFit.contain),
+                    TextButton.icon(
+                      icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
+                      label: Text(pickedImageFile == null && tempImageUrl == null ? 'إضافة صورة (اختياري)' : 'تغيير الصورة',
+                          style: const TextStyle(color: AppConstants.primaryColor)),
+                      onPressed: () {
+                        _showSingleImageSourceActionSheet(context, (xFile) {
+                          if (xFile != null) {
+                            setDialogState(() {
+                              pickedImageFile = File(xFile.path);
+                            });
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isUploading ? null : () => Navigator.pop(dialogContext),
+                  child: const Text('إلغاء'),
+                ),
+                ElevatedButton(
+                  onPressed: isUploading
+                      ? null
+                      : () async {
+                          if (noteController.text.trim().isEmpty && pickedImageFile == null && tempImageUrl == null) {
+                            _showFeedbackSnackBar(context, 'الرجاء إدخال ملاحظة أو إضافة صورة.', isError: true);
+                            return;
+                          }
+                          setDialogState(() => isUploading = true);
+                          String? finalImageUrl = tempImageUrl;
+                          if (pickedImageFile != null) {
+                            try {
+                              final currentUser = FirebaseAuth.instance.currentUser;
+                              final timestampForPath = DateTime.now().millisecondsSinceEpoch;
+                              final imageName = '${currentUser?.uid ?? 'user'}_$timestampForPath.jpg';
+                              final refPath = subPhaseId == null
+                                  ? 'project_entries/${widget.projectId}/$phaseId/$imageName'
+                                  : 'project_entries/${widget.projectId}/$subPhaseId/$imageName';
+                              final ref = FirebaseStorage.instance.ref().child(refPath);
+                              await ref.putFile(pickedImageFile!);
+                              finalImageUrl = await ref.getDownloadURL();
+                            } catch (e) {
+                              if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة: $e', isError: true);
+                              setDialogState(() => isUploading = false);
+                              return;
+                            }
+                          }
+
+                          try {
+                            await FirebaseFirestore.instance.collection(collectionPath).doc(entryId).update({
+                              'note': noteController.text.trim(),
+                              'imageUrl': finalImageUrl,
+                              'lastEditedByUid': FirebaseAuth.instance.currentUser?.uid,
+                              'lastEditedByName': _currentAdminName ?? 'المسؤول',
+                              'lastEditedAt': FieldValue.serverTimestamp(),
+                            });
+                            if (mounted) Navigator.pop(dialogContext);
+                            if (mounted) _showFeedbackSnackBar(context, 'تم تحديث الإدخال بنجاح.', isError: false);
+                          } catch (e) {
+                            if (mounted) _showFeedbackSnackBar(stfContext, 'فشل تحديث الإدخال: $e', isError: true);
+                          } finally {
+                            if (mounted) setDialogState(() => isUploading = false);
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, foregroundColor: Colors.white),
+                  child: isUploading
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
+                      : const Text('حفظ'),
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  Future<void> _deleteEntry(String phaseId, String entryId, {String? subPhaseId}) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف الإدخال'),
+        content: const Text('هل أنت متأكد من حذف هذا الإدخال؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), style: ElevatedButton.styleFrom(backgroundColor: AppConstants.deleteColor, foregroundColor: Colors.white), child: const Text('حذف')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    final collectionPath = subPhaseId == null
+        ? 'projects/${widget.projectId}/phases_status/$phaseId/entries'
+        : 'projects/${widget.projectId}/subphases_status/$subPhaseId/entries';
+
+    try {
+      await FirebaseFirestore.instance.collection(collectionPath).doc(entryId).delete();
+      if (mounted) _showFeedbackSnackBar(context, 'تم حذف الإدخال.', isError: false);
+    } catch (e) {
+      if (mounted) _showFeedbackSnackBar(context, 'فشل حذف الإدخال: $e', isError: true);
+    }
+  }
+
 
   Future<void> _loadAllAvailableEngineers() async {
     try {
@@ -858,30 +1008,30 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                           tooltip: 'إضافة ملاحظة/صورة للمرحلة الرئيسية',
                           onPressed: () => _showAddNoteOrImageDialog(phaseId, phaseActualName),
                         ),
-                        // IconButton(
-                        //   icon: const Icon(Icons.edit_note_outlined, color: AppConstants.primaryLight),
-                        //   tooltip: 'تعديل بيانات المرحلة',
-                        //   onPressed: () async {
-                        //     final snapshot = await FirebaseFirestore.instance
-                        //         .collection('projects')
-                        //         .doc(widget.projectId)
-                        //         .collection('phases')
-                        //         .doc(phaseId)
-                        //         .get();
-                        //     final data = snapshot.data() as Map<String, dynamic>? ?? {};
-                        //     if (!mounted) return;
-                        //     Navigator.push(
-                        //       context,
-                        //       MaterialPageRoute(
-                        //         builder: (_) => EditPhasePage(
-                        //           projectId: widget.projectId,
-                        //           phaseId: phaseId,
-                        //           phaseData: data,
-                        //         ),
-                        //       ),
-                        //     );
-                        //   },
-                        // ),
+                        IconButton(
+                          icon: const Icon(Icons.edit_note_outlined, color: AppConstants.primaryLight),
+                          tooltip: 'تعديل بيانات المرحلة',
+                          onPressed: () async {
+                            final snapshot = await FirebaseFirestore.instance
+                                .collection('projects')
+                                .doc(widget.projectId)
+                                .collection('phases')
+                                .doc(phaseId)
+                                .get();
+                            final data = snapshot.data() as Map<String, dynamic>? ?? {};
+                            if (!mounted) return;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => EditPhasePage(
+                                  projectId: widget.projectId,
+                                  phaseId: phaseId,
+                                  phaseData: data,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                       // Admin can always toggle
                       if (_currentUserRole == 'admin')
@@ -1993,12 +2143,36 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                           ),
                         const SizedBox(height: AppConstants.paddingSmall / 2),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               'بواسطة: $engineerName - ${timestamp != null ? DateFormat('dd/MM/yy hh:mm a', 'ar').format(timestamp.toDate()) : 'غير معروف'}',
                               style: const TextStyle(fontSize: 10, color: AppConstants.textSecondary, fontStyle: FontStyle.italic),
                             ),
+                            if (_currentUserRole == 'admin')
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, size: 18, color: AppConstants.primaryLight),
+                                    tooltip: 'تعديل الإدخال',
+                                    onPressed: () => _showEditEntryDialog(
+                                      phaseOrMainPhaseId,
+                                      entries[index].id,
+                                      entryData,
+                                      subPhaseId: subPhaseId,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, size: 18, color: AppConstants.deleteColor),
+                                    tooltip: 'حذف الإدخال',
+                                    onPressed: () => _deleteEntry(
+                                      phaseOrMainPhaseId,
+                                      entries[index].id,
+                                      subPhaseId: subPhaseId,
+                                    ),
+                                  ),
+                                ],
+                              ),
                           ],
                         ),
                       ],
