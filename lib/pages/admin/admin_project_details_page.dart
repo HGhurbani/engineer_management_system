@@ -28,9 +28,11 @@ import 'package:printing/printing.dart';
 import '../../utils/pdf_styles.dart';
 import '../../utils/pdf_image_cache.dart';
 import '../../utils/report_storage.dart';
-import 'package:engineer_management_system/html_stub.dart'
 import '../../utils/pdf_report_generator.dart';
+
+import 'package:engineer_management_system/html_stub.dart'
 if (dart.library.html) 'dart:html' as html;
+
 // import 'package:url_launcher/url_launcher.dart'; // Not used directly for notifications
 // import 'package:share_plus/share_plus.dart'; // Not used directly for notifications
 import 'dart:ui' as ui;
