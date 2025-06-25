@@ -38,7 +38,8 @@ class PdfReportGenerator {
 
     try {
 
-      final fontData = await rootBundle.load('assets/fonts/Tajawal-Regular.ttf');
+      // Use a slightly bolder font for a more formal look
+      final fontData = await rootBundle.load('assets/fonts/Tajawal-Medium.ttf');
 
       _arabicFont = pw.Font.ttf(fontData);
 
@@ -1623,6 +1624,8 @@ class PdfReportGenerator {
 
     final List<Map<String, dynamic>> dayEntries = [];
     final List<Map<String, dynamic>> dayTests = [];
+    // Collect all image URLs so we can fetch them in a single batch
+    final Set<String> imageUrls = {};
 
     try {
       List<Future<void>> fetchTasks = [];
@@ -1644,6 +1647,9 @@ class PdfReportGenerator {
           final snap = await q.orderBy('timestamp').get();
           for (var doc in snap.docs) {
             final data = doc.data();
+            final imgs =
+                (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            imageUrls.addAll(imgs);
             dayEntries.add({
               ...data,
               'phaseName': phaseName,
@@ -1670,6 +1676,9 @@ class PdfReportGenerator {
             final subSnap = await qSub.orderBy('timestamp').get();
             for (var doc in subSnap.docs) {
               final data = doc.data();
+              final imgs =
+                  (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              imageUrls.addAll(imgs);
               dayEntries.add({
                 ...data,
                 'phaseName': phaseName,
@@ -1705,6 +1714,8 @@ class PdfReportGenerator {
         for (var doc in testsSnap.docs) {
           final data = doc.data();
           final info = testInfo[doc.id];
+          final imgUrl = data['imageUrl'] as String?;
+          if (imgUrl != null) imageUrls.add(imgUrl);
           dayTests.add({
             ...data,
             'testId': doc.id,
@@ -1718,6 +1729,9 @@ class PdfReportGenerator {
     } catch (e) {
       print('Error preparing simple report details: $e');
     }
+
+    // Fetch all images referenced in entries and tests
+    final fetchedImages = await _fetchImagesForUrls(imageUrls.toList());
 
     await _loadArabicFont();
     if (_arabicFont == null) {
@@ -1745,7 +1759,8 @@ class PdfReportGenerator {
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
           theme: pw.ThemeData.withFont(base: _arabicFont),
-          margin: const pw.EdgeInsets.symmetric(horizontal: 15, vertical: 20),
+          // Provide some spacing on the sides since there is no header or footer
+          margin: const pw.EdgeInsets.symmetric(horizontal: 25, vertical: 20),
         ),
         build: (context) => [
           pw.Text('الملاحظات والتحديثات', style: headerStyle),
@@ -1754,6 +1769,7 @@ class PdfReportGenerator {
               ? pw.Text('لا توجد بيانات', style: cellStyle)
               : _buildSimpleEntriesTable(
                   dayEntries,
+                  fetchedImages,
                   headerStyle,
                   cellStyle,
                   PdfColors.grey300,
@@ -1766,6 +1782,7 @@ class PdfReportGenerator {
               ? pw.Text('لا توجد بيانات', style: cellStyle)
               : _buildSimpleTestsTable(
                   dayTests,
+                  fetchedImages,
                   headerStyle,
                   cellStyle,
                   PdfColors.grey300,
@@ -1782,6 +1799,7 @@ class PdfReportGenerator {
 
   static pw.Widget _buildSimpleEntriesTable(
     List<Map<String, dynamic>> entries,
+    Map<String, pw.MemoryImage> images,
     pw.TextStyle headerStyle,
     pw.TextStyle cellStyle,
     PdfColor headerColor,
@@ -1795,6 +1813,7 @@ class PdfReportGenerator {
         2: pw.FlexColumnWidth(1.2),
         3: pw.FlexColumnWidth(1.2),
         4: pw.FlexColumnWidth(2.5),
+        5: pw.FlexColumnWidth(1.5),
       },
       children: [
         pw.TableRow(
@@ -1805,6 +1824,7 @@ class PdfReportGenerator {
             _tableCell('المهندس', headerStyle, true),
             _tableCell('التاريخ', headerStyle, true),
             _tableCell('الملاحظات', headerStyle, true),
+            _tableCell('الصور', headerStyle, true),
           ],
         ),
         ...List<pw.TableRow>.generate(entries.length, (i) {
@@ -1817,6 +1837,10 @@ class PdfReportGenerator {
           final sub = e['subPhaseName'];
           final phaseText = sub != null ? '$phaseName > $sub' : phaseName;
           final note = e['note']?.toString() ?? '';
+          final imgs =
+              (e['imageUrls'] as List?)?.map((it) => it.toString()).toList() ?? [];
+          final firstImg =
+              imgs.isNotEmpty && images.containsKey(imgs.first) ? images[imgs.first] : null;
           return pw.TableRow(
             children: [
               _tableCell('${i + 1}', cellStyle, false),
@@ -1824,6 +1848,12 @@ class PdfReportGenerator {
               _tableCell(engineer, cellStyle, false),
               _tableCell(dateStr, cellStyle, false),
               _tableCell(note, cellStyle, false),
+              firstImg != null
+                  ? pw.Padding(
+                      padding: const pw.EdgeInsets.all(4),
+                      child: pw.Image(firstImg, width: 40, height: 40, fit: pw.BoxFit.cover),
+                    )
+                  : _tableCell('-', cellStyle, false),
             ],
           );
         }),
@@ -1833,6 +1863,7 @@ class PdfReportGenerator {
 
   static pw.Widget _buildSimpleTestsTable(
     List<Map<String, dynamic>> tests,
+    Map<String, pw.MemoryImage> images,
     pw.TextStyle headerStyle,
     pw.TextStyle cellStyle,
     PdfColor headerColor,
@@ -1846,6 +1877,7 @@ class PdfReportGenerator {
         2: pw.FlexColumnWidth(1.2),
         3: pw.FlexColumnWidth(1.2),
         4: pw.FlexColumnWidth(2.5),
+        5: pw.FlexColumnWidth(1.5),
       },
       children: [
         pw.TableRow(
@@ -1856,6 +1888,7 @@ class PdfReportGenerator {
             _tableCell('المهندس', headerStyle, true),
             _tableCell('التاريخ', headerStyle, true),
             _tableCell('الملاحظات', headerStyle, true),
+            _tableCell('الصورة', headerStyle, true),
           ],
         ),
         ...List<pw.TableRow>.generate(tests.length, (i) {
@@ -1867,6 +1900,9 @@ class PdfReportGenerator {
           final section = t['sectionName'] ?? '';
           final name = t['testName'] ?? '';
           final note = t['note']?.toString() ?? '';
+          final imgUrl = t['imageUrl'] as String?;
+          final img =
+              imgUrl != null && images.containsKey(imgUrl) ? images[imgUrl] : null;
           return pw.TableRow(
             children: [
               _tableCell('${i + 1}', cellStyle, false),
@@ -1874,6 +1910,12 @@ class PdfReportGenerator {
               _tableCell(engineer, cellStyle, false),
               _tableCell(dateStr, cellStyle, false),
               _tableCell(note, cellStyle, false),
+              img != null
+                  ? pw.Padding(
+                      padding: const pw.EdgeInsets.all(4),
+                      child: pw.Image(img, width: 40, height: 40, fit: pw.BoxFit.cover),
+                    )
+                  : _tableCell('-', cellStyle, false),
             ],
           );
         }),
