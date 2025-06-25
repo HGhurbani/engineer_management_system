@@ -29,6 +29,7 @@ import '../../utils/pdf_styles.dart';
 import '../../utils/pdf_image_cache.dart';
 import '../../utils/report_storage.dart';
 import '../../utils/pdf_report_generator.dart';
+import '../../utils/part_request_pdf_generator.dart';
 
 import 'package:engineer_management_system/html_stub.dart'
 if (dart.library.html) 'dart:html' as html;
@@ -1353,21 +1354,21 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                       Text('تاريخ الطلب: $formattedDate', style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
                     ],
                   ),
-                  // trailing: (_currentUserRole == 'admin')
-                  //     ? PopupMenuButton<String>(
-                  //         onSelected: (val) {
-                  //           if (val == 'edit') {
-                  //             _showEditPartRequestDialog(requestDoc);
-                  //           } else if (val == 'delete') {
-                  //             _deletePartRequest(requestDoc.id);
-                  //           }
-                  //         },
-                  //         itemBuilder: (context) => const [
-                  //           PopupMenuItem(value: 'edit', child: Text('تعديل')),
-                  //           PopupMenuItem(value: 'delete', child: Text('حذف')),
-                  //         ],
-                  //       )
-                  //     : null,
+                  trailing: IconButton(
+                    icon: const Icon(Icons.picture_as_pdf_outlined,
+                        color: AppConstants.primaryColor),
+                    tooltip: 'تقرير PDF',
+                    onPressed: () async {
+                      final bytes = await PartRequestPdfGenerator.generate(data);
+                      if (!mounted) return;
+                      Navigator.pushNamed(context, '/pdf_preview', arguments: {
+                        'bytes': bytes,
+                        'fileName': 'part_request_${requestDoc.id}.pdf',
+                        'text':
+                            'تقرير طلب مواد للمشروع ${data['projectName'] ?? ''}'
+                      });
+                    },
+                  ),
                 ),
               );
             },
