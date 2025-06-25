@@ -236,7 +236,7 @@ class PdfReportGenerator {
         fontSize: 16,
         fontFallback: commonFontFallback);
     final pw.TextStyle regularStyle = pw.TextStyle(
-        font: _arabicFont, fontSize: 12, fontFallback: commonFontFallback);
+        font: _arabicFont, fontSize: 14, fontFallback: commonFontFallback);
     final pw.TextStyle smallGrey = pw.TextStyle(
         font: _arabicFont,
         fontSize: 10,
@@ -334,11 +334,13 @@ class PdfReportGenerator {
           widgets.add(_buildImportantNotice(regularStyle));
           return widgets;
         },
-        footer: (context) => PdfStyles.buildFooter(context,
+        footer: (context) => PdfStyles.buildFooter(
+            context,
             font: _arabicFont!,
             fontFallback: commonFontFallback,
             qrData: qrLink,
-            generatedByText: generatedBy != null ? 'تم إنشاء هذا بواسطة $generatedBy' : null),
+            generatedByText:
+                'المهندس: ${generatedBy ?? 'غير محدد'}'),
       ),
     );
 
@@ -498,9 +500,9 @@ class PdfReportGenerator {
             cellAlignment: pw.Alignment.centerRight,
             headerDecoration: null,
             rowDecoration: null,
-            columnWidths: {
-              0: const pw.FlexColumnWidth(),
-              1: const pw.FixedColumnWidth(80),
+            columnWidths: const {
+              0: pw.FlexColumnWidth(1.5),
+              1: pw.FlexColumnWidth(1),
             },
             headers: [],
             data: <List<String>>[
@@ -526,8 +528,8 @@ class PdfReportGenerator {
                 child: pw.ClipRRect(
                   child: pw.Image(
                     fetchedImages[imageUrl]!,
-                    width: 150,
-                    height: 100,
+                    width: 250,
+                    height: 350,
                     fit: pw.BoxFit.cover,
                   ),
                 ),
@@ -592,9 +594,9 @@ class PdfReportGenerator {
             cellAlignment: pw.Alignment.centerRight,
             headerDecoration: null,
             rowDecoration: null,
-            columnWidths: {
-              0: const pw.FlexColumnWidth(),
-              1: const pw.FixedColumnWidth(80),
+            columnWidths: const {
+              0: pw.FlexColumnWidth(1.5),
+              1: pw.FlexColumnWidth(1),
             },
             headers: [],
             data: <List<String>>[
@@ -619,8 +621,8 @@ class PdfReportGenerator {
               child: pw.ClipRRect(
                 child: pw.Image(
                   fetchedImages[imgUrl]!,
-                  width: 150,
-                  height: 100,
+                  width: 250,
+                  height: 350,
                   fit: pw.BoxFit.cover,
                 ),
               ),

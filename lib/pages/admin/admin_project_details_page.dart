@@ -2026,9 +2026,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             font: _arabicFont!,
             fontFallback: commonFontFallback,
             qrData: qrLink,
-            generatedByText: _currentAdminName != null
-                ? 'تم إنشاء هذا بواسطة $_currentAdminName'
-                : null),
+            generatedByText:
+                'المهندس: ${_currentAdminName ?? 'غير محدد'}'),
       ),
     );
 

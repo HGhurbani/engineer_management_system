@@ -1382,8 +1382,12 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
               text: 'عدد الإدخالات: ${evaluation.rawMetrics['totalEntries'] ??
                   '0'}', style: regular),
         ],
-        footer: (context) =>
-            PdfStyles.buildFooter(context, font: _arabicFont!, fontFallback: commonFontFallback, qrData: qrLink),
+        footer: (context) => PdfStyles.buildFooter(
+            context,
+            font: _arabicFont!,
+            fontFallback: commonFontFallback,
+            qrData: qrLink,
+            generatedByText: 'المهندس: ${_authUser?.displayName ?? ''}'),
       ),
     );
 

@@ -1238,8 +1238,12 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
           }
           return widgets;
         },
-        footer: (context) => PdfStyles.buildFooter(context,
-            font: _arabicFont!, fontFallback: commonFontFallback, qrData: qrLink),
+        footer: (context) => PdfStyles.buildFooter(
+            context,
+            font: _arabicFont!,
+            fontFallback: commonFontFallback,
+            qrData: qrLink,
+            generatedByText: 'المهندس: ${_authUser?.displayName ?? ''}'),
       ),
     );
 

@@ -158,176 +158,49 @@ class PdfStyles {
     return pw.Column(children: widgets);
   }
 
-  static pw.Widget buildFooter(pw.Context context,
-      {required pw.Font font,
-      List<pw.Font> fontFallback = const [],
-      String? qrData,
-      String? generatedByText}) {
+  static pw.Widget buildFooter(
+    pw.Context context, {
+    required pw.Font font,
+    List<pw.Font> fontFallback = const [],
+    String? qrData,
+    required String generatedByText,
+  }) {
+    final pw.TextStyle footerStyle = pw.TextStyle(
+      font: font,
+      fontSize: 10,
+      fontFallback: fontFallback,
+    );
+    final pw.TextStyle infoStyle = pw.TextStyle(
+      font: font,
+      fontSize: 9,
+      color: PdfColors.grey600,
+      fontFallback: fontFallback,
+    );
+
+    final pageText =
+        'Page ${context.pageNumber} of ${context.pagesCount}';
+
     return pw.Container(
-      height: 80,
-      decoration: pw.BoxDecoration(
-        gradient: pw.LinearGradient(
-          colors: [PdfColor.fromHex('#21206C'), PdfColor.fromHex('#21206C')],
-          begin: pw.Alignment.topLeft,
-          end: pw.Alignment.bottomRight,
-        ),
-      ),
-      child: pw.Padding(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-        child: pw.Column(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      'صفحة ${context.pageNumber} من ${context.pagesCount}',
-                      style: pw.TextStyle(
-                        font: font,
-                        color: PdfColors.white,
-                        fontSize: 10,
-                        fontFallback: fontFallback,
-                      ),
-                      textDirection: pw.TextDirection.rtl,
-                    ),
-                    pw.SizedBox(height: 2),
-                    pw.Text(
-                      generatedByText ?? 'تم إنشاء هذا التقرير آلياً',
-                      style: pw.TextStyle(
-                        font: font,
-                        color: PdfColor.fromHex('#F5C842'),
-                        fontSize: 8,
-                        fontFallback: fontFallback,
-                      ),
-                      textDirection: pw.TextDirection.rtl,
-                    ),
-                  ],
-                ),
-                pw.Expanded(
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.center,
-                    children: [
-                      pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.center,
-                        children: [
-                      pw.Text(
-                        'المملكة العربية السعودية - الأحساء - سجل تجاري رقم: ٢٢٠١٤٩٢٠٥٠',
-                        style: pw.TextStyle(
-                          font: font,
-                          color: PdfColors.white,
-                          fontSize: 9,
-                          fontFallback: fontFallback,
-                        ),
-                        textDirection: pw.TextDirection.rtl,
-                      ),
-                          pw.SizedBox(width: 10),
-                          pw.Container(
-                            width: 12,
-                            height: 12,
-                            decoration: pw.BoxDecoration(
-                              color: PdfColor.fromHex('#F5C842'),
-                              borderRadius: pw.BorderRadius.circular(6),
-                            ),
-                            child: pw.Center(
-                              child: pw.Text('📍',
-                                  style: pw.TextStyle(
-                                      fontSize: 8,
-                                      fontFallback: fontFallback)),
-                            ),
-                          ),
-                        ],
-                      ),
-                      pw.SizedBox(height: 3),
-                      pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.center,
-                        children: [
-                          pw.Text(
-                            'الرقم الضريبي: ٣٠٠٤٧١٣٦٥٠٠٠٠٣',
-                            style: pw.TextStyle(
-                              font: font,
-                              color: PdfColor.fromHex('#F5C842'),
-                              fontSize: 9,
-                              fontFallback: fontFallback,
-                            ),
-                            textDirection: pw.TextDirection.rtl,
-                          ),
-                          pw.SizedBox(width: 20),
-                          pw.Text(
-                            '+966 54 538 8835',
-                            style: pw.TextStyle(
-                              font: font,
-                              color: PdfColors.white,
-                              fontSize: 9,
-                              fontFallback: fontFallback,
-                            ),
-                            textDirection: pw.TextDirection.rtl,
-                          ),
-                          pw.SizedBox(width: 10),
-                          pw.Container(
-                            width: 12,
-                            height: 12,
-                            decoration: pw.BoxDecoration(
-                              color: PdfColor.fromHex('#F5C842'),
-                              borderRadius: pw.BorderRadius.circular(6),
-                            ),
-                            child: pw.Center(
-                              child: pw.Text('📞',
-                                  style: pw.TextStyle(
-                                      fontSize: 8,
-                                      fontFallback: fontFallback)),
-                            ),
-                          ),
-                        ],
-                      ),
-                      pw.SizedBox(height: 3),
-                      pw.Text(
-                        'bhbcont@outlook.sa',
-                        style: pw.TextStyle(
-                          font: font,
-                          color: PdfColor.fromHex('#F5C842'),
-                          fontSize: 9,
-                          fontFallback: fontFallback,
-                        ),
-                        textDirection: pw.TextDirection.rtl,
-                      ),
-                    ],
-                  ),
-                ),
-                pw.Container(
-                  width: 40,
-                  height: 40,
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.white,
-                    borderRadius: pw.BorderRadius.circular(5),
-                  ),
-                  child: pw.Center(
-                    child: qrData != null
-                        ? pw.BarcodeWidget(
-                            barcode: pw.Barcode.qrCode(),
-                            data: qrData!,
-                            width: 40,
-                            height: 40,
-                          )
-                        : pw.Text(
-                            'QR',
-                            style: pw.TextStyle(
-                              font: font,
-                              color: PdfColor.fromHex('#21206C'),
-                              fontSize: 8,
-                              fontWeight: pw.FontWeight.bold,
-                              fontFallback: fontFallback,
-                            ),
-                          ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: pw.Column(
+        mainAxisSize: pw.MainAxisSize.min,
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          pw.Divider(),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(pageText, style: footerStyle),
+              pw.Text(generatedByText, style: footerStyle),
+            ],
+          ),
+          pw.SizedBox(height: 5),
+          pw.Text(
+            'BHB Contracting - +966 54 538 8835 - bhbcont@outlook.sa',
+            style: infoStyle,
+            textAlign: pw.TextAlign.center,
+          ),
+        ],
       ),
     );
   }
