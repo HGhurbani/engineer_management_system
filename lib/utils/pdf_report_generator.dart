@@ -52,62 +52,39 @@ class PdfReportGenerator {
   }
 
 
+
+
   static Future<Map<String, pw.MemoryImage>> _fetchImagesForUrls(
-
       List<String> urls) async {
-
     final Map<String, pw.MemoryImage> fetched = {};
-
     await Future.wait(urls.map((url) async {
-
       if (fetched.containsKey(url)) return;
-
       final cached = PdfImageCache.get(url);
-
       if (cached != null) {
-
         fetched[url] = cached;
-
         return;
-
       }
-
       try {
-
         final response =
-
-        await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
-
+            await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
         final contentType = response.headers['content-type'] ?? '';
-
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
-
           final decoded = img.decodeImage(response.bodyBytes);
-
-          if (decoded != null) {
-
+          if (decoded != null && decoded.width > 0 && decoded.height > 0) {
             final memImg = pw.MemoryImage(response.bodyBytes);
-
             fetched[url] = memImg;
-
             PdfImageCache.put(url, memImg);
-
+          } else {
+            // Skip images that fail to decode or have invalid dimensions
+            print('Invalid image data for URL $url');
           }
-
         }
-
       } catch (e) {
-
         print('Error fetching image from URL $url: $e');
-
       }
-
     }));
-
     return fetched;
-
   }
-
 
   static Future<Uint8List> generate({
 
@@ -2146,3 +2123,4 @@ class PdfReportGenerator {
   }
 
 }
+
