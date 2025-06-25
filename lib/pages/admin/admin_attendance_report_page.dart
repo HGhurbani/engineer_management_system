@@ -922,8 +922,12 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
             ...summaryWidgets
           ];
         },
-        footer: (context) => PdfStyles.buildFooter(context,
-            font: _arabicFont!, fontFallback: commonFontFallback, qrData: qrLink),
+        footer: (context) => PdfStyles.buildFooter(
+            context,
+            font: _arabicFont!,
+            fontFallback: commonFontFallback,
+            qrData: qrLink,
+            generatedByText: 'المهندس: ${_authUser?.displayName ?? ''}'),
       ),
     );
 

@@ -3602,9 +3602,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 font: _arabicFont!,
                 fontFallback: commonFontFallback,
                 qrData: qrLink,
-                generatedByText: _currentEngineerName != null
-                    ? 'تم إنشاء هذا بواسطة $_currentEngineerName'
-                    : null),
+                generatedByText:
+                    'المهندس: ${_currentEngineerName ?? 'غير محدد'}'),
         )
     );
 

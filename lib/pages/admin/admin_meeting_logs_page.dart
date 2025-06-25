@@ -1189,8 +1189,12 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
           }
           return widgets;
         },
-        footer: (context) => PdfStyles.buildFooter(context,
-            font: _arabicFont!, fontFallback: commonFontFallback, qrData: qrLink),
+        footer: (context) => PdfStyles.buildFooter(
+            context,
+            font: _arabicFont!,
+            fontFallback: commonFontFallback,
+            qrData: qrLink,
+            generatedByText: 'المهندس: ${_authUser?.displayName ?? ''}'),
       ),
     );
 
