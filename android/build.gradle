@@ -24,30 +24,33 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-// Workaround for plugins missing a namespace definition when using AGP 8+
+// Ensure all Android library modules are compiled with a recent SDK.
+// This avoids errors such as "android:attr/lStar not found" when building
+// release APKs. The whatsapp_share2 plugin in particular requires this.
 subprojects { project ->
-    if (project.name == 'whatsapp_share2') {
-        project.plugins.withId('com.android.library') {
-            if (project.hasProperty('android')) {
-                project.android.namespace = 'com.whatsapp.share2'
-                // Ensure the plugin is compiled with a recent SDK to avoid
-                // missing attributes like android:attr/lStar.
-                if (project.android.hasProperty('compileSdk')) {
-                    project.android.compileSdk = 33
+    project.plugins.withId('com.android.library') {
+        if (project.hasProperty('android')) {
+            // Provide a namespace for plugins that might be missing one.
+            if (!project.android.namespace) {
+                project.android.namespace = "com.${project.name}"
+            }
+
+            // Bump compileSdk/targetSdk if the project allows it.
+            if (project.android.hasProperty('compileSdk')) {
+                project.android.compileSdk = 33
+            }
+            if (project.android.hasProperty('compileSdkVersion')) {
+                project.android.compileSdkVersion = 33
+            }
+            project.android.defaultConfig.with {
+                if (hasProperty('minSdk')) {
+                    minSdk = Math.max(minSdk as int, 21)
                 }
-                if (project.android.hasProperty('compileSdkVersion')) {
-                    project.android.compileSdkVersion = 33
+                if (hasProperty('targetSdk')) {
+                    targetSdk = 33
                 }
-                project.android.defaultConfig.with {
-                    if (hasProperty('minSdk')) {
-                        minSdk = Math.max(minSdk as int, 21)
-                    }
-                    if (hasProperty('targetSdk')) {
-                        targetSdk = 33
-                    }
-                    if (hasProperty('targetSdkVersion')) {
-                        targetSdkVersion = 33
-                    }
+                if (hasProperty('targetSdkVersion')) {
+                    targetSdkVersion = 33
                 }
             }
         }
