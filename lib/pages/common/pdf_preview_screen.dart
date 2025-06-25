@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:whatsapp_share2/whatsapp_share2.dart';
 
 import '../../theme/app_constants.dart';
 
@@ -37,21 +36,6 @@ class PdfPreviewScreen extends StatelessWidget {
     final path = '${dir.path}/$fileName';
     final file = File(path);
     await file.writeAsBytes(pdfBytes, flush: true);
-
-    if (clientPhone != null && clientPhone!.isNotEmpty) {
-      var normalized = clientPhone!.replaceAll(RegExp(r'[^0-9]'), '');
-      if (normalized.startsWith('0')) {
-        normalized = '966${normalized.substring(1)}';
-      }
-      try {
-        await WhatsappShare.shareFile(
-          phone: normalized,
-          text: shareText,
-          filePath: path,
-        );
-        return;
-      } catch (_) {}
-    }
 
     await Share.shareXFiles([XFile(path)], text: shareText);
   }
