@@ -530,7 +530,13 @@ class PdfReportGenerator {
 
           textDirection: pw.TextDirection.rtl,
 
-          theme: pw.ThemeData.withFont(base: _arabicFont, fontFallback: commonFontFallback),
+          theme: pw.ThemeData.withFont(
+            base: _arabicFont,
+            bold: _arabicFont,
+            italic: _arabicFont,
+            boldItalic: _arabicFont,
+            fontFallback: commonFontFallback,
+          ),
 
           margin: PdfStyles.pageMargins,
 
@@ -1891,7 +1897,12 @@ class PdfReportGenerator {
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
-          theme: pw.ThemeData.withFont(base: _arabicFont),
+          theme: pw.ThemeData.withFont(
+            base: _arabicFont,
+            bold: _arabicFont,
+            italic: _arabicFont,
+            boldItalic: _arabicFont,
+          ),
           // Provide some spacing on the sides since there is no header or footer
           margin: const pw.EdgeInsets.symmetric(horizontal: 25, vertical: 20),
         ),

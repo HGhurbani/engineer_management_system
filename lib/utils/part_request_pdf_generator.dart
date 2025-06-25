@@ -61,7 +61,12 @@ class PartRequestPdfGenerator {
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
-          theme: pw.ThemeData.withFont(base: _arabicFont!),
+          theme: pw.ThemeData.withFont(
+            base: _arabicFont!,
+            bold: _arabicFont!,
+            italic: _arabicFont!,
+            boldItalic: _arabicFont!,
+          ),
           margin: PdfStyles.pageMargins,
         ),
         header: (context) => PdfStyles.buildHeader(
