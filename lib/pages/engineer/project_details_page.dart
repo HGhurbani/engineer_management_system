@@ -33,6 +33,7 @@ import '../../utils/pdf_styles.dart';
 import '../../utils/pdf_image_cache.dart';
 import '../../utils/report_storage.dart';
 import '../../utils/pdf_report_generator.dart';
+import '../../utils/part_request_pdf_generator.dart';
 // --- End PDF Imports ---
 
 import '../../main.dart'; // Assuming helper functions are in main.dart
@@ -3081,6 +3082,19 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                   },
                   style: TextButton.styleFrom(foregroundColor: AppConstants.errorColor),
                   child: const Text('حذف'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final bytes = await PartRequestPdfGenerator.generate(data);
+                    if (!mounted) return;
+                    Navigator.pop(ctx);
+                    Navigator.pushNamed(context, '/pdf_preview', arguments: {
+                      'bytes': bytes,
+                      'fileName': 'part_request_${requestDoc.id}.pdf',
+                      'text': "تقرير طلب مواد للمشروع ${data['projectName'] ?? ''}"
+                    });
+                  },
+                  child: const Text('تقرير PDF'),
                 ),
                 ElevatedButton(
                   onPressed: () async {
