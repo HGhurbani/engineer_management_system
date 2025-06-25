@@ -1804,7 +1804,6 @@ class PdfReportGenerator {
     PdfColor headerColor,
     PdfColor borderColor,
   ) {
-
     final Map<String, List<Map<String, dynamic>>> grouped = {};
     for (final entry in entries) {
       final phaseName = entry['phaseName'] ?? '';
@@ -1813,21 +1812,19 @@ class PdfReportGenerator {
       grouped.putIfAbsent(key, () => []).add(entry);
     }
 
-    final List<pw.TableRow> rows = [];
+    final List<pw.Widget> widgets = [];
     grouped.forEach((phase, items) {
-      rows.add(
-        _headerRow(
-          phase,
-          headerStyle,
-          headerColor,
+      widgets.add(
+        pw.Container(
+          alignment: pw.Alignment.center,
+          padding: const pw.EdgeInsets.all(6),
+          color: headerColor,
+          child: pw.Text(
+            phase,
+            style: headerStyle.copyWith(color: PdfColors.white),
+            textDirection: pw.TextDirection.rtl,
+          ),
         ),
-      );
-
-      rows.add(
-        pw.TableRow(children: [
-          _tableCell('الملاحظة', headerStyle, true),
-          _tableCell('الصور', headerStyle, true),
-        ]),
       );
 
       for (final item in items) {
@@ -1839,36 +1836,86 @@ class PdfReportGenerator {
           final img = images[url];
           if (img != null) {
             imgWidgets.add(
-              pw.Padding(
-                padding: const pw.EdgeInsets.all(2),
-                child: pw.Image(img, width: 40, height: 40, fit: pw.BoxFit.cover),
+              pw.Container(
+                margin: const pw.EdgeInsets.all(2),
+                child: pw.Image(img,
+                    width: 120, height: 120, fit: pw.BoxFit.cover),
               ),
             );
           }
         }
 
-        rows.add(
-          pw.TableRow(children: [
-            _tableCell(note, cellStyle, false),
-            pw.Padding(
-              padding: const pw.EdgeInsets.all(4),
-              child: imgWidgets.isEmpty
-                  ? pw.Text('-', style: cellStyle, textAlign: pw.TextAlign.center)
-                  : pw.Wrap(spacing: 4, runSpacing: 4, children: imgWidgets),
-            ),
-          ]),
+        widgets.add(
+          pw.Table(
+            border: pw.TableBorder.all(color: borderColor),
+            columnWidths: const {0: pw.FlexColumnWidth()},
+            children: [
+              pw.TableRow(children: [
+                pw.Container(
+                  color: headerColor,
+                  alignment: pw.Alignment.center,
+                  padding: const pw.EdgeInsets.all(4),
+                  child: pw.Text('ملاحظات',
+                      style: headerStyle.copyWith(color: PdfColors.white),
+                      textDirection: pw.TextDirection.rtl),
+                ),
+              ]),
+              pw.TableRow(children: [
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(4),
+                  child: pw.Text(
+                    note.isEmpty ? '-' : note,
+                    style: cellStyle,
+                    textAlign: pw.TextAlign.center,
+                    textDirection: pw.TextDirection.rtl,
+                  ),
+                ),
+              ]),
+            ],
+          ),
         );
+
+        widgets.add(pw.SizedBox(height: 5));
+
+        widgets.add(
+          pw.Table(
+            border: pw.TableBorder.all(color: borderColor),
+            columnWidths: const {0: pw.FlexColumnWidth()},
+            children: [
+              pw.TableRow(children: [
+                pw.Container(
+                  color: headerColor,
+                  alignment: pw.Alignment.center,
+                  padding: const pw.EdgeInsets.all(4),
+                  child: pw.Text('الصور',
+                      style: headerStyle.copyWith(color: PdfColors.white),
+                      textDirection: pw.TextDirection.rtl),
+                ),
+              ]),
+              pw.TableRow(children: [
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(4),
+                  child: imgWidgets.isEmpty
+                      ? pw.Text('-',
+                          style: cellStyle,
+                          textAlign: pw.TextAlign.center)
+                      : pw.Wrap(
+                          spacing: 5,
+                          runSpacing: 5,
+                          alignment: pw.WrapAlignment.center,
+                          children: imgWidgets,
+                        ),
+                ),
+              ]),
+            ],
+          ),
+        );
+
+        widgets.add(pw.SizedBox(height: 10));
       }
     });
 
-    return pw.Table(
-      border: pw.TableBorder.all(color: borderColor),
-      columnWidths: const {
-        0: pw.FlexColumnWidth(3),
-        1: pw.FlexColumnWidth(2),
-      },
-      children: rows,
-    );
+    return pw.Column(children: widgets);
   }
   static pw.Widget _buildSimpleTestsTable(
     List<Map<String, dynamic>> tests,
@@ -1884,52 +1931,107 @@ class PdfReportGenerator {
       grouped.putIfAbsent(name, () => []).add(t);
     }
 
-    final List<pw.TableRow> rows = [];
+    final List<pw.Widget> widgets = [];
     grouped.forEach((test, items) {
-      rows.add(
-        _headerRow(
-          test,
-          headerStyle,
-          headerColor,
+      widgets.add(
+        pw.Container(
+          alignment: pw.Alignment.center,
+          padding: const pw.EdgeInsets.all(6),
+          color: headerColor,
+          child: pw.Text(
+            test,
+            style: headerStyle.copyWith(color: PdfColors.white),
+            textDirection: pw.TextDirection.rtl,
+          ),
         ),
-      );
-
-      rows.add(
-        pw.TableRow(children: [
-          _tableCell('الملاحظة', headerStyle, true),
-          _tableCell('الصور', headerStyle, true),
-        ]),
       );
 
       for (final item in items) {
         final note = item['note']?.toString() ?? '';
         final url = item['imageUrl'] as String?;
         final img = url != null ? images[url] : null;
-        final imgWidget = img != null
-            ? pw.Image(img, width: 40, height: 40, fit: pw.BoxFit.cover)
-            : null;
-
-        rows.add(
-          pw.TableRow(children: [
-            _tableCell(note, cellStyle, false),
-            pw.Padding(
-              padding: const pw.EdgeInsets.all(4),
-              child: imgWidget ??
-                  pw.Text('-', style: cellStyle, textAlign: pw.TextAlign.center),
+        final imgWidgets = <pw.Widget>[];
+        if (img != null) {
+          imgWidgets.add(
+            pw.Container(
+              margin: const pw.EdgeInsets.all(2),
+              child:
+                  pw.Image(img, width: 120, height: 120, fit: pw.BoxFit.cover),
             ),
-          ]),
+          );
+        }
+
+        widgets.add(
+          pw.Table(
+            border: pw.TableBorder.all(color: borderColor),
+            columnWidths: const {0: pw.FlexColumnWidth()},
+            children: [
+              pw.TableRow(children: [
+                pw.Container(
+                  color: headerColor,
+                  alignment: pw.Alignment.center,
+                  padding: const pw.EdgeInsets.all(4),
+                  child: pw.Text('ملاحظات',
+                      style: headerStyle.copyWith(color: PdfColors.white),
+                      textDirection: pw.TextDirection.rtl),
+                ),
+              ]),
+              pw.TableRow(children: [
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(4),
+                  child: pw.Text(
+                    note.isEmpty ? '-' : note,
+                    style: cellStyle,
+                    textAlign: pw.TextAlign.center,
+                    textDirection: pw.TextDirection.rtl,
+                  ),
+                ),
+              ]),
+            ],
+          ),
         );
+
+        widgets.add(pw.SizedBox(height: 5));
+
+        widgets.add(
+          pw.Table(
+            border: pw.TableBorder.all(color: borderColor),
+            columnWidths: const {0: pw.FlexColumnWidth()},
+            children: [
+              pw.TableRow(children: [
+                pw.Container(
+                  color: headerColor,
+                  alignment: pw.Alignment.center,
+                  padding: const pw.EdgeInsets.all(4),
+                  child: pw.Text('الصور',
+                      style: headerStyle.copyWith(color: PdfColors.white),
+                      textDirection: pw.TextDirection.rtl),
+                ),
+              ]),
+              pw.TableRow(children: [
+                pw.Padding(
+                  padding: const pw.EdgeInsets.all(4),
+                  child: imgWidgets.isEmpty
+                      ? pw.Text('-',
+                          style: cellStyle,
+                          textAlign: pw.TextAlign.center)
+                      : pw.Wrap(
+                          spacing: 5,
+                          runSpacing: 5,
+                          alignment: pw.WrapAlignment.center,
+                          children: imgWidgets,
+                        ),
+                ),
+              ]),
+            ],
+          ),
+        );
+
+        widgets.add(pw.SizedBox(height: 10));
       }
     });
 
-    return pw.Table(
-      border: pw.TableBorder.all(color: borderColor),
-      columnWidths: const {
-        0: pw.FlexColumnWidth(3),
-        1: pw.FlexColumnWidth(2),
-      },
-      children: rows,
-    );
+    return pw.Column(children: widgets);
   }
 
   static pw.Widget _tableCell(
