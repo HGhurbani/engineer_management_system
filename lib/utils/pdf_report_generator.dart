@@ -292,6 +292,7 @@ class PdfReportGenerator {
 
     pdf.addPage(
       pw.MultiPage(
+        maxPages: 500,
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
@@ -1028,6 +1029,7 @@ class PdfReportGenerator {
 
     pdf.addPage(
       pw.MultiPage(
+        maxPages: 500,
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
