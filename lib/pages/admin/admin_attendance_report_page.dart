@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
@@ -927,7 +928,7 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
             font: _arabicFont!,
             fontFallback: commonFontFallback,
             qrData: qrLink,
-            generatedByText: 'المهندس: ${_authUser?.displayName ?? ''}'),
+            generatedByText: 'المهندس: ${FirebaseAuth.instance.currentUser?.displayName ?? ''}'),
       ),
     );
 

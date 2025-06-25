@@ -1194,7 +1194,7 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
             font: _arabicFont!,
             fontFallback: commonFontFallback,
             qrData: qrLink,
-            generatedByText: 'المهندس: ${_authUser?.displayName ?? ''}'),
+            generatedByText: 'المهندس: ${FirebaseAuth.instance.currentUser?.displayName ?? ''}'),
       ),
     );
 
