@@ -125,7 +125,7 @@ To set up and run the project locally, follow these steps:
         * Follow Firebase instructions to add `GoogleService-Info.plist` to your Xcode project.
     * **For Web**:
         * Add a Web app to your Firebase project.
-        * Update `web/index.html` with your project's `firebaseConfig` information (if `flutterfire configure` didn't do it automatically). Ensure `apiKey` and `appId` in `lib/firebase_options.dart` also match web settings.
+        * Create a `web/firebase-config.js` file containing your project's `firebaseConfig` object and ensure `web/index.html` includes this script. The keys should match the values in `lib/firebase_options.dart`.
     * **For All Platforms**: Run the following command to generate the `firebase_options.dart` file:
         ```bash
         flutterfire configure
