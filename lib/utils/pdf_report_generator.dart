@@ -467,19 +467,19 @@ class PdfReportGenerator {
 
         fontWeight: pw.FontWeight.bold,
 
-        fontSize: 16,
+        fontSize: 18,
 
         fontFallback: commonFontFallback);
 
     final pw.TextStyle regularStyle = pw.TextStyle(
 
-        font: _arabicFont, fontSize: 14, fontFallback: commonFontFallback);
+        font: _arabicFont, fontSize: 16, fontFallback: commonFontFallback);
 
     final pw.TextStyle smallGrey = pw.TextStyle(
 
         font: _arabicFont,
 
-        fontSize: 10,
+        fontSize: 12,
 
         color: PdfColors.grey600,
 
@@ -787,7 +787,7 @@ class PdfReportGenerator {
 
                 fontWeight: pw.FontWeight.bold,
 
-                fontSize: 16,
+                fontSize: 18,
 
               ),
 
@@ -836,7 +836,7 @@ class PdfReportGenerator {
 
           fontWeight: pw.FontWeight.bold,
 
-          fontSize: 16,
+          fontSize: 18,
 
         ),
 
@@ -932,7 +932,7 @@ class PdfReportGenerator {
                     'رقم الإدخال #$index',
                     style: pw.TextStyle(
                       color: PdfColors.white,
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
@@ -941,7 +941,7 @@ class PdfReportGenerator {
                   child: pw.Text(
                     subName != null ? '$phaseName > $subName' : phaseName,
                     style: pw.TextStyle(
-                      fontSize: 14,
+                      fontSize: 16,
                       fontWeight: pw.FontWeight.bold,
                       color: PdfColors.black,
                     ),
@@ -982,7 +982,7 @@ class PdfReportGenerator {
                       child: pw.Text(
                         'المهندس المسؤول:',
                         style: pw.TextStyle(
-                          fontSize: 12,
+                          fontSize: 14,
                           fontWeight: pw.FontWeight.bold,
                           color: PdfColors.black,
                         ),
@@ -1009,7 +1009,7 @@ class PdfReportGenerator {
                       child: pw.Text(
                         'تاريخ التسجيل:',
                         style: pw.TextStyle(
-                          fontSize: 12,
+                          fontSize: 14,
                           fontWeight: pw.FontWeight.bold,
                           color: PdfColors.black,
                         ),
@@ -1037,7 +1037,7 @@ class PdfReportGenerator {
                         child: pw.Text(
                           'الملاحظات:',
                           style: pw.TextStyle(
-                            fontSize: 12,
+                            fontSize: 14,
                             fontWeight: pw.FontWeight.bold,
                             color: PdfColors.black,
                           ),
@@ -1065,7 +1065,7 @@ class PdfReportGenerator {
               child: pw.Text(
                 'الصور المرفقة (${imageUrls.where((url) => fetchedImages.containsKey(url)).length}):',
                 style: pw.TextStyle(
-                  fontSize: 13,
+                  fontSize: 15,
                   fontWeight: pw.FontWeight.bold,
                   color: PdfColors.black,
                 ),
@@ -1093,11 +1093,11 @@ class PdfReportGenerator {
                       mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
                       children: rowImages.map((imageUrl) =>
                           pw.Container(
-                            width: 150,
-                            height: 180,
+                            width: 180,
+                            height: 210,
                             decoration: pw.BoxDecoration(
                               border: pw.Border.all(color: borderColor, width: 1.5),
-                              borderRadius: pw.BorderRadius.circular(8),
+                              borderRadius: pw.BorderRadius.zero,
                               boxShadow: [
                                 pw.BoxShadow(
                                   color: PdfColors.grey300,
@@ -1106,8 +1106,8 @@ class PdfReportGenerator {
                               ],
                             ),
                             child: pw.ClipRRect(
-                              horizontalRadius: 8,
-                              verticalRadius: 8,
+                              horizontalRadius: 0,
+                              verticalRadius: 0,
                               child: pw.Image(
                                 fetchedImages[imageUrl]!,
                                 fit: pw.BoxFit.cover,
@@ -1133,7 +1133,7 @@ class PdfReportGenerator {
                 child: pw.Text(
                   'وعدد ${imageUrls.where((url) => fetchedImages.containsKey(url)).length - 9} صورة إضافية غير معروضة...',
                   style: pw.TextStyle(
-                    fontSize: 10,
+                    fontSize: 12,
                     color: PdfColors.grey700,
                     fontStyle: pw.FontStyle.italic,
                   ),
@@ -1206,7 +1206,7 @@ class PdfReportGenerator {
                     'رقم الاختبار #$index',
                     style: pw.TextStyle(
                       color: PdfColors.white,
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
@@ -1215,7 +1215,7 @@ class PdfReportGenerator {
                   child: pw.Text(
                     '$section - $name',
                     style: pw.TextStyle(
-                      fontSize: 14,
+                      fontSize: 16,
                       fontWeight: pw.FontWeight.bold,
                       color: PdfColors.black,
                     ),
@@ -1256,7 +1256,7 @@ class PdfReportGenerator {
                       child: pw.Text(
                         'المهندس المسؤول:',
                         style: pw.TextStyle(
-                          fontSize: 12,
+                          fontSize: 14,
                           fontWeight: pw.FontWeight.bold,
                           color: PdfColors.black,
                         ),
@@ -1283,7 +1283,7 @@ class PdfReportGenerator {
                       child: pw.Text(
                         'آخر تحديث:',
                         style: pw.TextStyle(
-                          fontSize: 12,
+                          fontSize: 14,
                           fontWeight: pw.FontWeight.bold,
                           color: PdfColors.black,
                         ),
@@ -1311,7 +1311,7 @@ class PdfReportGenerator {
                         child: pw.Text(
                           'الملاحظات:',
                           style: pw.TextStyle(
-                            fontSize: 12,
+                            fontSize: 14,
                             fontWeight: pw.FontWeight.bold,
                             color: PdfColors.black,
                           ),
@@ -1339,7 +1339,7 @@ class PdfReportGenerator {
               child: pw.Text(
                 'الصورة المرفقة:',
                 style: pw.TextStyle(
-                  fontSize: 13,
+                  fontSize: 15,
                   fontWeight: pw.FontWeight.bold,
                   color: PdfColors.black,
                 ),
@@ -1351,11 +1351,11 @@ class PdfReportGenerator {
 
             pw.Center(
               child: pw.Container(
-                width: 200,
-                height: 250,
+                width: 230,
+                height: 280,
                 decoration: pw.BoxDecoration(
                   border: pw.Border.all(color: borderColor, width: 1.5),
-                  borderRadius: pw.BorderRadius.circular(8),
+                  borderRadius: pw.BorderRadius.zero,
                   boxShadow: [
                     pw.BoxShadow(
                       color: PdfColors.grey300,
@@ -1364,8 +1364,8 @@ class PdfReportGenerator {
                   ],
                 ),
                 child: pw.ClipRRect(
-                  horizontalRadius: 8,
-                  verticalRadius: 8,
+                  horizontalRadius: 0,
+                  verticalRadius: 0,
                   child: pw.Image(
                     fetchedImages[imgUrl]!,
                     fit: pw.BoxFit.cover,
@@ -1590,7 +1590,7 @@ class PdfReportGenerator {
 
                 fontWeight: pw.FontWeight.bold,
 
-                fontSize: 12,
+                fontSize: 14,
 
               ),
 
@@ -1632,7 +1632,7 @@ class PdfReportGenerator {
 
                   fontWeight: pw.FontWeight.bold,
 
-                  fontSize: 16,
+                  fontSize: 18,
 
                 ),
 
@@ -1789,12 +1789,12 @@ class PdfReportGenerator {
 
     final pw.TextStyle headerStyle = pw.TextStyle(
       font: _arabicFont,
-      fontSize: 14,
+      fontSize: 16,
       fontWeight: pw.FontWeight.bold,
     );
     final pw.TextStyle cellStyle = pw.TextStyle(
       font: _arabicFont,
-      fontSize: 12,
+      fontSize: 14,
     );
 
     pdf.addPage(
