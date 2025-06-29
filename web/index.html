@@ -25,19 +25,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
 
-  <!-- Firebase Configuration -->
+  <script src="firebase-config.js"></script>
   <script>
     window.onload = function () {
-      const firebaseConfig = {
-        apiKey: "AIzaSyDX_fhBTQmwm-KP8Qu2gfwFQylGuaEm4VA",
-      authDomain: "eng-system.firebaseapp.com",
-      projectId: "eng-system",
-      storageBucket: "eng-system.firebasestorage.app",
-      messagingSenderId: "526461382833",
-      appId: "1:526461382833:web:46090faa13de2d4b30f290",
-      measurementId: "G-NMMTY5PN4Y",
-      };
-      firebase.initializeApp(firebaseConfig);
+      firebase.initializeApp(window.firebaseConfig);
     };
 
     // Placeholder for the Google Maps init callback
