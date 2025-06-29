@@ -16,9 +16,6 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <!-- Google Maps JavaScript API (async for performance) -->
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyALwjTWZOafa0RhBLcOgrgHHuzQWk5_fwQ&callback=initMap"></script>
-
   <!-- Firebase JS SDKs using compat (non-module) for browser compatibility -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
@@ -27,15 +24,19 @@
 
   <script src="firebase-config.js"></script>
   <script>
-    window.onload = function () {
+    // Initialize Firebase once the page finishes loading
+    window.addEventListener('load', function () {
       firebase.initializeApp(window.firebaseConfig);
-    };
+    });
 
-    // Placeholder for the Google Maps init callback
+    // Google Maps callback expected by the API loader
     function initMap() {
-      console.log("Google Maps API loaded.");
+      console.log('Google Maps API loaded.');
     }
   </script>
+
+  <!-- Google Maps JavaScript API (deferred to ensure initMap is defined) -->
+  <script defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyALwjTWZOafa0RhBLcOgrgHHuzQWk5_fwQ&callback=initMap"></script>
 
   <link rel="manifest" href="manifest.json">
   <title>engineer_management_system</title>
