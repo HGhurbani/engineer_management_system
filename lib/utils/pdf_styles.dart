@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 class PdfStyles {
   /// Default page margins for all generated PDF documents.
   static const pw.EdgeInsets pageMargins = pw.EdgeInsets.zero;
+
   static pw.Widget buildHeader({
     required pw.Font font,
     required pw.MemoryImage logo,
@@ -23,7 +24,7 @@ class PdfStyles {
       color: primaryColor,
     );
     final pw.TextStyle regularStyle =
-        pw.TextStyle(font: font, fontSize: 12, color: PdfColors.black);
+    pw.TextStyle(font: font, fontSize: 12, color: PdfColors.black);
 
     return pw.Container(
       alignment: pw.Alignment.centerRight,
@@ -76,7 +77,7 @@ class PdfStyles {
     required List<List<String>> data,
     PdfColor? headerColor,
     PdfColor? borderColor,
-    bool isRtl = false,
+    bool isRtl = true,
   }) {
     final PdfColor primary = headerColor ?? PdfColor.fromHex('#21206C');
     final PdfColor border = borderColor ?? PdfColors.grey300;
@@ -88,14 +89,14 @@ class PdfStyles {
       color: PdfColors.white,
     );
     final pw.TextStyle cellStyle =
-        pw.TextStyle(font: font, fontSize: 11, color: PdfColors.black);
+    pw.TextStyle(font: font, fontSize: 11, color: PdfColors.black);
 
-    final headerCells = isRtl ? headers.reversed.toList() : headers;
-    final dataRows =
-        isRtl ? data.map((row) => row.reversed.toList()).toList() : data;
+    final headerCells = headers;
+    final dataRows = data;
 
     final List<pw.Widget> widgets = [];
 
+    // رأس الجدول
     widgets.add(
       pw.Container(
         decoration: pw.BoxDecoration(
@@ -110,17 +111,18 @@ class PdfStyles {
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: headerCells
               .map((h) => pw.Expanded(
-                      child: pw.Text(
-                    h,
-                    style: headerStyle,
-                    textAlign: pw.TextAlign.center,
-                    textDirection: pw.TextDirection.rtl,
-                  )))
+              child: pw.Text(
+                h,
+                style: headerStyle,
+                textAlign: pw.TextAlign.center,
+                textDirection: pw.TextDirection.rtl,
+              )))
               .toList(),
         ),
       ),
     );
 
+    // صفوف البيانات
     bool alternate = false;
     for (final row in dataRows) {
       final rowColor = alternate ? PdfColors.grey100 : PdfColors.white;
@@ -136,19 +138,12 @@ class PdfStyles {
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: row
                 .map((c) => pw.Expanded(
-                        child: pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.center,
-                      children: [
-                        pw.Text('🔹 ',
-                            style: cellStyle.copyWith(color: primary)),
-                        pw.Text(
-                          c,
-                          style: cellStyle,
-                          textAlign: pw.TextAlign.center,
-                          textDirection: pw.TextDirection.rtl,
-                        ),
-                      ],
-                    )))
+                child: pw.Text(
+                  c,
+                  style: cellStyle,
+                  textAlign: pw.TextAlign.center,
+                  textDirection: pw.TextDirection.rtl,
+                )))
                 .toList(),
           ),
         ),
@@ -159,12 +154,12 @@ class PdfStyles {
   }
 
   static pw.Widget buildFooter(
-    pw.Context context, {
-    required pw.Font font,
-    List<pw.Font> fontFallback = const [],
-    String? qrData,
-    required String generatedByText,
-  }) {
+      pw.Context context, {
+        required pw.Font font,
+        List<pw.Font> fontFallback = const [],
+        String? qrData,
+        required String generatedByText,
+      }) {
     final pw.TextStyle footerStyle = pw.TextStyle(
       font: font,
       fontSize: 10,
@@ -177,8 +172,7 @@ class PdfStyles {
       fontFallback: fontFallback,
     );
 
-    final pageText =
-        'Page ${context.pageNumber} of ${context.pagesCount}';
+    final pageText = 'Page ${context.pageNumber} of ${context.pagesCount}';
 
     return pw.Container(
       padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 10),
