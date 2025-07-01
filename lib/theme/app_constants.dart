@@ -53,4 +53,13 @@ class AppConstants {
   // PDF header titles
   static const String meetingReportHeader = 'تقرير الاجتماع';
   static const String attendanceReportHeader = 'سجل الحضور اليومي';
+
+  // Measurement units for materials
+  static const List<String> measurementUnits = [
+    'كرتون',
+    'حبة',
+    'لفة',
+    'كيلو',
+    'متر',
+  ];
 }
