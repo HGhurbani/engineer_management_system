@@ -23,7 +23,7 @@ dependencies:
   image_picker: ^1.1.0 #
   http: ^1.2.1 #
   url_launcher: ^6.2.2 #
-  share_plus: ^9.0.0 #
+  share_plus: ^11.0.0 #
   google_maps_flutter: ^2.5.0 #
   firebase_core_web: ^2.0.0 #
   pdf: ^3.10.4 #
@@ -92,3 +92,5 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+dependency_overrides:
+  web: ^1.0.0  # أجبر استخدام الإصدار الجديد
