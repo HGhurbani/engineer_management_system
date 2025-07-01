@@ -216,6 +216,21 @@ class _AdminEngineersPageState extends State<AdminEngineersPage> {
                         'createdAt': FieldValue.serverTimestamp(),
                       });
 
+                      // Add the newly created engineer to all existing projects
+                      final Map<String, String> newEngineerData = {
+                        'uid': userCred.user!.uid,
+                        'name': nameController.text.trim(),
+                      };
+                      final projectsSnapshot = await FirebaseFirestore.instance
+                          .collection('projects')
+                          .get();
+                      for (final project in projectsSnapshot.docs) {
+                        await project.reference.update({
+                          'assignedEngineers': FieldValue.arrayUnion([newEngineerData]),
+                          'engineerUids': FieldValue.arrayUnion([userCred.user!.uid]),
+                        });
+                      }
+
                       Navigator.pop(dialogContext);
                       _showFeedbackSnackBar(context, 'تم إضافة المهندس بنجاح.', isError: false);
                     } on FirebaseAuthException catch (e) {
