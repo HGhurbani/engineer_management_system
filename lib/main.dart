@@ -29,6 +29,7 @@ import 'package:engineer_management_system/pages/admin/admin_holiday_settings_pa
 import 'package:engineer_management_system/pages/engineer/request_material_page.dart';
 import 'package:engineer_management_system/pages/engineer/meeting_logs_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_meeting_logs_page.dart';
+import 'package:engineer_management_system/pages/admin/admin_materials_page.dart';
 import 'package:engineer_management_system/pages/common/change_password_page.dart';
 import 'package:engineer_management_system/pages/common/pdf_preview_screen.dart';
 
@@ -184,6 +185,7 @@ class MyApp extends StatelessWidget {
         // --- ADDITION START ---
         '/admin/evaluations': (context) => const AdminEvaluationsPage(), // مسار جديد لصفحة التقييم
         '/admin/meeting_logs': (context) => const AdminMeetingLogsPage(),
+        '/admin/materials': (context) => const AdminMaterialsPage(),
         // --- ADDITION END ---
       },
 

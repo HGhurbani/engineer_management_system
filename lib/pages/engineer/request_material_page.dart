@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 
 import '../../main.dart';
 import '../../theme/app_constants.dart';
+import '../../models/material_item.dart';
 
 class RequestMaterialPage extends StatefulWidget {
   final String engineerId;
@@ -32,6 +33,10 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
   /// Controllers for multiple requested items
   final List<TextEditingController> _materialControllers = [TextEditingController()];
   final List<TextEditingController> _quantityControllers = [TextEditingController()];
+  final List<MaterialItem?> _selectedMaterials = [null];
+
+  List<MaterialItem> _materials = [];
+  bool _loadingMaterials = true;
 
   String? _selectedProjectId;
   String? _selectedProjectName;
@@ -49,6 +54,7 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
     } else {
       _fetchAssignedProjects();
     }
+    _fetchMaterials();
   }
 
   Future<void> _fetchAssignedProjects() async {
@@ -74,6 +80,26 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
     }
   }
 
+  Future<void> _fetchMaterials() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('materials')
+          .orderBy('name')
+          .get();
+      if (mounted) {
+        setState(() {
+          _materials = snap.docs
+              .map((d) => MaterialItem.fromFirestore(
+                  d.id, d.data() as Map<String, dynamic>))
+              .toList();
+          _loadingMaterials = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingMaterials = false);
+    }
+  }
+
   Future<void> _submitRequest() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -90,7 +116,9 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
       // Collect requested items as a list of maps
       final List<Map<String, dynamic>> items = [];
       for (int i = 0; i < _materialControllers.length; i++) {
-        final name = _materialControllers[i].text.trim();
+        final name = _selectedMaterials.length > i && _selectedMaterials[i] != null
+            ? _selectedMaterials[i]!.name
+            : _materialControllers[i].text.trim();
         final qty = int.tryParse(_quantityControllers[i].text.trim()) ?? 1;
         items.add({'name': name, 'quantity': qty});
       }
@@ -196,20 +224,40 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
                       Row(
                         children: [
                           Expanded(
-                            child: TextFormField(
-                              controller: _materialControllers[index],
-                              decoration: const InputDecoration(
-                                labelText: 'اسم المادة المطلوبة',
-                                prefixIcon: Icon(Icons.settings_input_component_outlined, color: AppConstants.primaryColor),
-                                border: OutlineInputBorder(),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'الرجاء إدخال اسم المادة.';
-                                }
-                                return null;
-                              },
-                            ),
+                            child: _loadingMaterials
+                                ? const Center(child: CircularProgressIndicator())
+                                : Autocomplete<MaterialItem>(
+                                    optionsBuilder: (text) {
+                                      final q = text.text.toLowerCase();
+                                      return _materials.where((m) => m.name.toLowerCase().contains(q));
+                                    },
+                                    displayStringForOption: (opt) => opt.name,
+                                    fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                                      if (_materialControllers.length > index) {
+                                        _materialControllers[index] = controller;
+                                      }
+                                      return TextFormField(
+                                        controller: controller,
+                                        focusNode: focusNode,
+                                        decoration: const InputDecoration(
+                                          labelText: 'اسم المادة المطلوبة',
+                                          prefixIcon: Icon(Icons.settings_input_component_outlined, color: AppConstants.primaryColor),
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'الرجاء إدخال اسم المادة.';
+                                          }
+                                          return null;
+                                        },
+                                      );
+                                    },
+                                    onSelected: (opt) {
+                                      if (_selectedMaterials.length > index) {
+                                        _selectedMaterials[index] = opt;
+                                      }
+                                    },
+                                  ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -240,6 +288,9 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
                                 setState(() {
                                   _materialControllers.removeAt(index).dispose();
                                   _quantityControllers.removeAt(index).dispose();
+                                  if (_selectedMaterials.length > index) {
+                                    _selectedMaterials.removeAt(index);
+                                  }
                                 });
                               },
                             ),
@@ -256,6 +307,7 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
                       setState(() {
                         _materialControllers.add(TextEditingController());
                         _quantityControllers.add(TextEditingController());
+                        _selectedMaterials.add(null);
                       });
                     },
                     icon: const Icon(Icons.add_circle_outline, color: AppConstants.primaryColor),

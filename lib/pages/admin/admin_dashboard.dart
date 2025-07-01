@@ -718,6 +718,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         route: '/admin/employees',
       ),
       _ManagementItem(
+        title: 'إدارة المواد',
+        subtitle: 'إضافة وتعديل المواد',
+        icon: Icons.inventory_2_outlined,
+        color: AppConstants.infoColor,
+        route: '/admin/materials',
+      ),
+      _ManagementItem(
         title: 'عرض المشاريع',
         subtitle: 'متابعة جميع المشاريع',
         icon: Icons.work_rounded,
