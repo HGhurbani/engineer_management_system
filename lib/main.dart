@@ -32,6 +32,7 @@ import 'package:engineer_management_system/pages/admin/admin_meeting_logs_page.d
 import 'package:engineer_management_system/pages/admin/admin_materials_page.dart';
 import 'package:engineer_management_system/pages/common/change_password_page.dart';
 import 'package:engineer_management_system/pages/common/pdf_preview_screen.dart';
+import 'package:engineer_management_system/pages/admin/admin_finance_page.dart';
 
 // --- ADDITION START ---
 import 'package:engineer_management_system/pages/admin/admin_evaluations_page.dart'; // استيراد صفحة التقييم الجديدة
@@ -186,6 +187,7 @@ class MyApp extends StatelessWidget {
         '/admin/evaluations': (context) => const AdminEvaluationsPage(), // مسار جديد لصفحة التقييم
         '/admin/meeting_logs': (context) => const AdminMeetingLogsPage(),
         '/admin/materials': (context) => const AdminMaterialsPage(),
+        '/admin/finance': (context) => const AdminFinancePage(),
         // --- ADDITION END ---
       },
 
