@@ -11,7 +11,6 @@ import 'package:file_picker/file_picker.dart';
 
 import '../../theme/app_constants.dart';
 import '../../models/material_item.dart';
-import '../../data/default_material_names.dart';
 
 class AdminMaterialsPage extends StatefulWidget {
   const AdminMaterialsPage({super.key});
@@ -39,50 +38,7 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
       return name.contains(q);
     }).toList();
   }
-
-  Future<void> _addDefaultMaterials() async {
-    final batch = FirebaseFirestore.instance.batch();
-    final col = FirebaseFirestore.instance.collection('materials');
-    for (final name in defaultMaterialNames) {
-      final doc = col.doc();
-      batch.set(doc, {
-        'name': name,
-        'unit': null,
-        'imageUrl': null,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    }
-    await batch.commit();
-  }
-
-  Future<void> _confirmAddDefaultMaterials() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('إضافة مواد افتراضية'),
-          content: const Text('سيتم إضافة جميع أسماء المواد الافتراضية بدون صور أَو وحدات قياس. هل أنت متأكد؟'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppConstants.primaryColor,
-                  foregroundColor: Colors.white),
-              child: const Text('إضافة'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (confirm == true) {
-      await _addDefaultMaterials();
-    }
-  }
+  
 
   Widget _buildSearchBar() {
     return Container(
@@ -350,13 +306,6 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
           title: const Text('إدارة المواد', style: TextStyle(color: Colors.white)),
           backgroundColor: AppConstants.primaryColor,
           iconTheme: const IconThemeData(color: Colors.white),
-          actions: [
-            IconButton(
-              onPressed: _confirmAddDefaultMaterials,
-              tooltip: 'إضافة المواد الافتراضية',
-              icon: const Icon(Icons.playlist_add),
-            ),
-          ],
         ),
         floatingActionButton: FloatingActionButton(
           backgroundColor: AppConstants.primaryColor,
