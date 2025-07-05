@@ -1309,7 +1309,7 @@ class PdfReportGenerator {
                       pw.Container(
                         padding: const pw.EdgeInsets.all(12),
                         child: pw.Text(
-                          'الملاحظات:',
+                          'الأعمال المستلمة:',
                           style: pw.TextStyle(
                             fontSize: 14,
                             fontWeight: pw.FontWeight.bold,
