@@ -2576,6 +2576,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
     List<XFile>? _selectedBeforeImages;
     List<XFile>? _selectedAfterImages;
+    List<XFile>? _selectedOtherImages;
 
     await showDialog(
       context: context,
@@ -2630,7 +2631,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                         validator: (value) {
                           if ((value == null || value.isEmpty) &&
                               (_selectedBeforeImages == null || _selectedBeforeImages!.isEmpty) &&
-                              (_selectedAfterImages == null || _selectedAfterImages!.isEmpty)) {
+                              (_selectedAfterImages == null || _selectedAfterImages!.isEmpty) &&
+                              (_selectedOtherImages == null || _selectedOtherImages!.isEmpty)) {
                             return 'الرجاء إدخال ملاحظة أو إضافة صورة واحدة على الأقل.';
                           }
                           return null;
@@ -2758,6 +2760,67 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                           });
                         },
                       ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      if (_selectedOtherImages != null && _selectedOtherImages!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Wrap(
+                            spacing: 8.0,
+                            runSpacing: 8.0,
+                            children: _selectedOtherImages!.map((xFile) {
+                              return Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+                                    child: kIsWeb
+                                        ? Image.network(xFile.path, height: 100, width: 100, fit: BoxFit.cover)
+                                        : Image.file(File(xFile.path), height: 100, width: 100, fit: BoxFit.cover),
+                                  ),
+                                  Positioned(
+                                    top: -5,
+                                    right: -5,
+                                    child: IconButton(
+                                      icon: const CircleAvatar(
+                                        backgroundColor: Colors.black54,
+                                        radius: 12,
+                                        child: Icon(Icons.close, color: Colors.white, size: 14),
+                                      ),
+                                      onPressed: () {
+                                        setDialogContentState(() {
+                                          _selectedOtherImages!.remove(xFile);
+                                          if (_selectedOtherImages!.isEmpty) {
+                                            _selectedOtherImages = null;
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
+                        label: Text(
+                            (_selectedOtherImages == null || _selectedOtherImages!.isEmpty)
+                                ? 'إضافة صور أخرى (اختياري)'
+                                : 'تغيير/إضافة المزيد من الصور',
+                            style: const TextStyle(color: AppConstants.primaryColor)
+                        ),
+                        onPressed: () {
+                          _showImageSourceActionSheet(context, (List<XFile>? images) {
+                            if (images != null && images.isNotEmpty) {
+                              setDialogContentState(() {
+                                if (_selectedOtherImages == null) {
+                                  _selectedOtherImages = [];
+                                }
+                                _selectedOtherImages!.addAll(images);
+                              });
+                            }
+                          });
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -2774,6 +2837,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                     setDialogContentState(() => isDialogLoading = true);
                     List<String> uploadedBeforeUrls = [];
                     List<String> uploadedAfterUrls = [];
+                    List<String> uploadedOtherUrls = [];
 
                     Future<void> uploadImages(List<XFile> files, List<String> store) async {
                       for (int i = 0; i < files.length; i++) {
@@ -2823,14 +2887,18 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       await uploadImages(_selectedAfterImages!, uploadedAfterUrls);
                     }
 
-                    final uploadedImageUrls = [...uploadedBeforeUrls, ...uploadedAfterUrls];
+                    if (_selectedOtherImages != null && _selectedOtherImages!.isNotEmpty) {
+                      await uploadImages(_selectedOtherImages!, uploadedOtherUrls);
+                    }
+
+                    final uploadedImageUrls = [...uploadedBeforeUrls, ...uploadedAfterUrls, ...uploadedOtherUrls];
 
                     // ... (rest of the try-catch block for Firestore update)
                     try {
                       await FirebaseFirestore.instance.collection(entriesCollectionPath).add({
                         'type': uploadedImageUrls.isNotEmpty ? 'image_with_note' : 'note',
                         'note': noteController.text.trim(),
-                        'imageUrls': uploadedImageUrls.isNotEmpty ? uploadedImageUrls : null,
+                        'imageUrls': uploadedOtherUrls.isNotEmpty ? uploadedOtherUrls : null,
                         if (uploadedBeforeUrls.isNotEmpty) 'beforeImageUrls': uploadedBeforeUrls,
                         if (uploadedAfterUrls.isNotEmpty) 'afterImageUrls': uploadedAfterUrls,
                         'engineerUid': _currentEngineerUid,
@@ -2992,9 +3060,34 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                               ],
                             ),
                           ),
+                        if (imageUrls.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: AppConstants.paddingSmall),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('صور إضافية:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                Wrap(
+                                  spacing: AppConstants.paddingSmall / 2,
+                                  runSpacing: AppConstants.paddingSmall / 2,
+                                  children: imageUrls.map((url) {
+                                    return InkWell(
+                                      onTap: () => _viewImageDialog(url),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
+                                        child: Image.network(url, height: 100, width: 100, fit: BoxFit.cover,
+                                            errorBuilder: (c,e,s) => Container(height: 100, width:100, color: AppConstants.backgroundColor, child: Center(child: Icon(Icons.broken_image, color: AppConstants.textSecondary.withOpacity(0.5), size: 40)))),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                          ),
                         if (note.isNotEmpty)
                           Padding(
-                            padding: EdgeInsets.only(top: beforeUrls.isNotEmpty || afterUrls.isNotEmpty ? AppConstants.paddingSmall : 0),
+                            padding: EdgeInsets.only(top: beforeUrls.isNotEmpty || afterUrls.isNotEmpty || imageUrls.isNotEmpty ? AppConstants.paddingSmall : 0),
                             child: Text(note, style: const TextStyle(fontSize: 13.5)),
                           ),
                         const SizedBox(height: AppConstants.paddingSmall / 2),
