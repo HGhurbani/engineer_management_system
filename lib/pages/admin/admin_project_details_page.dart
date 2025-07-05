@@ -2094,6 +2094,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 final String engineerName = entryData['employeeName'] ?? entryData['engineerName'] ?? 'غير معروف';
                 final Timestamp? timestamp = entryData['timestamp'] as Timestamp?;
 
+                final List<String> beforeUrls = (entryData['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                final List<String> afterUrls = (entryData['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
                 final List<String> imageUrlsToDisplay = [];
                 final dynamic imagesField = entryData['imageUrls'];
                 final dynamic singleImageField = entryData['imageUrl'];
@@ -2113,6 +2115,56 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (beforeUrls.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: AppConstants.paddingSmall),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('صور قبل:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                Wrap(
+                                  spacing: AppConstants.paddingSmall / 2,
+                                  runSpacing: AppConstants.paddingSmall / 2,
+                                  children: beforeUrls.map((url) {
+                                    return InkWell(
+                                      onTap: () => _viewImageDialog(url),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
+                                        child: Image.network(url, height: 100, width: 100, fit: BoxFit.cover,
+                                            errorBuilder: (c,e,s) => Container(height: 100, width:100, color: AppConstants.backgroundColor, child: Center(child: Icon(Icons.broken_image, color: AppConstants.textSecondary.withOpacity(0.5), size: 40)))),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (afterUrls.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: AppConstants.paddingSmall),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('صور بعد:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                Wrap(
+                                  spacing: AppConstants.paddingSmall / 2,
+                                  runSpacing: AppConstants.paddingSmall / 2,
+                                  children: afterUrls.map((url) {
+                                    return InkWell(
+                                      onTap: () => _viewImageDialog(url),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
+                                        child: Image.network(url, height: 100, width: 100, fit: BoxFit.cover,
+                                            errorBuilder: (c,e,s) => Container(height: 100, width:100, color: AppConstants.backgroundColor, child: Center(child: Icon(Icons.broken_image, color: AppConstants.textSecondary.withOpacity(0.5), size: 40)))),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                          ),
                         if (imageUrlsToDisplay.isNotEmpty)
                           Padding(
                             padding: EdgeInsets.only(bottom: note.isNotEmpty ? AppConstants.paddingSmall : 0),
@@ -2140,7 +2192,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                           ),
                         if (note.isNotEmpty)
                           Padding(
-                            padding: EdgeInsets.only(top: imageUrlsToDisplay.isNotEmpty ? AppConstants.paddingSmall : 0),
+                            padding: EdgeInsets.only(top: (imageUrlsToDisplay.isNotEmpty || beforeUrls.isNotEmpty || afterUrls.isNotEmpty) ? AppConstants.paddingSmall : 0),
                             child: ExpandableText(note, valueColor: AppConstants.textPrimary),
                           ),
                         const SizedBox(height: AppConstants.paddingSmall / 2),
@@ -2256,12 +2308,56 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     );
   }
 
+  void _showImageSourceActionSheet(BuildContext context, Function(List<XFile>?) onImagesSelected) {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_camera, color: AppConstants.primaryColor),
+                title: const Text('التقاط صورة بالكاميرا'),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  final picker = ImagePicker();
+                  final XFile? image = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                  if (image != null) {
+                    onImagesSelected([image]);
+                  } else {
+                    onImagesSelected(null);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: AppConstants.primaryColor),
+                title: const Text('اختيار صور من المعرض'),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  final picker = ImagePicker();
+                  final List<XFile> images = await picker.pickMultiImage(imageQuality: 70);
+                  if (images.isNotEmpty) {
+                    onImagesSelected(images);
+                  } else {
+                    onImagesSelected(null);
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // --- MODIFICATION START: _showAddNoteOrImageDialog - Send notifications ---
   Future<void> _showAddNoteOrImageDialog(String phaseId, String phaseOrSubPhaseName, {String? subPhaseId}) async {
     if (!mounted) return;
 
     final noteController = TextEditingController();
-    File? pickedImageFile;
+    List<XFile>? _selectedBeforeImages;
+    List<XFile>? _selectedAfterImages;
+    List<XFile>? _selectedOtherImages;
     bool isUploadingDialog = false;
     final formKeyDialog = GlobalKey<FormState>();
 
@@ -2298,26 +2394,193 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         ),
                         maxLines: 3,
                         validator: (value) {
-                          if ((value == null || value.isEmpty) && pickedImageFile == null) {
+                          if ((value == null || value.isEmpty) &&
+                              (_selectedBeforeImages == null || _selectedBeforeImages!.isEmpty) &&
+                              (_selectedAfterImages == null || _selectedAfterImages!.isEmpty) &&
+                              (_selectedOtherImages == null || _selectedOtherImages!.isEmpty)) {
                             return 'الرجاء إدخال ملاحظة أو إضافة صورة.';
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
-                      if (pickedImageFile != null)
+                      if (_selectedBeforeImages != null && _selectedBeforeImages!.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Image.file(pickedImageFile!, height: 120, fit: BoxFit.contain),
+                          child: Wrap(
+                            spacing: 8.0,
+                            runSpacing: 8.0,
+                            children: _selectedBeforeImages!.map((xFile) {
+                              return Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+                                    child: kIsWeb
+                                        ? Image.network(xFile.path, height: 100, width: 100, fit: BoxFit.cover)
+                                        : Image.file(File(xFile.path), height: 100, width: 100, fit: BoxFit.cover),
+                                  ),
+                                  Positioned(
+                                    top: -5,
+                                    right: -5,
+                                    child: IconButton(
+                                      icon: const CircleAvatar(
+                                        backgroundColor: Colors.black54,
+                                        radius: 12,
+                                        child: Icon(Icons.close, color: Colors.white, size: 14),
+                                      ),
+                                      onPressed: () {
+                                        setDialogState(() {
+                                          _selectedBeforeImages!.remove(xFile);
+                                          if (_selectedBeforeImages!.isEmpty) {
+                                            _selectedBeforeImages = null;
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
                         ),
                       TextButton.icon(
                         icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
-                        label: Text(pickedImageFile == null ? 'إضافة صورة (اختياري)' : 'تغيير الصورة', style: const TextStyle(color: AppConstants.primaryColor)),
+                        label: Text(
+                            (_selectedBeforeImages == null || _selectedBeforeImages!.isEmpty)
+                                ? 'إضافة صور قبل (اختياري)'
+                                : 'تغيير/إضافة المزيد من صور قبل',
+                            style: const TextStyle(color: AppConstants.primaryColor)
+                        ),
                         onPressed: () {
-                          _showSingleImageSourceActionSheet(context, (xFile) {
-                            if (xFile != null) {
+                          _showImageSourceActionSheet(context, (List<XFile>? images) {
+                            if (images != null && images.isNotEmpty) {
                               setDialogState(() {
-                                pickedImageFile = File(xFile.path);
+                                if (_selectedBeforeImages == null) {
+                                  _selectedBeforeImages = [];
+                                }
+                                _selectedBeforeImages!.addAll(images);
+                              });
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      if (_selectedAfterImages != null && _selectedAfterImages!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Wrap(
+                            spacing: 8.0,
+                            runSpacing: 8.0,
+                            children: _selectedAfterImages!.map((xFile) {
+                              return Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+                                    child: kIsWeb
+                                        ? Image.network(xFile.path, height: 100, width: 100, fit: BoxFit.cover)
+                                        : Image.file(File(xFile.path), height: 100, width: 100, fit: BoxFit.cover),
+                                  ),
+                                  Positioned(
+                                    top: -5,
+                                    right: -5,
+                                    child: IconButton(
+                                      icon: const CircleAvatar(
+                                        backgroundColor: Colors.black54,
+                                        radius: 12,
+                                        child: Icon(Icons.close, color: Colors.white, size: 14),
+                                      ),
+                                      onPressed: () {
+                                        setDialogState(() {
+                                          _selectedAfterImages!.remove(xFile);
+                                          if (_selectedAfterImages!.isEmpty) {
+                                            _selectedAfterImages = null;
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
+                        label: Text(
+                            (_selectedAfterImages == null || _selectedAfterImages!.isEmpty)
+                                ? 'إضافة صور بعد (اختياري)'
+                                : 'تغيير/إضافة المزيد من صور بعد',
+                            style: const TextStyle(color: AppConstants.primaryColor)
+                        ),
+                        onPressed: () {
+                          _showImageSourceActionSheet(context, (List<XFile>? images) {
+                            if (images != null && images.isNotEmpty) {
+                              setDialogState(() {
+                                if (_selectedAfterImages == null) {
+                                  _selectedAfterImages = [];
+                                }
+                                _selectedAfterImages!.addAll(images);
+                              });
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      if (_selectedOtherImages != null && _selectedOtherImages!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Wrap(
+                            spacing: 8.0,
+                            runSpacing: 8.0,
+                            children: _selectedOtherImages!.map((xFile) {
+                              return Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+                                    child: kIsWeb
+                                        ? Image.network(xFile.path, height: 100, width: 100, fit: BoxFit.cover)
+                                        : Image.file(File(xFile.path), height: 100, width: 100, fit: BoxFit.cover),
+                                  ),
+                                  Positioned(
+                                    top: -5,
+                                    right: -5,
+                                    child: IconButton(
+                                      icon: const CircleAvatar(
+                                        backgroundColor: Colors.black54,
+                                        radius: 12,
+                                        child: Icon(Icons.close, color: Colors.white, size: 14),
+                                      ),
+                                      onPressed: () {
+                                        setDialogState(() {
+                                          _selectedOtherImages!.remove(xFile);
+                                          if (_selectedOtherImages!.isEmpty) {
+                                            _selectedOtherImages = null;
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
+                        label: Text(
+                            (_selectedOtherImages == null || _selectedOtherImages!.isEmpty)
+                                ? 'إضافة صور أخرى (اختياري)'
+                                : 'تغيير/إضافة المزيد من الصور',
+                            style: const TextStyle(color: AppConstants.primaryColor)
+                        ),
+                        onPressed: () {
+                          _showImageSourceActionSheet(context, (List<XFile>? images) {
+                            if (images != null && images.isNotEmpty) {
+                              setDialogState(() {
+                                if (_selectedOtherImages == null) {
+                                  _selectedOtherImages = [];
+                                }
+                                _selectedOtherImages!.addAll(images);
                               });
                             }
                           });
@@ -2337,35 +2600,57 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     if (!formKeyDialog.currentState!.validate()) return;
 
                     setDialogState(() => isUploadingDialog = true);
-                    String? imageUrl;
                     final currentUser = FirebaseAuth.instance.currentUser;
-                    // _currentAdminName should be fetched in initState or similar
                     String actorName = _currentAdminName ?? "المسؤول";
 
+                    List<String> uploadedBeforeUrls = [];
+                    List<String> uploadedAfterUrls = [];
+                    List<String> uploadedOtherUrls = [];
 
-                    if (pickedImageFile != null) {
-                      try {
-                        final timestampForPath = DateTime.now().millisecondsSinceEpoch;
-                        final imageName = '${currentUser?.uid ?? 'unknown_user'}_${timestampForPath}.jpg';
-                        final refPath = subPhaseId == null
-                            ? 'project_entries/${widget.projectId}/$phaseId/$imageName'
-                            : 'project_entries/${widget.projectId}/$subPhaseId/$imageName';
-
-                        final ref = FirebaseStorage.instance.ref().child(refPath);
-                        await ref.putFile(pickedImageFile!);
-                        imageUrl = await ref.getDownloadURL();
-                      } catch (e) {
-                        if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة: $e', isError: true,);
-                        setDialogState(() => isUploadingDialog = false);
-                        return;
+                    Future<void> uploadImages(List<XFile> files, List<String> store) async {
+                      for (int i = 0; i < files.length; i++) {
+                        final XFile imageFile = files[i];
+                        try {
+                          final timestampForPath = DateTime.now().millisecondsSinceEpoch;
+                          final imageName = '${currentUser?.uid ?? 'unknown_user'}_${timestampForPath}_$i.jpg';
+                          final refPath = subPhaseId == null
+                              ? 'project_entries/${widget.projectId}/$phaseId/$imageName'
+                              : 'project_entries/${widget.projectId}/$subPhaseId/$imageName';
+                          final ref = FirebaseStorage.instance.ref().child(refPath);
+                          if (kIsWeb) {
+                            await ref.putData(await imageFile.readAsBytes());
+                          } else {
+                            await ref.putFile(File(imageFile.path));
+                          }
+                          final url = await ref.getDownloadURL();
+                          store.add(url);
+                        } catch (e) {
+                          if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة (${i+1}): $e', isError: true,);
+                        }
                       }
                     }
 
+                    if (_selectedBeforeImages != null && _selectedBeforeImages!.isNotEmpty) {
+                      await uploadImages(_selectedBeforeImages!, uploadedBeforeUrls);
+                    }
+
+                    if (_selectedAfterImages != null && _selectedAfterImages!.isNotEmpty) {
+                      await uploadImages(_selectedAfterImages!, uploadedAfterUrls);
+                    }
+
+                    if (_selectedOtherImages != null && _selectedOtherImages!.isNotEmpty) {
+                      await uploadImages(_selectedOtherImages!, uploadedOtherUrls);
+                    }
+
+                    final uploadedImageUrls = [...uploadedBeforeUrls, ...uploadedAfterUrls, ...uploadedOtherUrls];
+
                     try {
                       await FirebaseFirestore.instance.collection(collectionPath).add({
-                        'type': imageUrl != null ? (noteController.text.trim().isEmpty ? 'image_only' : 'image_with_note') : 'note_only',
+                        'type': uploadedImageUrls.isNotEmpty ? 'image_with_note' : 'note',
                         'note': noteController.text.trim(),
-                        'imageUrl': imageUrl,
+                        'imageUrls': uploadedOtherUrls.isNotEmpty ? uploadedOtherUrls : null,
+                        if (uploadedBeforeUrls.isNotEmpty) 'beforeImageUrls': uploadedBeforeUrls,
+                        if (uploadedAfterUrls.isNotEmpty) 'afterImageUrls': uploadedAfterUrls,
                         'engineerUid': currentUser?.uid,
                         'engineerName': actorName,
                         'timestamp': FieldValue.serverTimestamp(),
@@ -2379,7 +2664,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
                         final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
 
-                        String notificationBody = "قام المسؤول '$actorName' بإضافة ${imageUrl != null ? 'صورة وملاحظة' : 'ملاحظة'} جديدة في ${subPhaseId != null ? 'المرحلة الفرعية' : 'المرحلة'}: '$phaseOrSubPhaseName'.";
+                        String notificationBody = "قام المسؤول '$actorName' بإضافة ${uploadedImageUrls.isNotEmpty ? 'صورة وملاحظة' : 'ملاحظة'} جديدة في ${subPhaseId != null ? 'المرحلة الفرعية' : 'المرحلة'}: '$phaseOrSubPhaseName'.";
 
                         // Notify Assigned Engineers
                         if(assignedEngineerUids.isNotEmpty) {
@@ -2415,7 +2700,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         final List<dynamic> assignedEngineersRaw = projectData['assignedEngineers'] as List<dynamic>? ?? [];
                         final List<String> assignedEngineerUids = assignedEngineersRaw.map((e) => Map<String,dynamic>.from(e)['uid'].toString()).toList();
 
-                        String notificationBody = "قام المسؤول '$actorName' بإضافة ${imageUrl != null ? 'صورة وملاحظة' : 'ملاحظة'} جديدة في ${subPhaseId != null ? 'المرحلة الفرعية' : 'المرحلة'}: '$phaseOrSubPhaseName'.";
+                        String notificationBody = "قام المسؤول '$actorName' بإضافة ${uploadedImageUrls.isNotEmpty ? 'صورة وملاحظة' : 'ملاحظة'} جديدة في ${subPhaseId != null ? 'المرحلة الفرعية' : 'المرحلة'}: '$phaseOrSubPhaseName'.";
 
                         // Notify Assigned Engineers
                         if(assignedEngineerUids.isNotEmpty) {
