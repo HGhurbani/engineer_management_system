@@ -35,6 +35,10 @@ A comprehensive system for managing projects, engineers, clients, and employees,
     * Evaluation system for engineers based on criteria such as working hours, completed tasks, and activity rate.
     * Set different weights for evaluation criteria by the Admin.
     * Enable automatic monthly and yearly evaluations.
+* **Financial Management**:
+    * Review sales and spare part orders for approval.
+    * Manage debts, payments and collections.
+    * Record purchases and link them to maintenance and production costs.
 * **Attachments and Important Notes Management**:
     * Add important notes and attachments to projects.
 * **Holiday Settings**:

@@ -767,6 +767,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         route: '/admin/meeting_logs',
       ),
       _ManagementItem(
+        title: 'الوحدة المالية',
+        subtitle: 'مراجعة الطلبات والتحصيل',
+        icon: Icons.account_balance_wallet,
+        color: const Color(0xFF10B981),
+        route: '/admin/finance',
+      ),
+      _ManagementItem(
         title: 'الإعدادات العامة',
         subtitle: 'إعدادات النظام',
         icon: Icons.settings_rounded,
