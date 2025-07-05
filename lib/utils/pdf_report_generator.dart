@@ -169,10 +169,15 @@ class PdfReportGenerator {
             final data = doc.data();
 
             final imgs =
-
                 (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            final beforeImgs =
+                (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            final afterImgs =
+                (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
 
             imageUrls.addAll(imgs);
+            imageUrls.addAll(beforeImgs);
+            imageUrls.addAll(afterImgs);
 
             dayEntries.add({
 
@@ -226,10 +231,15 @@ class PdfReportGenerator {
               final data = doc.data();
 
               final imgs =
-
                   (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              final beforeImgs =
+                  (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              final afterImgs =
+                  (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
 
               imageUrls.addAll(imgs);
+              imageUrls.addAll(beforeImgs);
+              imageUrls.addAll(afterImgs);
 
               dayEntries.add({
 
@@ -892,6 +902,8 @@ class PdfReportGenerator {
     final phaseName = entry['phaseName'] ?? '';
     final subName = entry['subPhaseName'];
     final imageUrls = (entry['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    final beforeUrls = (entry['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    final afterUrls = (entry['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
 
     return pw.Container(
       margin: const pw.EdgeInsets.only(bottom: 20),
@@ -1052,7 +1064,7 @@ class PdfReportGenerator {
           ),
 
           // Images Section
-          if (imageUrls.isNotEmpty) ...[
+          if (imageUrls.isNotEmpty || beforeUrls.isNotEmpty || afterUrls.isNotEmpty) ...[
             pw.SizedBox(height: 20),
             pw.Container(
               width: double.infinity,
@@ -1063,7 +1075,7 @@ class PdfReportGenerator {
                 ),
               ),
               child: pw.Text(
-                'الصور المرفقة (${imageUrls.where((url) => fetchedImages.containsKey(url)).length}):',
+                'الصور المرفقة:',
                 style: pw.TextStyle(
                   fontSize: 15,
                   fontWeight: pw.FontWeight.bold,
@@ -1075,76 +1087,64 @@ class PdfReportGenerator {
             ),
             pw.SizedBox(height: 10),
 
-            // عرض الصور في صفوف، كل صف يحتوي على 3 صور
-            ...() {
-              final availableImages = imageUrls
-                  .where((imageUrl) => fetchedImages.containsKey(imageUrl))
-                  .toList();
-
-              List<pw.Widget> imageRows = [];
-
-              for (int i = 0; i < availableImages.length; i += 3) {
-                final rowImages = availableImages.skip(i).take(3).toList();
-
-                imageRows.add(
-                  pw.Container(
-                    margin: const pw.EdgeInsets.only(bottom: 15),
-                    child: pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-                      children: rowImages.map((imageUrl) =>
-                          pw.Container(
-                            width: 180,
-                            height: 210,
-                            decoration: pw.BoxDecoration(
-                              border: pw.Border.all(color: borderColor, width: 1.5),
-                              borderRadius: pw.BorderRadius.zero,
-                              boxShadow: [
-                                pw.BoxShadow(
-                                  color: PdfColors.grey300,
-                                  blurRadius: 2,
-                                ),
-                              ],
-                            ),
-                            child: pw.ClipRRect(
-                              horizontalRadius: 0,
-                              verticalRadius: 0,
-                              child: pw.Image(
-                                fetchedImages[imageUrl]!,
-                                fit: pw.BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                      ).toList(),
-                    ),
-                  ),
-                );
-              }
-
-              return imageRows;
-            }(),
-
-            if (imageUrls.where((url) => fetchedImages.containsKey(url)).length > 9)
-              pw.Container(
-                padding: const pw.EdgeInsets.all(8),
-                decoration: pw.BoxDecoration(
-                  color: lightGrey,
-                  borderRadius: pw.BorderRadius.circular(5),
-                ),
-                child: pw.Text(
-                  'وعدد ${imageUrls.where((url) => fetchedImages.containsKey(url)).length - 9} صورة إضافية غير معروضة...',
-                  style: pw.TextStyle(
-                    fontSize: 12,
-                    color: PdfColors.grey700,
-                    fontStyle: pw.FontStyle.italic,
-                  ),
-                  textAlign: pw.TextAlign.right,
-                  textDirection: pw.TextDirection.rtl,
-                ),
-              ),
+            if (beforeUrls.isNotEmpty)
+              _buildImagesGrid(beforeUrls, fetchedImages, borderColor),
+            if (afterUrls.isNotEmpty)
+              _buildImagesGrid(afterUrls, fetchedImages, borderColor),
+            if (imageUrls.isNotEmpty)
+              _buildImagesGrid(imageUrls, fetchedImages, borderColor),
           ],
         ],
       ),
     );
+  }
+
+  static pw.Widget _buildImagesGrid(
+      List<String> urls,
+      Map<String, pw.MemoryImage> fetchedImages,
+      PdfColor borderColor) {
+    final availableImages =
+        urls.where((u) => fetchedImages.containsKey(u)).toList();
+    if (availableImages.isEmpty) return pw.SizedBox();
+
+    List<pw.Widget> rows = [];
+    for (int i = 0; i < availableImages.length; i += 3) {
+      final rowImages = availableImages.skip(i).take(3).toList();
+      rows.add(
+        pw.Container(
+          margin: const pw.EdgeInsets.only(bottom: 15),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+            children: rowImages
+                .map((imageUrl) => pw.Container(
+                      width: 180,
+                      height: 210,
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: borderColor, width: 1.5),
+                        borderRadius: pw.BorderRadius.zero,
+                        boxShadow: [
+                          pw.BoxShadow(
+                            color: PdfColors.grey300,
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: pw.ClipRRect(
+                        horizontalRadius: 0,
+                        verticalRadius: 0,
+                        child: pw.Image(
+                          fetchedImages[imageUrl]!,
+                          fit: pw.BoxFit.cover,
+                        ),
+                      ),
+                    ))
+                .toList(),
+          ),
+        ),
+      );
+    }
+
+    return pw.Column(children: rows);
   }
 
 
@@ -1693,7 +1693,13 @@ class PdfReportGenerator {
             final data = doc.data();
             final imgs =
                 (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            final beforeImgs =
+                (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            final afterImgs =
+                (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
             imageUrls.addAll(imgs);
+            imageUrls.addAll(beforeImgs);
+            imageUrls.addAll(afterImgs);
             dayEntries.add({
               ...data,
               'phaseName': phaseName,
@@ -1722,7 +1728,13 @@ class PdfReportGenerator {
               final data = doc.data();
               final imgs =
                   (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              final beforeImgs =
+                  (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              final afterImgs =
+                  (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
               imageUrls.addAll(imgs);
+              imageUrls.addAll(beforeImgs);
+              imageUrls.addAll(afterImgs);
               dayEntries.add({
                 ...data,
                 'phaseName': phaseName,

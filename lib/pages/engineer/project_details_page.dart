@@ -2574,7 +2574,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     String? selectedEmployeeId;
     String? selectedEmployeeName;
 
-    List<XFile>? _selectedImagesInDialogStateful;
+    List<XFile>? _selectedBeforeImages;
+    List<XFile>? _selectedAfterImages;
 
     await showDialog(
       context: context,
@@ -2627,20 +2628,22 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                         ),
                         maxLines: 3,
                         validator: (value) {
-                          if ((value == null || value.isEmpty) && (_selectedImagesInDialogStateful == null || _selectedImagesInDialogStateful!.isEmpty)) {
+                          if ((value == null || value.isEmpty) &&
+                              (_selectedBeforeImages == null || _selectedBeforeImages!.isEmpty) &&
+                              (_selectedAfterImages == null || _selectedAfterImages!.isEmpty)) {
                             return 'الرجاء إدخال ملاحظة أو إضافة صورة واحدة على الأقل.';
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
-                      if (_selectedImagesInDialogStateful != null && _selectedImagesInDialogStateful!.isNotEmpty)
+                      if (_selectedBeforeImages != null && _selectedBeforeImages!.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8.0),
                           child: Wrap(
                             spacing: 8.0,
                             runSpacing: 8.0,
-                            children: _selectedImagesInDialogStateful!.map((xFile) {
+                            children: _selectedBeforeImages!.map((xFile) {
                               return Stack(
                                 children: [
                                   ClipRRect(
@@ -2660,9 +2663,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                       ),
                                       onPressed: () {
                                         setDialogContentState(() {
-                                          _selectedImagesInDialogStateful!.remove(xFile);
-                                          if (_selectedImagesInDialogStateful!.isEmpty) {
-                                            _selectedImagesInDialogStateful = null;
+                                          _selectedBeforeImages!.remove(xFile);
+                                          if (_selectedBeforeImages!.isEmpty) {
+                                            _selectedBeforeImages = null;
                                           }
                                         });
                                       },
@@ -2676,19 +2679,80 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       TextButton.icon(
                         icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
                         label: Text(
-                            (_selectedImagesInDialogStateful == null || _selectedImagesInDialogStateful!.isEmpty)
-                                ? 'إضافة صور (اختياري)'
-                                : 'تغيير/إضافة المزيد من الصور',
+                            (_selectedBeforeImages == null || _selectedBeforeImages!.isEmpty)
+                                ? 'إضافة صور قبل (اختياري)'
+                                : 'تغيير/إضافة المزيد من صور قبل',
                             style: const TextStyle(color: AppConstants.primaryColor)
                         ),
                         onPressed: () {
                           _showImageSourceActionSheet(context, (List<XFile>? images) {
                             if (images != null && images.isNotEmpty) {
                               setDialogContentState(() {
-                                if (_selectedImagesInDialogStateful == null) {
-                                  _selectedImagesInDialogStateful = [];
+                                if (_selectedBeforeImages == null) {
+                                  _selectedBeforeImages = [];
                                 }
-                                _selectedImagesInDialogStateful!.addAll(images);
+                                _selectedBeforeImages!.addAll(images);
+                              });
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      if (_selectedAfterImages != null && _selectedAfterImages!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Wrap(
+                            spacing: 8.0,
+                            runSpacing: 8.0,
+                            children: _selectedAfterImages!.map((xFile) {
+                              return Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+                                    child: kIsWeb
+                                        ? Image.network(xFile.path, height: 100, width: 100, fit: BoxFit.cover)
+                                        : Image.file(File(xFile.path), height: 100, width: 100, fit: BoxFit.cover),
+                                  ),
+                                  Positioned(
+                                    top: -5,
+                                    right: -5,
+                                    child: IconButton(
+                                      icon: const CircleAvatar(
+                                        backgroundColor: Colors.black54,
+                                        radius: 12,
+                                        child: Icon(Icons.close, color: Colors.white, size: 14),
+                                      ),
+                                      onPressed: () {
+                                        setDialogContentState(() {
+                                          _selectedAfterImages!.remove(xFile);
+                                          if (_selectedAfterImages!.isEmpty) {
+                                            _selectedAfterImages = null;
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
+                        label: Text(
+                            (_selectedAfterImages == null || _selectedAfterImages!.isEmpty)
+                                ? 'إضافة صور بعد (اختياري)'
+                                : 'تغيير/إضافة المزيد من صور بعد',
+                            style: const TextStyle(color: AppConstants.primaryColor)
+                        ),
+                        onPressed: () {
+                          _showImageSourceActionSheet(context, (List<XFile>? images) {
+                            if (images != null && images.isNotEmpty) {
+                              setDialogContentState(() {
+                                if (_selectedAfterImages == null) {
+                                  _selectedAfterImages = [];
+                                }
+                                _selectedAfterImages!.addAll(images);
                               });
                             }
                           });
@@ -2708,11 +2772,12 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                     if (!formKeyDialog.currentState!.validate()) return;
 
                     setDialogContentState(() => isDialogLoading = true);
-                    List<String> uploadedImageUrls = [];
+                    List<String> uploadedBeforeUrls = [];
+                    List<String> uploadedAfterUrls = [];
 
-                    if (_selectedImagesInDialogStateful != null && _selectedImagesInDialogStateful!.isNotEmpty) {
-                      for (int i = 0; i < _selectedImagesInDialogStateful!.length; i++) {
-                        final XFile imageFile = _selectedImagesInDialogStateful![i];
+                    Future<void> uploadImages(List<XFile> files, List<String> store) async {
+                      for (int i = 0; i < files.length; i++) {
+                        final XFile imageFile = files[i];
                         try {
                           var request = http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
                           if (kIsWeb) {
@@ -2737,7 +2802,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                           if (response.statusCode == 200) {
                             var responseData = json.decode(response.body);
                             if (responseData['status'] == 'success' && responseData['url'] != null) {
-                              uploadedImageUrls.add(responseData['url']);
+                              store.add(responseData['url']);
                             } else {
                               throw Exception(responseData['message'] ?? 'فشل رفع الصورة (${i+1}) من السيرفر.');
                             }
@@ -2750,12 +2815,24 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       }
                     }
 
+                    if (_selectedBeforeImages != null && _selectedBeforeImages!.isNotEmpty) {
+                      await uploadImages(_selectedBeforeImages!, uploadedBeforeUrls);
+                    }
+
+                    if (_selectedAfterImages != null && _selectedAfterImages!.isNotEmpty) {
+                      await uploadImages(_selectedAfterImages!, uploadedAfterUrls);
+                    }
+
+                    final uploadedImageUrls = [...uploadedBeforeUrls, ...uploadedAfterUrls];
+
                     // ... (rest of the try-catch block for Firestore update)
                     try {
                       await FirebaseFirestore.instance.collection(entriesCollectionPath).add({
                         'type': uploadedImageUrls.isNotEmpty ? 'image_with_note' : 'note',
                         'note': noteController.text.trim(),
                         'imageUrls': uploadedImageUrls.isNotEmpty ? uploadedImageUrls : null,
+                        if (uploadedBeforeUrls.isNotEmpty) 'beforeImageUrls': uploadedBeforeUrls,
+                        if (uploadedAfterUrls.isNotEmpty) 'afterImageUrls': uploadedAfterUrls,
                         'engineerUid': _currentEngineerUid,
                         'engineerName': _currentEngineerName ?? 'مهندس',
                         if (selectedEmployeeId != null) 'employeeId': selectedEmployeeId,
@@ -2850,6 +2927,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 final String note = entryData['note'] ?? '';
                 final List<dynamic>? imageUrlsDynamic = entryData['imageUrls'] as List<dynamic>?;
                 final List<String> imageUrls = imageUrlsDynamic?.map((e) => e.toString()).toList() ?? [];
+                final List<String> beforeUrls = (entryData['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                final List<String> afterUrls = (entryData['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
 
                 final String employeeName = entryData['employeeName'] ?? entryData['engineerName'] ?? 'مهندس';
                 final Timestamp? timestamp = entryData['timestamp'] as Timestamp?;
@@ -2863,27 +2942,59 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (imageUrls.isNotEmpty)
+                        if (beforeUrls.isNotEmpty)
                           Padding(
-                            padding: EdgeInsets.only(bottom: note.isNotEmpty ? AppConstants.paddingSmall : 0),
-                            child: Wrap(
-                              spacing: AppConstants.paddingSmall / 2,
-                              runSpacing: AppConstants.paddingSmall / 2,
-                              children: imageUrls.map((url) {
-                                return InkWell(
-                                  onTap: () => _viewImageDialog(url),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
-                                    child: Image.network(url, height: 100, width: 100, fit: BoxFit.cover,
-                                        errorBuilder: (c,e,s) => Container(height: 100, width:100, color: AppConstants.backgroundColor, child: Center(child: Icon(Icons.broken_image, color: AppConstants.textSecondary.withOpacity(0.5), size: 40)))),
-                                  ),
-                                );
-                              }).toList(),
+                            padding: const EdgeInsets.only(bottom: AppConstants.paddingSmall),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('صور قبل:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                Wrap(
+                                  spacing: AppConstants.paddingSmall / 2,
+                                  runSpacing: AppConstants.paddingSmall / 2,
+                                  children: beforeUrls.map((url) {
+                                    return InkWell(
+                                      onTap: () => _viewImageDialog(url),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
+                                        child: Image.network(url, height: 100, width: 100, fit: BoxFit.cover,
+                                            errorBuilder: (c,e,s) => Container(height: 100, width:100, color: AppConstants.backgroundColor, child: Center(child: Icon(Icons.broken_image, color: AppConstants.textSecondary.withOpacity(0.5), size: 40)))),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (afterUrls.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: AppConstants.paddingSmall),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('صور بعد:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                Wrap(
+                                  spacing: AppConstants.paddingSmall / 2,
+                                  runSpacing: AppConstants.paddingSmall / 2,
+                                  children: afterUrls.map((url) {
+                                    return InkWell(
+                                      onTap: () => _viewImageDialog(url),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
+                                        child: Image.network(url, height: 100, width: 100, fit: BoxFit.cover,
+                                            errorBuilder: (c,e,s) => Container(height: 100, width:100, color: AppConstants.backgroundColor, child: Center(child: Icon(Icons.broken_image, color: AppConstants.textSecondary.withOpacity(0.5), size: 40)))),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
                             ),
                           ),
                         if (note.isNotEmpty)
                           Padding(
-                            padding: EdgeInsets.only(top: imageUrls.isNotEmpty ? AppConstants.paddingSmall : 0),
+                            padding: EdgeInsets.only(top: beforeUrls.isNotEmpty || afterUrls.isNotEmpty ? AppConstants.paddingSmall : 0),
                             child: Text(note, style: const TextStyle(fontSize: 13.5)),
                           ),
                         const SizedBox(height: AppConstants.paddingSmall / 2),
