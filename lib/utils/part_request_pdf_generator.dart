@@ -54,11 +54,11 @@ class PartRequestPdfGenerator {
       ]);
     }
 
-    // Compress the PDF output to keep memory usage under control
-    final pdf = pw.Document(compress: true);
+    // Disable compression so images are embedded without modification
+    final pdf = pw.Document(compress: false);
     pdf.addPage(
       pw.MultiPage(
-        maxPages: 10000,
+        maxPages: 1000000,
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,

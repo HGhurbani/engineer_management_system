@@ -31,16 +31,10 @@ import 'report_storage.dart';
 class PdfReportGenerator {
 
   static pw.Font? _arabicFont;
-  // Limit the dimensions of any embedded images to keep memory usage low
-  // Lower the maximum image dimension to significantly reduce memory usage
-  // during PDF generation. This helps prevent "Out of Memory" issues when
-  // many high resolution images are included in the report.
-  // Reduced further to allow handling many images without exhausting memory.
-  // Even 128px on the longest side proved large when dozens of images are
-  // embedded, so we compress images down to 96px on the longest side.
-  static const int _maxImageDimension = 96;
-  // JPEG quality used when encoding resized images.
-  static const int _jpgQuality = 40;
+  // Previously images were aggressively resized and compressed to keep
+  // memory usage low. To honor the new requirement of embedding images
+  // without any compression or resizing, these limits are effectively
+  // disabled.
 
 
   static Future<void> _loadArabicFont() async {
@@ -63,27 +57,8 @@ class PdfReportGenerator {
   }
 
   static Future<Uint8List> _resizeImageIfNeeded(Uint8List bytes) async {
-    // Decode the image using Flutter's codec with a target size to avoid
-    // allocating memory for the full resolution image. This drastically lowers
-    // peak memory usage when working with very large images.
-    final ui.Codec codec = await ui.instantiateImageCodec(
-      bytes,
-      targetWidth: _maxImageDimension,
-      targetHeight: _maxImageDimension,
-      allowUpscaling: false,
-    );
-    final ui.FrameInfo frame = await codec.getNextFrame();
-    final ui.Image image = frame.image;
-    final ByteData? raw =
-        await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-    if (raw == null) return bytes;
-    final img.Image converted = img.Image.fromBytes(
-      width: image.width,
-      height: image.height,
-      bytes: raw.buffer,
-    );
-    // Encode to JPEG with a lower quality to further reduce memory usage.
-    return Uint8List.fromList(img.encodeJpg(converted, quality: _jpgQuality));
+    // Image resizing and compression disabled; return the original bytes.
+    return bytes;
   }
 
   @visibleForTesting
@@ -349,8 +324,8 @@ class PdfReportGenerator {
     if (emojiFont != null) commonFontFallback.add(emojiFont);
 
 
-    // Enable compression on the PDF document to reduce memory usage
-    final pdf = pw.Document(compress: true);
+    // Disable PDF compression to embed images without modification
+    final pdf = pw.Document(compress: false);
 
     final fileName =
 
@@ -455,7 +430,7 @@ class PdfReportGenerator {
     pdf.addPage(
 
       pw.MultiPage(
-        maxPages: 10000,
+        maxPages: 1000000,
         pageTheme: pw.PageTheme(
 
           pageFormat: PdfPageFormat.a4,
@@ -1747,8 +1722,8 @@ class PdfReportGenerator {
       throw Exception('Arabic font not available');
     }
 
-    // Enable compression on the PDF document to reduce memory usage
-    final pdf = pw.Document(compress: true);
+    // Disable PDF compression to embed images without modification
+    final pdf = pw.Document(compress: false);
     final fileName =
         'simple_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
     final token = generateReportToken();
@@ -1765,7 +1740,7 @@ class PdfReportGenerator {
 
     pdf.addPage(
       pw.MultiPage(
-        maxPages: 10000,
+        maxPages: 1000000,
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
