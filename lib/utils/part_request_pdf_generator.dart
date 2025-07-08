@@ -54,7 +54,8 @@ class PartRequestPdfGenerator {
       ]);
     }
 
-    final pdf = pw.Document();
+    // Compress the PDF output to keep memory usage under control
+    final pdf = pw.Document(compress: true);
     pdf.addPage(
       pw.MultiPage(
         maxPages: 10000,
