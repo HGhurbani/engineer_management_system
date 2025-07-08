@@ -34,7 +34,8 @@ class PdfReportGenerator {
   // Lower the maximum image dimension to significantly reduce memory usage
   // during PDF generation. This helps prevent "Out of Memory" issues when
   // many high resolution images are included in the report.
-  static const int _maxImageDimension = 512;
+  // Reduced further to allow handling many images without exhausting memory.
+  static const int _maxImageDimension = 256;
 
 
   static Future<void> _loadArabicFont() async {
@@ -71,7 +72,7 @@ class PdfReportGenerator {
     );
     // Compress further to avoid excessive memory consumption when building
     // very large reports.
-    return Uint8List.fromList(img.encodeJpg(resized, quality: 70));
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 60));
   }
 
   @visibleForTesting
