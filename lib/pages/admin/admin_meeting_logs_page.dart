@@ -1074,7 +1074,7 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
           final resizedBytes =
-              PdfReportGenerator.resizeImageForTest(response.bodyBytes);
+              await PdfReportGenerator.resizeImageForTest(response.bodyBytes);
           final memImg = pw.MemoryImage(resizedBytes);
           fetched[url] = memImg;
           PdfImageCache.put(url, memImg);
