@@ -1208,6 +1208,7 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
 
     pdf.addPage(
       pw.MultiPage(
+        maxPages: 1000,
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,

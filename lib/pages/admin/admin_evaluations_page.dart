@@ -1337,6 +1337,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
     pdf.addPage(
       pw.MultiPage(
+        maxPages: 1000,
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
