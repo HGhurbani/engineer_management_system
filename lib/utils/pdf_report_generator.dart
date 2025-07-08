@@ -80,7 +80,7 @@ class PdfReportGenerator {
     final img.Image converted = img.Image.fromBytes(
       width: image.width,
       height: image.height,
-      bytes: raw.buffer.asUint8List(),
+      bytes: raw.buffer,
     );
     // Encode to JPEG with a lower quality to further reduce memory usage.
     return Uint8List.fromList(img.encodeJpg(converted, quality: _jpgQuality));
