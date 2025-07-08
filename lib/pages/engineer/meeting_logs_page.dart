@@ -1114,8 +1114,9 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
       }
 
       try {
-        final response =
-            await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+        final response = await http
+            .get(Uri.parse(url))
+            .timeout(const Duration(seconds: 60));
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
           final resizedBytes =

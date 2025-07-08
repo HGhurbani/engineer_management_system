@@ -24,7 +24,9 @@ class ReportStorage {
           // contentType: MediaType('application', 'pdf'), // قد تحتاج لإضافة هذا إذا كان الخادم يتطلب نوع المحتوى
         ));
 
-      var response = await request.send().timeout(const Duration(seconds: 15));
+      var response = await request
+          .send()
+          .timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
         final responseBody = await response.stream.bytesToString();
@@ -56,8 +58,9 @@ class ReportStorage {
   // دالة لتنزيل تقرير PDF
   static Future<Uint8List?> downloadReportPdf(String url) async {
     try {
-      final response =
-          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 60));
       if (response.statusCode == 200) {
         return response.bodyBytes;
       } else {
