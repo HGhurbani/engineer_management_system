@@ -35,9 +35,9 @@ class PdfReportGenerator {
   // during PDF generation. This helps prevent "Out of Memory" issues when
   // many high resolution images are included in the report.
   // Reduced further to allow handling many images without exhausting memory.
-  // The previous value of 256 still caused issues in low memory devices, so
-  // we shrink images down to 128px on the longest side.
-  static const int _maxImageDimension = 128;
+  // Even 128px on the longest side proved large when dozens of images are
+  // embedded, so we compress images down to 96px on the longest side.
+  static const int _maxImageDimension = 96;
 
 
   static Future<void> _loadArabicFont() async {
@@ -73,10 +73,9 @@ class PdfReportGenerator {
       height: widthLarger ? null : _maxImageDimension,
     );
     // Compress further to avoid excessive memory consumption when building
-    // very large reports.
-    // Save with slightly lower quality to further reduce memory usage while
-    // keeping reasonable visual fidelity.
-    return Uint8List.fromList(img.encodeJpg(resized, quality: 50));
+    // very large reports. Save with lower quality to further reduce memory
+    // usage while keeping reasonable visual fidelity.
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 40));
   }
 
   @visibleForTesting
