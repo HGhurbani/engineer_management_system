@@ -10,7 +10,7 @@ void main() {
     final resized = PdfReportGenerator.resizeImageForTest(bytes);
     final decoded = img.decodeImage(resized)!;
     // Images should be resized down to the configured maximum dimension
-    expect(decoded.width <= 256, true);
-    expect(decoded.height <= 256, true);
+    expect(decoded.width <= 128, true);
+    expect(decoded.height <= 128, true);
   });
 }
