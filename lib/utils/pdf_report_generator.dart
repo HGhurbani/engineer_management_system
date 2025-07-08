@@ -1596,7 +1596,10 @@ class PdfReportGenerator {
     required List<Map<String, dynamic>> testsStructure,
     DateTime? start,
     DateTime? end,
+    void Function(double progress)? onProgress,
   }) async {
+    PdfImageCache.clear();
+    onProgress?.call(0.0);
     DateTime now = DateTime.now();
     bool useRange = start != null || end != null;
     if (useRange) {
