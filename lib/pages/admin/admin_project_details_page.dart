@@ -30,6 +30,7 @@ import '../../utils/pdf_image_cache.dart';
 import '../../utils/report_storage.dart';
 import '../../utils/pdf_report_generator.dart';
 import '../../utils/part_request_pdf_generator.dart';
+import '../../utils/progress_dialog.dart';
 
 import 'package:engineer_management_system/html_stub.dart'
 if (dart.library.html) 'dart:html' as html;
@@ -1889,7 +1890,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             ? 'التقرير التراكمي'
             : 'التقرير اليومي';
 
-    _showLoadingDialog(context, 'جاري إنشاء التقرير...');
+    final progress = ProgressDialog.show(context, 'جاري تحميل البيانات...');
 
     try {
       final pdfBytes = await PdfReportGenerator.generate(
@@ -1900,9 +1901,10 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         generatedBy: _currentAdminName,
         start: start,
         end: end,
+        onProgress: (p) => progress.value = p,
       );
 
-      _hideLoadingDialog(context);
+      ProgressDialog.hide(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
 
       _openPdfPreview(
@@ -1911,7 +1913,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         'يرجى الإطلاع على $headerText للمشروع.',
       );
     } catch (e) {
-      _hideLoadingDialog(context);
+      ProgressDialog.hide(context);
       _showFeedbackSnackBar(context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
       print('Error generating daily report PDF: $e');
     }
