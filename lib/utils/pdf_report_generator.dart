@@ -78,9 +78,9 @@ class PdfReportGenerator {
         await image.toByteData(format: ui.ImageByteFormat.rawRgba);
     if (raw == null) return bytes;
     final img.Image converted = img.Image.fromBytes(
-      image.width,
-      image.height,
-      raw.buffer.asUint8List(),
+      width: image.width,
+      height: image.height,
+      bytes: raw.buffer.asUint8List(),
     );
     // Encode to JPEG with a lower quality to further reduce memory usage.
     return Uint8List.fromList(img.encodeJpg(converted, quality: _jpgQuality));
