@@ -3798,7 +3798,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
     pdf.addPage(
         pw.MultiPage(
-            maxPages: 10000,
+            maxPages: 1000000,
             pageTheme: pw.PageTheme(
               pageFormat: PdfPageFormat.a4,
               orientation: pw.PageOrientation.portrait,
