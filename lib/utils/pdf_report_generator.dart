@@ -74,7 +74,7 @@ class PdfReportGenerator {
     );
     final ui.FrameInfo frame = await codec.getNextFrame();
     final ui.Image image = frame.image;
-    final ui.ByteData? raw =
+    final ByteData? raw =
         await image.toByteData(format: ui.ImageByteFormat.rawRgba);
     if (raw == null) return bytes;
     final img.Image converted = img.Image.fromBytes(
