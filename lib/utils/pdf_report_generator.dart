@@ -30,7 +30,8 @@ import 'report_storage.dart';
 class PdfReportGenerator {
 
   static pw.Font? _arabicFont;
-  static const int _maxImageDimension = 1024;
+  // Limit the dimensions of any embedded images to keep memory usage low
+  static const int _maxImageDimension = 720;
 
 
   static Future<void> _loadArabicFont() async {
@@ -65,7 +66,9 @@ class PdfReportGenerator {
       width: widthLarger ? _maxImageDimension : null,
       height: widthLarger ? null : _maxImageDimension,
     );
-    return Uint8List.fromList(img.encodeJpg(resized, quality: 85));
+    // Compress further to avoid excessive memory consumption when building
+    // very large reports.
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 70));
   }
 
   @visibleForTesting
@@ -422,7 +425,8 @@ class PdfReportGenerator {
     if (emojiFont != null) commonFontFallback.add(emojiFont);
 
 
-    final pdf = pw.Document();
+    // Enable compression on the PDF document to reduce memory usage
+    final pdf = pw.Document(compress: true);
 
     final fileName =
 
@@ -1811,7 +1815,8 @@ class PdfReportGenerator {
       throw Exception('Arabic font not available');
     }
 
-    final pdf = pw.Document();
+    // Enable compression on the PDF document to reduce memory usage
+    final pdf = pw.Document(compress: true);
     final fileName =
         'simple_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
     final token = generateReportToken();
