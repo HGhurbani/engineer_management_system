@@ -18,6 +18,7 @@ import 'package:image/image.dart' as img;
 import '../../utils/pdf_styles.dart';
 import '../../utils/pdf_image_cache.dart';
 import '../../utils/report_storage.dart';
+import '../../utils/pdf_report_generator.dart';
 import 'package:engineer_management_system/html_stub.dart'
     if (dart.library.html) 'dart:html' as html;
 import 'package:intl/intl.dart';
@@ -1071,12 +1072,11 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
             await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
-          final decoded = img.decodeImage(response.bodyBytes);
-          if (decoded != null) {
-            final memImg = pw.MemoryImage(response.bodyBytes);
-            fetched[url] = memImg;
-            PdfImageCache.put(url, memImg);
-          }
+          final resizedBytes =
+              PdfReportGenerator.resizeImageForTest(response.bodyBytes);
+          final memImg = pw.MemoryImage(resizedBytes);
+          fetched[url] = memImg;
+          PdfImageCache.put(url, memImg);
         }
       } on TimeoutException catch (_) {
         print('Timeout fetching image from URL $url');
