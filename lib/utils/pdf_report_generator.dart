@@ -89,7 +89,9 @@ class PdfReportGenerator {
       }
       try {
         final response =
-            await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+            await http
+                .get(Uri.parse(url))
+                .timeout(const Duration(seconds: 60));
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
           final resizedBytes = _resizeImageIfNeeded(response.bodyBytes);
