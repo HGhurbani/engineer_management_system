@@ -57,7 +57,7 @@ class PartRequestPdfGenerator {
     final pdf = pw.Document();
     pdf.addPage(
       pw.MultiPage(
-        maxPages: 500,
+        maxPages: 1000,
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,

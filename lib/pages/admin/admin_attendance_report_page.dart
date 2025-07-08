@@ -859,6 +859,7 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
 
     pdf.addPage(
       pw.MultiPage(
+        maxPages: 1000,
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
