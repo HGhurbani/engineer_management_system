@@ -38,6 +38,8 @@ class PdfReportGenerator {
   // Even 128px on the longest side proved large when dozens of images are
   // embedded, so we compress images down to 96px on the longest side.
   static const int _maxImageDimension = 96;
+  // JPEG quality used when encoding resized images.
+  static const int _jpgQuality = 40;
 
 
   static Future<void> _loadArabicFont() async {
@@ -75,7 +77,7 @@ class PdfReportGenerator {
     // Compress further to avoid excessive memory consumption when building
     // very large reports. Save with lower quality to further reduce memory
     // usage while keeping reasonable visual fidelity.
-    return Uint8List.fromList(img.encodeJpg(resized, quality: 40));
+    return Uint8List.fromList(img.encodeJpg(resized, quality: _jpgQuality));
   }
 
   @visibleForTesting
