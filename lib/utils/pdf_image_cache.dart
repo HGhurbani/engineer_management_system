@@ -9,4 +9,8 @@ class PdfImageCache {
   static void put(String url, pw.MemoryImage image) {
     _cache[url] = image;
   }
+
+  static void clear() {
+    _cache.clear();
+  }
 }
