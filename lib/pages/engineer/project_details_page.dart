@@ -34,6 +34,7 @@ import '../../utils/pdf_image_cache.dart';
 import '../../utils/report_storage.dart';
 import '../../utils/pdf_report_generator.dart';
 import '../../utils/part_request_pdf_generator.dart';
+import '../../utils/progress_dialog.dart';
 // --- End PDF Imports ---
 
 import '../../main.dart'; // Assuming helper functions are in main.dart
@@ -971,7 +972,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final bool isArabic = Localizations.localeOf(context).languageCode == 'ar';
     String getLocalizedText(String ar, String en) => isArabic ? ar : en;
 
-    _showLoadingDialog(context, getLocalizedText('جاري إنشاء التقرير...', 'Generating Report...'));
+    final progress = ProgressDialog.show(context, getLocalizedText('جاري إنشاء التقرير...', 'Generating Report...'));
 
     final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
     try {
@@ -983,9 +984,10 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         generatedBy: _currentEngineerName,
         start: start,
         end: end,
+        onProgress: (p) => progress.value = p,
       );
 
-      _hideLoadingDialog(context);
+      ProgressDialog.hide(context);
       _showFeedbackSnackBar(context, getLocalizedText('تم إنشاء التقرير بنجاح.', 'Report generated successfully.'), isError: false);
       _openPdfPreview(
         pdfBytes,
@@ -993,7 +995,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         getLocalizedText('يرجى الإطلاع على التقرير للمشروع.', 'Please review the project report.'),
       );
     } catch (e) {
-      _hideLoadingDialog(context);
+      ProgressDialog.hide(context);
       _showFeedbackSnackBar(context, getLocalizedText('فشل إنشاء أو مشاركة التقرير: $e', 'Failed to generate or share report: $e'), isError: true);
       print('Error generating daily report PDF: $e');
     }

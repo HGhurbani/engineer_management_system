@@ -87,13 +87,17 @@ class PdfReportGenerator {
 
 
   static Future<Map<String, pw.MemoryImage>> _fetchImagesForUrls(
-      List<String> urls) async {
+      List<String> urls, {
+      void Function(double progress)? onProgress,
+    }) async {
     final Map<String, pw.MemoryImage> fetched = {};
-    for (final url in urls) {
+    for (int i = 0; i < urls.length; i++) {
+      final url = urls[i];
       if (fetched.containsKey(url)) continue;
       final cached = PdfImageCache.get(url);
       if (cached != null) {
         fetched[url] = cached;
+        onProgress?.call((i + 1) / urls.length);
         continue;
       }
       try {
@@ -112,6 +116,7 @@ class PdfReportGenerator {
       }
       // Small delay to give the garbage collector a chance to free memory
       await Future.delayed(const Duration(milliseconds: 10));
+      onProgress?.call((i + 1) / urls.length);
     }
     return fetched;
   }
@@ -131,10 +136,12 @@ class PdfReportGenerator {
     DateTime? start,
 
     DateTime? end,
+    void Function(double progress)? onProgress,
 
   }) async {
     // Ensure the cache does not retain images from previous reports
     PdfImageCache.clear();
+    onProgress?.call(0.0);
 
     DateTime now = DateTime.now();
 
@@ -162,236 +169,129 @@ class PdfReportGenerator {
 
     try {
 
-      List<Future<void>> fetchTasks = [];
+      int totalDataTasks = 2; // tests and requests
+      for (var p in phases) {
+        totalDataTasks++; // phase
+        totalDataTasks += (p['subPhases'] as List).length;
+      }
+      int completedTasks = 0;
+      void update() {
+        completedTasks++;
+        onProgress?.call((completedTasks / totalDataTasks) * 0.6);
+      }
 
       for (var phase in phases) {
-
         final phaseId = phase['id'];
-
         final phaseName = phase['name'];
+        Query<Map<String, dynamic>> q = FirebaseFirestore.instance
+            .collection('projects')
+            .doc(projectId)
+            .collection('phases_status')
+            .doc(phaseId)
+            .collection('entries');
+        if (useRange) {
+          q = q
+              .where('timestamp', isGreaterThanOrEqualTo: start)
+              .where('timestamp', isLessThan: end);
+        }
+        final snap = await q.orderBy('timestamp').get();
+        for (var doc in snap.docs) {
+          final data = doc.data();
+          final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          final beforeImgs = (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          final afterImgs = (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          imageUrls.addAll(imgs);
+          imageUrls.addAll(beforeImgs);
+          imageUrls.addAll(afterImgs);
+          dayEntries.add({
+            ...data,
+            'phaseName': phaseName,
+            'subPhaseName': null,
+          });
+        }
+        update();
 
-        fetchTasks.add(() async {
-
-          Query<Map<String, dynamic>> q = FirebaseFirestore.instance
-
+        for (var sub in phase['subPhases']) {
+          final subId = sub['id'];
+          final subName = sub['name'];
+          Query<Map<String, dynamic>> qSub = FirebaseFirestore.instance
               .collection('projects')
-
               .doc(projectId)
-
-              .collection('phases_status')
-
-              .doc(phaseId)
-
+              .collection('subphases_status')
+              .doc(subId)
               .collection('entries');
-
           if (useRange) {
-
-            q = q
-
+            qSub = qSub
                 .where('timestamp', isGreaterThanOrEqualTo: start)
-
                 .where('timestamp', isLessThan: end);
-
           }
-
-          final snap = await q.orderBy('timestamp').get();
-
-          for (var doc in snap.docs) {
-
+          final subSnap = await qSub.orderBy('timestamp').get();
+          for (var doc in subSnap.docs) {
             final data = doc.data();
-
-            final imgs =
-                (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-            final beforeImgs =
-                (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-            final afterImgs =
-                (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-
+            final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            final beforeImgs = (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            final afterImgs = (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
             imageUrls.addAll(imgs);
             imageUrls.addAll(beforeImgs);
             imageUrls.addAll(afterImgs);
-
             dayEntries.add({
-
               ...data,
-
               'phaseName': phaseName,
-
-              'subPhaseName': null,
-
+              'subPhaseName': subName,
             });
-
           }
-
-        }());
-
-
-        for (var sub in phase['subPhases']) {
-
-          final subId = sub['id'];
-
-          final subName = sub['name'];
-
-          fetchTasks.add(() async {
-
-            Query<Map<String, dynamic>> qSub = FirebaseFirestore.instance
-
-                .collection('projects')
-
-                .doc(projectId)
-
-                .collection('subphases_status')
-
-                .doc(subId)
-
-                .collection('entries');
-
-            if (useRange) {
-
-              qSub = qSub
-
-                  .where('timestamp', isGreaterThanOrEqualTo: start)
-
-                  .where('timestamp', isLessThan: end);
-
-            }
-
-            final subSnap = await qSub.orderBy('timestamp').get();
-
-            for (var doc in subSnap.docs) {
-
-              final data = doc.data();
-
-              final imgs =
-                  (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-              final beforeImgs =
-                  (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-              final afterImgs =
-                  (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-
-              imageUrls.addAll(imgs);
-              imageUrls.addAll(beforeImgs);
-              imageUrls.addAll(afterImgs);
-
-              dayEntries.add({
-
-                ...data,
-
-                'phaseName': phaseName,
-
-                'subPhaseName': subName,
-
-              });
-
-            }
-
-          }());
-
+          update();
         }
-
       }
-
 
       final Map<String, Map<String, String>> testInfo = {};
-
       for (var section in testsStructure) {
-
         final sectionName = section['section_name'] as String;
-
         for (var t in section['tests'] as List) {
-
           testInfo[(t as Map)['id']] = {
-
             'name': t['name'] as String,
-
             'section': sectionName,
-
           };
-
         }
-
       }
 
+      Query<Map<String, dynamic>> qTests = FirebaseFirestore.instance
+          .collection('projects')
+          .doc(projectId)
+          .collection('tests_status');
+      if (useRange) {
+        qTests = qTests
+            .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
+            .where('lastUpdatedAt', isLessThan: end);
+      }
+      final testsSnap = await qTests.get();
+      for (var doc in testsSnap.docs) {
+        final data = doc.data();
+        final info = testInfo[doc.id];
+        final imgUrl = data['imageUrl'] as String?;
+        if (imgUrl != null) imageUrls.add(imgUrl);
+        dayTests.add({
+          ...data,
+          'testId': doc.id,
+          'testName': info?['name'] ?? doc.id,
+          'sectionName': info?['section'] ?? '',
+        });
+      }
+      update();
 
-      fetchTasks.add(() async {
-
-        Query<Map<String, dynamic>> qTests = FirebaseFirestore.instance
-
-            .collection('projects')
-
-            .doc(projectId)
-
-            .collection('tests_status');
-
-        if (useRange) {
-
-          qTests = qTests
-
-              .where('lastUpdatedAt', isGreaterThanOrEqualTo: start)
-
-              .where('lastUpdatedAt', isLessThan: end);
-
-        }
-
-        final testsSnap = await qTests.get();
-
-        for (var doc in testsSnap.docs) {
-
-          final data = doc.data();
-
-          final info = testInfo[doc.id];
-
-          final imgUrl = data['imageUrl'] as String?;
-
-          if (imgUrl != null) imageUrls.add(imgUrl);
-
-          dayTests.add({
-
-            ...data,
-
-            'testId': doc.id,
-
-            'testName': info?['name'] ?? doc.id,
-
-            'sectionName': info?['section'] ?? '',
-
-          });
-
-        }
-
-      }());
-
-
-      fetchTasks.add(() async {
-
-        Query<Map<String, dynamic>> qReq = FirebaseFirestore.instance
-
-            .collection('partRequests')
-
-            .where('projectId', isEqualTo: projectId);
-
-        if (useRange) {
-
-          qReq = qReq
-
-              .where('requestedAt', isGreaterThanOrEqualTo: start)
-
-              .where('requestedAt', isLessThan: end);
-
-        }
-
-        final reqSnap = await qReq.get();
-
-        for (var doc in reqSnap.docs) {
-
-          dayRequests.add(doc.data());
-
-        }
-
-      }());
-
-
-      await Future.wait(fetchTasks);
+      Query<Map<String, dynamic>> qReq = FirebaseFirestore.instance
+          .collection('partRequests')
+          .where('projectId', isEqualTo: projectId);
+      if (useRange) {
+        qReq = qReq
+            .where('requestedAt', isGreaterThanOrEqualTo: start)
+            .where('requestedAt', isLessThan: end);
+      }
+      final reqSnap = await qReq.get();
+      for (var doc in reqSnap.docs) {
+        dayRequests.add(doc.data());
+      }
+      update();
 
     } catch (e) {
 
@@ -409,7 +309,11 @@ class PdfReportGenerator {
     }
 
 
-    final fetchedImages = await _fetchImagesForUrls(imageUrls.toList());
+    final fetchedImages = await _fetchImagesForUrls(
+      imageUrls.toList(),
+      onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
+    );
+    onProgress?.call(0.9);
 
     pw.Font? emojiFont;
 
@@ -734,6 +638,7 @@ class PdfReportGenerator {
 
     final pdfBytes = await pdf.save();
     PdfImageCache.clear();
+    onProgress?.call(1.0);
     await uploadReportPdf(pdfBytes, fileName, token);
 
     return pdfBytes;
@@ -1820,7 +1725,11 @@ class PdfReportGenerator {
     }
 
     // Fetch all images referenced in entries and tests
-    final fetchedImages = await _fetchImagesForUrls(imageUrls.toList());
+    final fetchedImages = await _fetchImagesForUrls(
+      imageUrls.toList(),
+      onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
+    );
+    onProgress?.call(0.9);
 
     await _loadArabicFont();
     if (_arabicFont == null) {
@@ -1890,6 +1799,7 @@ class PdfReportGenerator {
 
     final bytes = await pdf.save();
     PdfImageCache.clear();
+    onProgress?.call(1.0);
     await uploadReportPdf(bytes, fileName, token);
     return bytes;
   }
