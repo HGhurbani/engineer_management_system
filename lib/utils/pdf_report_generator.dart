@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:flutter/services.dart' show rootBundle;
+import 'dart:ui' as ui;
 
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
@@ -61,27 +62,33 @@ class PdfReportGenerator {
 
   }
 
-  static Uint8List _resizeImageIfNeeded(Uint8List bytes) {
-    final img.Image? decoded = img.decodeImage(bytes);
-    if (decoded == null) return bytes;
-    if (decoded.width <= _maxImageDimension &&
-        decoded.height <= _maxImageDimension) {
-      return bytes;
-    }
-    final bool widthLarger = decoded.width >= decoded.height;
-    final img.Image resized = img.copyResize(
-      decoded,
-      width: widthLarger ? _maxImageDimension : null,
-      height: widthLarger ? null : _maxImageDimension,
+  static Future<Uint8List> _resizeImageIfNeeded(Uint8List bytes) async {
+    // Decode the image using Flutter's codec with a target size to avoid
+    // allocating memory for the full resolution image. This drastically lowers
+    // peak memory usage when working with very large images.
+    final ui.Codec codec = await ui.instantiateImageCodec(
+      bytes,
+      targetWidth: _maxImageDimension,
+      targetHeight: _maxImageDimension,
+      allowUpscaling: false,
     );
-    // Compress further to avoid excessive memory consumption when building
-    // very large reports. Save with lower quality to further reduce memory
-    // usage while keeping reasonable visual fidelity.
-    return Uint8List.fromList(img.encodeJpg(resized, quality: _jpgQuality));
+    final ui.FrameInfo frame = await codec.getNextFrame();
+    final ui.Image image = frame.image;
+    final ui.ByteData? raw =
+        await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (raw == null) return bytes;
+    final img.Image converted = img.Image.fromBytes(
+      image.width,
+      image.height,
+      raw.buffer.asUint8List(),
+    );
+    // Encode to JPEG with a lower quality to further reduce memory usage.
+    return Uint8List.fromList(img.encodeJpg(converted, quality: _jpgQuality));
   }
 
   @visibleForTesting
-  static Uint8List resizeImageForTest(Uint8List bytes) => _resizeImageIfNeeded(bytes);
+  static Future<Uint8List> resizeImageForTest(Uint8List bytes) =>
+      _resizeImageIfNeeded(bytes);
 
 
 
@@ -106,7 +113,8 @@ class PdfReportGenerator {
             .timeout(const Duration(seconds: 60));
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
-          final resizedBytes = _resizeImageIfNeeded(response.bodyBytes);
+          final resizedBytes =
+              await _resizeImageIfNeeded(response.bodyBytes);
           final memImg = pw.MemoryImage(resizedBytes);
           fetched[url] = memImg;
           PdfImageCache.put(url, memImg);
