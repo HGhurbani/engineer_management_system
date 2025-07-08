@@ -118,6 +118,8 @@ class PdfReportGenerator {
     DateTime? end,
 
   }) async {
+    // Ensure the cache does not retain images from previous reports
+    PdfImageCache.clear();
 
     DateTime now = DateTime.now();
 
@@ -715,7 +717,7 @@ class PdfReportGenerator {
 
 
     final pdfBytes = await pdf.save();
-
+    PdfImageCache.clear();
     await uploadReportPdf(pdfBytes, fileName, token);
 
     return pdfBytes;
@@ -1870,6 +1872,7 @@ class PdfReportGenerator {
     );
 
     final bytes = await pdf.save();
+    PdfImageCache.clear();
     await uploadReportPdf(bytes, fileName, token);
     return bytes;
   }
