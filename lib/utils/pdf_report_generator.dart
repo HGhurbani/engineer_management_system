@@ -80,18 +80,17 @@ class PdfReportGenerator {
   static Future<Map<String, pw.MemoryImage>> _fetchImagesForUrls(
       List<String> urls) async {
     final Map<String, pw.MemoryImage> fetched = {};
-    await Future.wait(urls.map((url) async {
-      if (fetched.containsKey(url)) return;
+    for (final url in urls) {
+      if (fetched.containsKey(url)) continue;
       final cached = PdfImageCache.get(url);
       if (cached != null) {
         fetched[url] = cached;
-        return;
+        continue;
       }
       try {
-        final response =
-            await http
-                .get(Uri.parse(url))
-                .timeout(const Duration(seconds: 60));
+        final response = await http
+            .get(Uri.parse(url))
+            .timeout(const Duration(seconds: 60));
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
           final resizedBytes = _resizeImageIfNeeded(response.bodyBytes);
@@ -102,7 +101,9 @@ class PdfReportGenerator {
       } catch (e) {
         print('Error fetching image from URL $url: $e');
       }
-    }));
+      // Small delay to give the garbage collector a chance to free memory
+      await Future.delayed(const Duration(milliseconds: 10));
+    }
     return fetched;
   }
 
