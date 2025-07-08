@@ -31,7 +31,10 @@ class PdfReportGenerator {
 
   static pw.Font? _arabicFont;
   // Limit the dimensions of any embedded images to keep memory usage low
-  static const int _maxImageDimension = 720;
+  // Lower the maximum image dimension to significantly reduce memory usage
+  // during PDF generation. This helps prevent "Out of Memory" issues when
+  // many high resolution images are included in the report.
+  static const int _maxImageDimension = 512;
 
 
   static Future<void> _loadArabicFont() async {
