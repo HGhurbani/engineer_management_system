@@ -8,8 +8,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
 import 'package:http/http.dart' as http;
-
 import 'package:image/image.dart' as img;
+import 'package:meta/meta.dart';
 
 import 'package:pdf/pdf.dart';
 
@@ -30,6 +30,7 @@ import 'report_storage.dart';
 class PdfReportGenerator {
 
   static pw.Font? _arabicFont;
+  static const int _maxImageDimension = 1024;
 
 
   static Future<void> _loadArabicFont() async {
@@ -51,6 +52,25 @@ class PdfReportGenerator {
 
   }
 
+  static Uint8List _resizeImageIfNeeded(Uint8List bytes) {
+    final img.Image? decoded = img.decodeImage(bytes);
+    if (decoded == null) return bytes;
+    if (decoded.width <= _maxImageDimension &&
+        decoded.height <= _maxImageDimension) {
+      return bytes;
+    }
+    final bool widthLarger = decoded.width >= decoded.height;
+    final img.Image resized = img.copyResize(
+      decoded,
+      width: widthLarger ? _maxImageDimension : null,
+      height: widthLarger ? null : _maxImageDimension,
+    );
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 85));
+  }
+
+  @visibleForTesting
+  static Uint8List resizeImageForTest(Uint8List bytes) => _resizeImageIfNeeded(bytes);
+
 
 
 
@@ -69,15 +89,10 @@ class PdfReportGenerator {
             await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
-          final decoded = img.decodeImage(response.bodyBytes);
-          if (decoded != null && decoded.width > 0 && decoded.height > 0) {
-            final memImg = pw.MemoryImage(response.bodyBytes);
-            fetched[url] = memImg;
-            PdfImageCache.put(url, memImg);
-          } else {
-            // Skip images that fail to decode or have invalid dimensions
-            print('Invalid image data for URL $url');
-          }
+          final resizedBytes = _resizeImageIfNeeded(response.bodyBytes);
+          final memImg = pw.MemoryImage(resizedBytes);
+          fetched[url] = memImg;
+          PdfImageCache.put(url, memImg);
         }
       } catch (e) {
         print('Error fetching image from URL $url: $e');

@@ -3334,14 +3334,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
-          final decoded = img.decodeImage(response.bodyBytes);
-          if (decoded != null) {
-            final memImg = pw.MemoryImage(response.bodyBytes);
-            fetched[url] = memImg;
-            PdfImageCache.put(url, memImg);
-          } else {
-            print('Invalid image bytes for URL $url');
-          }
+          final resizedBytes =
+              PdfReportGenerator.resizeImageForTest(response.bodyBytes);
+          final memImg = pw.MemoryImage(resizedBytes);
+          fetched[url] = memImg;
+          PdfImageCache.put(url, memImg);
         } else {
           print('Failed to load image from URL $url');
         }

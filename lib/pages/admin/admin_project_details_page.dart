@@ -1981,15 +1981,14 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
 
       try {
         final response =
-        await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+            await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
-          final decoded = img.decodeImage(response.bodyBytes);
-          if (decoded != null) {
-            final memImg = pw.MemoryImage(response.bodyBytes);
-            fetched[url] = memImg;
-            PdfImageCache.put(url, memImg);
-          }
+          final resizedBytes =
+              PdfReportGenerator.resizeImageForTest(response.bodyBytes);
+          final memImg = pw.MemoryImage(resizedBytes);
+          fetched[url] = memImg;
+          PdfImageCache.put(url, memImg);
         }
       } on TimeoutException catch (_) {
         print('Timeout fetching image from URL $url');
