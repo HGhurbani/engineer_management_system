@@ -1912,7 +1912,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         onProgress: (p) => progress.value = p,
       );
 
-      ProgressDialog.hide(context);
+      await ProgressDialog.hide(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
 
       _openPdfPreview(
@@ -1921,7 +1921,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         'يرجى الإطلاع على $headerText للمشروع.',
       );
     } catch (e) {
-      ProgressDialog.hide(context);
+      await ProgressDialog.hide(context);
       _showFeedbackSnackBar(context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
       print('Error generating daily report PDF: $e');
     }
