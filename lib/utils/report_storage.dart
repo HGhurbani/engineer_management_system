@@ -91,6 +91,6 @@ String buildReportDownloadUrl(String fileName, String token) {
 }
 
 // Upload the PDF using [ReportStorage] ignoring the token on the client side
-Future<void> uploadReportPdf(Uint8List bytes, String fileName, String token) async {
-  await ReportStorage.uploadReportPdf(bytes, fileName);
-}
+Future<String?> uploadReportPdf(
+    Uint8List bytes, String fileName, String token) async {
+  return await ReportStorage.uploadReportPdf(bytes, fileName);}

@@ -814,11 +814,13 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
     }
   }
 
-  void _openPdfPreview(Uint8List pdfBytes, String fileName, String text) {
+  void _openPdfPreview(
+      Uint8List pdfBytes, String fileName, String text, String? link) {
     Navigator.of(context).pushNamed('/pdf_preview', arguments: {
       'bytes': pdfBytes,
       'fileName': fileName,
       'text': text,
+      'link': link,
     });
   }
 
@@ -948,7 +950,7 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
 
     try {
       final pdfBytes = await pdf.save();
-      await uploadReportPdf(pdfBytes, fileName, token);
+      final link = await uploadReportPdf(pdfBytes, fileName, token);
 
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
@@ -956,7 +958,8 @@ class _AdminAttendanceReportPageState extends State<AdminAttendanceReportPage>
       _openPdfPreview(
           pdfBytes,
           fileName,
-          'يرجى الاطلاع على التقرير المرفق.');
+          'يرجى الاطلاع على التقرير المرفق.',
+          link);
     } catch (e) {
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(

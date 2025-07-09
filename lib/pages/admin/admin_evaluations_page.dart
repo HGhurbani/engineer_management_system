@@ -1401,7 +1401,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
 
     try {
       final bytes = await pdf.save();
-      await uploadReportPdf(bytes, fileName, token);
+      final link = await uploadReportPdf(bytes, fileName, token);
 
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
@@ -1414,12 +1414,16 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           ..click();
         html.Url.revokeObjectUrl(url);
       } else {
-        final dir = await getTemporaryDirectory();
-        final path = '${dir.path}/$fileName';
-        final file = File(path);
-        await file.writeAsBytes(bytes);
-        await Share.shareXFiles(
-            [XFile(path)], text: 'تقرير تقييم ${evaluation.engineerName}');
+        if (link != null) {
+          await Share.share(link);
+        } else {
+          final dir = await getTemporaryDirectory();
+          final path = '${dir.path}/$fileName';
+          final file = File(path);
+          await file.writeAsBytes(bytes);
+          await Share.shareXFiles(
+              [XFile(path)], text: 'تقرير تقييم ${evaluation.engineerName}');
+        }
       }
     } catch (e) {
       _hideLoadingDialog(context);
@@ -1427,5 +1431,4 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
           context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
     }
   }
-
 }

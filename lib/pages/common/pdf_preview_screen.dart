@@ -18,6 +18,7 @@ class PdfPreviewScreen extends StatelessWidget {
   final String fileName;
   final String shareText;
   final String? clientPhone; // This already exists
+  final String? shareLink;
 
   const PdfPreviewScreen({
     Key? key,
@@ -25,9 +26,49 @@ class PdfPreviewScreen extends StatelessWidget {
     required this.fileName,
     required this.shareText,
     this.clientPhone, // This already exists
+    this.shareLink,
   }) : super(key: key);
 
   Future<void> _sharePdf(BuildContext context) async {
+    if (shareLink != null) {
+      final text = '$shareText\n$shareLink';
+      if (kIsWeb) {
+        if (clientPhone != null && clientPhone!.isNotEmpty) {
+          String normalizedPhone =
+              clientPhone!.replaceAll(RegExp(r'[^0-9]'), '');
+          if (normalizedPhone.startsWith('0')) {
+            normalizedPhone = '966${normalizedPhone.substring(1)}';
+          }
+          final Uri whatsappWebUri = Uri.parse(
+            'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent(text)}',
+          );
+          await launchUrl(whatsappWebUri, webOnlyWindowName: '_blank');
+        } else {
+          await Share.share(text);
+        }
+      } else {
+        if (clientPhone != null && clientPhone!.isNotEmpty) {
+          String normalizedPhone =
+              clientPhone!.replaceAll(RegExp(r'[^0-9]'), '');
+          if (normalizedPhone.startsWith('0')) {
+            normalizedPhone = '966${normalizedPhone.substring(1)}';
+          }
+          final Uri whatsappUri = Uri.parse(
+            'whatsapp://send?phone=$normalizedPhone&text=${Uri.encodeComponent(text)}',
+          );
+          if (await canLaunchUrl(whatsappUri)) {
+            await launchUrl(whatsappUri,
+                mode: LaunchMode.externalApplication);
+          } else {
+            await Share.share(text);
+          }
+        } else {
+          await Share.share(text);
+        }
+      }
+      return;
+    }
+
     if (kIsWeb) {
       // On web, trigger PDF download then open WhatsApp Web in a new tab.
       final blob = html.Blob([pdfBytes], 'application/pdf');
@@ -56,7 +97,8 @@ class PdfPreviewScreen extends StatelessWidget {
 
       if (clientPhone != null && clientPhone!.isNotEmpty) {
         // Normalize phone number: remove non-digits and add country code if missing
-        String normalizedPhone = clientPhone!.replaceAll(RegExp(r'[^0-9]'), '');
+        String normalizedPhone =
+            clientPhone!.replaceAll(RegExp(r'[^0-9]'), '');
         if (normalizedPhone.startsWith('0')) {
           normalizedPhone = '966${normalizedPhone.substring(1)}';
         }

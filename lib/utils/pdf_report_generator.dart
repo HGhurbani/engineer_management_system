@@ -27,6 +27,12 @@ import 'pdf_image_cache.dart';
 
 import 'report_storage.dart';
 
+class PdfReportResult {
+  final Uint8List bytes;
+  final String? downloadUrl;
+  PdfReportResult({required this.bytes, this.downloadUrl});
+}
+
 
 class PdfReportGenerator {
 
@@ -128,7 +134,7 @@ class PdfReportGenerator {
     return fetched;
   }
 
-  static Future<Uint8List> generate({
+  static Future<PdfReportResult> generate({
 
     required String projectId,
 
@@ -647,9 +653,9 @@ class PdfReportGenerator {
     final pdfBytes = await pdf.save();
     PdfImageCache.clear();
     onProgress?.call(1.0);
-    await uploadReportPdf(pdfBytes, fileName, token);
+    final url = await uploadReportPdf(pdfBytes, fileName, token);
 
-    return pdfBytes;
+    return PdfReportResult(bytes: pdfBytes, downloadUrl: url);
 
   }
 

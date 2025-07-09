@@ -178,6 +178,7 @@ class MyApp extends StatelessWidget {
                 fileName: args['fileName'] as String,
                 shareText: args['text'] as String,
                 clientPhone: args['phone'] as String?,
+                shareLink: args['link'] as String?,
               );
             }
             return const Scaffold(body: Center(child: Text('لا يمكن عرض الملف')));
