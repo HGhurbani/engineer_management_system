@@ -88,35 +88,42 @@ class PdfReportGenerator {
   static Future<Map<String, pw.MemoryImage>> _fetchImagesForUrls(
       List<String> urls, {
       void Function(double progress)? onProgress,
+      int concurrency = 5,
     }) async {
     final Map<String, pw.MemoryImage> fetched = {};
-    for (int i = 0; i < urls.length; i++) {
-      final url = urls[i];
-      if (fetched.containsKey(url)) continue;
+    final uniqueUrls = urls.toSet().toList();
+    int completed = 0;
+
+    Future<void> handleUrl(String url) async {
+      if (fetched.containsKey(url)) return;
       final cached = PdfImageCache.get(url);
       if (cached != null) {
         fetched[url] = cached;
-        onProgress?.call((i + 1) / urls.length);
-        continue;
-      }
-      try {
-        final response = await http
-            .get(Uri.parse(url))
-            .timeout(const Duration(seconds: 60));
-        final contentType = response.headers['content-type'] ?? '';
-        if (response.statusCode == 200 && contentType.startsWith('image/')) {
-          final resizedBytes =
-              await _resizeImageIfNeeded(response.bodyBytes);
-          final memImg = pw.MemoryImage(resizedBytes);
-          fetched[url] = memImg;
-          PdfImageCache.put(url, memImg);
+      } else {
+        try {
+          final response = await http
+              .get(Uri.parse(url))
+              .timeout(const Duration(seconds: 60));
+          final contentType = response.headers['content-type'] ?? '';
+          if (response.statusCode == 200 && contentType.startsWith('image/')) {
+            final resizedBytes =
+                await _resizeImageIfNeeded(response.bodyBytes);
+            final memImg = pw.MemoryImage(resizedBytes);
+            fetched[url] = memImg;
+            PdfImageCache.put(url, memImg);
+          }
+        } catch (e) {
+          print('Error fetching image from URL $url: $e');
         }
-      } catch (e) {
-        print('Error fetching image from URL $url: $e');
       }
-      // Small delay to give the garbage collector a chance to free memory
+      onProgress?.call(++completed / uniqueUrls.length);
+    }
+
+    for (int i = 0; i < uniqueUrls.length; i += concurrency) {
+      final batch = uniqueUrls.skip(i).take(concurrency).toList();
+      await Future.wait(batch.map(handleUrl));
+      // Allow GC to run between batches
       await Future.delayed(const Duration(milliseconds: 10));
-      onProgress?.call((i + 1) / urls.length);
     }
     return fetched;
   }
