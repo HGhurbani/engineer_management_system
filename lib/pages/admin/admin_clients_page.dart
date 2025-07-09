@@ -531,6 +531,152 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
     );
   }
 
+  Future<void> _showAddCredentialsDialog(DocumentSnapshot clientDoc) async {
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isLoading = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: !isLoading,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Directionality(
+            textDirection: ui.TextDirection.rtl,
+            child: AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+              ),
+              title: const Text(
+                'إضافة بيانات الدخول',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.textPrimary,
+                  fontSize: 22,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildStyledTextField(
+                        controller: emailController,
+                        labelText: 'البريد الإلكتروني',
+                        icon: Icons.email_outlined,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'هذا الحقل مطلوب.';
+                          }
+                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                            return 'صيغة بريد إلكتروني غير صحيحة.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppConstants.itemSpacing),
+                      _buildStyledTextField(
+                        controller: passwordController,
+                        labelText: 'كلمة المرور',
+                        icon: Icons.lock_outline,
+                        obscureText: true,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'هذا الحقل مطلوب.';
+                          }
+                          if (value.length < 6) {
+                            return 'يجب أن تكون كلمة المرور 6 أحرف على الأقل.';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actionsAlignment: MainAxisAlignment.center,
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('إلغاء', style: TextStyle(color: AppConstants.textSecondary)),
+                ),
+                const SizedBox(width: AppConstants.itemSpacing / 2),
+                ElevatedButton.icon(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+
+                          setDialogState(() => isLoading = true);
+
+                          try {
+                            final userCred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                              email: emailController.text.trim(),
+                              password: passwordController.text.trim(),
+                            );
+
+                            final clientData = clientDoc.data() as Map<String, dynamic>;
+                            clientData['email'] = emailController.text.trim();
+                            clientData['uid'] = userCred.user!.uid;
+
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(userCred.user!.uid)
+                                .set(clientData);
+
+                            final oldId = clientDoc.id;
+                            final projectsSnap = await FirebaseFirestore.instance
+                                .collection('projects')
+                                .where('clientId', isEqualTo: oldId)
+                                .get();
+                            for (final doc in projectsSnap.docs) {
+                              await doc.reference.update({'clientId': userCred.user!.uid});
+                            }
+
+                            await clientDoc.reference.delete();
+
+                            Navigator.pop(dialogContext);
+                            _showFeedbackSnackBar(context, 'تم إضافة بيانات الدخول بنجاح.', isError: false);
+                          } on FirebaseAuthException catch (e) {
+                            _showFeedbackSnackBar(dialogContext, _getFirebaseErrorMessage(e.code), isError: true);
+                          } catch (e) {
+                            _showFeedbackSnackBar(dialogContext, 'فشل الإضافة: $e', isError: true);
+                          } finally {
+                            if (mounted) setDialogState(() => isLoading = false);
+                          }
+                        },
+                  icon: isLoading
+                      ? const SizedBox.shrink()
+                      : const Icon(Icons.save, color: Colors.white),
+                  label: isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text('حفظ', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.primaryColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -679,6 +825,9 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                       case 'delete':
                         _deleteClient(uid, email);
                         break;
+                      case 'add_credentials':
+                        _showAddCredentialsDialog(clientDoc);
+                        break;
                     }
                   },
                   itemBuilder: (context) => [
@@ -702,6 +851,17 @@ class _AdminClientsPageState extends State<AdminClientsPage> {
                         ],
                       ),
                     ),
+                    if ((data['email'] == null || (data['email'] as String).isEmpty))
+                      PopupMenuItem(
+                        value: 'add_credentials',
+                        child: Row(
+                          children: const [
+                            Icon(Icons.lock_open, color: AppConstants.primaryColor),
+                            SizedBox(width: 8),
+                            Text('إضافة بيانات الدخول'),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ],
