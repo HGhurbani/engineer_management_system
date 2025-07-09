@@ -357,7 +357,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     if (widget.notificationType != null && widget.highlightItemId != null) {
       final type = widget.notificationType!;
       if (type.contains('subphase')) {
@@ -790,6 +790,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.5, fontFamily: 'Tajawal'),
         unselectedLabelStyle: const TextStyle(fontSize: 16, fontFamily: 'Tajawal'),
         tabs: const [
+          Tab(text: 'تفاصيل', icon: Icon(Icons.info_outline_rounded)),
           Tab(text: 'مراحل المشروع', icon: Icon(Icons.list_alt_rounded)),
           Tab(text: 'اختبارات التشغيل', icon: Icon(Icons.checklist_rtl_rounded)),
           Tab(text: 'طلبات المواد', icon: Icon(Icons.build_circle_outlined)),
@@ -948,6 +949,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDetailsTab(Map<String, dynamic> projectDataMap) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      child: _buildProjectSummaryCard(projectDataMap),
     );
   }
 
@@ -3201,11 +3209,11 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         appBar: _buildAppBar(),
         body: Column(
           children: [
-            _buildProjectSummaryCard(projectDataMap),
             Expanded(
               child: TabBarView(
                 controller: _tabController,
                 children: [
+                  _buildDetailsTab(projectDataMap),
                   _buildPhasesTab(),
                   _buildTestsTab(),
                   _buildPartRequestsTab(),
