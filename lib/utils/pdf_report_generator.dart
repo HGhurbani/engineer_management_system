@@ -31,10 +31,12 @@ import 'report_storage.dart';
 class PdfReportGenerator {
 
   static pw.Font? _arabicFont;
-  // Previously images were aggressively resized and compressed to keep
-  // memory usage low. To honor the new requirement of embedding images
-  // without any compression or resizing, these limits are effectively
-  // disabled.
+  // Limit the dimensions of embedded images so large photos do not cause
+  // out-of-memory errors when generating huge reports. A 1024px maximum keeps
+  // quality reasonable while dramatically reducing memory usage.
+  static const int _maxImageDimension = 1024;
+  // JPEG quality used when encoding resized images.
+  static const int _jpgQuality = 75;
 
 
   static Future<void> _loadArabicFont() async {
@@ -57,8 +59,23 @@ class PdfReportGenerator {
   }
 
   static Future<Uint8List> _resizeImageIfNeeded(Uint8List bytes) async {
-    // Image resizing and compression disabled; return the original bytes.
-    return bytes;
+    final ui.Codec codec = await ui.instantiateImageCodec(
+      bytes,
+      targetWidth: _maxImageDimension,
+      targetHeight: _maxImageDimension,
+      allowUpscaling: false,
+    );
+    final ui.FrameInfo frame = await codec.getNextFrame();
+    final ui.Image image = frame.image;
+    final ByteData? raw =
+        await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (raw == null) return bytes;
+    final img.Image converted = img.Image.fromBytes(
+      width: image.width,
+      height: image.height,
+      bytes: raw.buffer,
+    );
+    return Uint8List.fromList(img.encodeJpg(converted, quality: _jpgQuality));
   }
 
   @visibleForTesting
@@ -324,8 +341,9 @@ class PdfReportGenerator {
     if (emojiFont != null) commonFontFallback.add(emojiFont);
 
 
-    // Disable PDF compression to embed images without modification
-    final pdf = pw.Document(compress: false);
+    // Enable compression to keep memory usage manageable when many pages are
+    // generated.
+    final pdf = pw.Document(compress: true);
 
     final fileName =
 
@@ -430,7 +448,7 @@ class PdfReportGenerator {
     pdf.addPage(
 
       pw.MultiPage(
-        maxPages: 1000000,
+        maxPages: 10000,
         pageTheme: pw.PageTheme(
 
           pageFormat: PdfPageFormat.a4,
@@ -1722,8 +1740,9 @@ class PdfReportGenerator {
       throw Exception('Arabic font not available');
     }
 
-    // Disable PDF compression to embed images without modification
-    final pdf = pw.Document(compress: false);
+    // Enable compression here as well for consistent behaviour and lower
+    // memory usage.
+    final pdf = pw.Document(compress: true);
     final fileName =
         'simple_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
     final token = generateReportToken();
@@ -1740,7 +1759,7 @@ class PdfReportGenerator {
 
     pdf.addPage(
       pw.MultiPage(
-        maxPages: 1000000,
+        maxPages: 10000,
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
