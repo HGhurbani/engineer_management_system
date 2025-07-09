@@ -606,11 +606,12 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
   }
 
   Widget _buildStatsGrid(double screenWidth) {
-    int crossAxisCount = 2; // Default for mobile and tablet
-    if (screenWidth >= _desktopBreakpoint) {
-      crossAxisCount = 4; // 4 columns for desktop
-    } else if (screenWidth >= _tabletBreakpoint) {
-      crossAxisCount = 2; // 2 columns for tablet, will spread
+    // Display all four cards in a single row on tablet and larger screens
+    int crossAxisCount;
+    if (screenWidth >= _tabletBreakpoint) {
+      crossAxisCount = 4; // Laptop/desktop/tablet
+    } else {
+      crossAxisCount = 2; // Mobile
     }
 
     // List of stat items without revenue
