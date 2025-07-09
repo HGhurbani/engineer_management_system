@@ -976,7 +976,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
     final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
     try {
-      final pdfBytes = await PdfReportGenerator.generate(
+      final result = await PdfReportGenerator.generate(
         projectId: widget.projectId,
         projectSnapshot: _projectDataSnapshot,
         phases: predefinedPhasesStructure,
@@ -990,9 +990,10 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       await ProgressDialog.hide(context);
       _showFeedbackSnackBar(context, getLocalizedText('تم إنشاء التقرير بنجاح.', 'Report generated successfully.'), isError: false);
       _openPdfPreview(
-        pdfBytes,
+        result.bytes,
         fileName,
         getLocalizedText('يرجى الإطلاع على التقرير للمشروع.', 'Please review the project report.'),
+        result.downloadUrl,
       );
     } catch (e) {
       await ProgressDialog.hide(context);
@@ -3838,7 +3839,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
     try {
       final pdfBytes = await pdf.save();
-      await uploadReportPdf(pdfBytes, fileName, token);
+      final link = await uploadReportPdf(pdfBytes, fileName, token);
 
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, "تم إنشاء التقرير بنجاح.", isError: false);
@@ -3846,7 +3847,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       _openPdfPreview(
         pdfBytes,
         fileName,
-        'الرجاء الإطلاع على تقرير ${isTestSection ? "الاختبار" : "المرحلة"}: $name لمشروع $projectName.'
+        'الرجاء الإطلاع على تقرير ${isTestSection ? "الاختبار" : "المرحلة"}: $name لمشروع $projectName.',
+        link,
       );
 
     } catch (e) {
@@ -3878,11 +3880,13 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
   }
 
-  void _openPdfPreview(Uint8List pdfBytes, String fileName, String text) {
+  void _openPdfPreview(
+      Uint8List pdfBytes, String fileName, String text, String? link) {
     Navigator.of(context).pushNamed('/pdf_preview', arguments: {
       'bytes': pdfBytes,
       'fileName': fileName,
       'text': text,
+      'link': link,
       'phone': _clientPhone,
     });
   }

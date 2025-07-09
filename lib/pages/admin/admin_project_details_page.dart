@@ -1901,7 +1901,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     final progress = ProgressDialog.show(context, 'جاري تحميل البيانات...');
 
     try {
-      final pdfBytes = await PdfReportGenerator.generate(
+      final result = await PdfReportGenerator.generate(
         projectId: widget.projectId,
         projectSnapshot: _projectDataSnapshot,
         phases: predefinedPhasesStructure,
@@ -1916,9 +1916,10 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
 
       _openPdfPreview(
-        pdfBytes,
+        result.bytes,
         fileName,
         'يرجى الإطلاع على $headerText للمشروع.',
+        result.downloadUrl,
       );
     } catch (e) {
       await ProgressDialog.hide(context);
@@ -2027,11 +2028,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     }
   }
 
-  void _openPdfPreview(Uint8List pdfBytes, String fileName, String text) {
+  void _openPdfPreview(
+      Uint8List pdfBytes, String fileName, String text, String? link) {
     Navigator.of(context).pushNamed('/pdf_preview', arguments: {
       'bytes': pdfBytes,
       'fileName': fileName,
       'text': text,
+      'link': link,
       'phone': _clientPhone,
     });
   }

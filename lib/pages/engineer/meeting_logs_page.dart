@@ -1154,11 +1154,13 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
     }
   }
 
-  void _openPdfPreview(Uint8List pdfBytes, String fileName, String text) {
+  void _openPdfPreview(
+      Uint8List pdfBytes, String fileName, String text, String? link) {
     Navigator.of(context).pushNamed('/pdf_preview', arguments: {
       'bytes': pdfBytes,
       'fileName': fileName,
       'text': text,
+      'link': link,
     });
   }
 
@@ -1257,7 +1259,7 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
 
     try {
       final pdfBytes = await pdf.save();
-      await uploadReportPdf(pdfBytes, fileName, token);
+      final link = await uploadReportPdf(pdfBytes, fileName, token);
 
       _hideLoadingDialog(context);
       _showFeedbackSnackBar(context, 'تم إنشاء المحضر بنجاح.', isError: false);
@@ -1266,6 +1268,7 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
         pdfBytes,
         fileName,
         'يرجى الاطلاع على المحضر المرفق.',
+        link,
       );
     } catch (e) {
       _hideLoadingDialog(context);
@@ -1274,5 +1277,4 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
       // ignore: avoid_print
       print('Error generating meeting PDF: $e');
     }
-  }
-}
+  }}
