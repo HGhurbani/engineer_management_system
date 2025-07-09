@@ -337,7 +337,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     _currentEngineerUid = FirebaseAuth.instance.currentUser?.uid;
     if (widget.notificationType != null && widget.highlightItemId != null) {
       final type = widget.notificationType!;
@@ -1587,6 +1587,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         labelColor: Colors.white,
         unselectedLabelColor: Colors.white70,
         tabs: const [
+          Tab(text: 'تفاصيل', icon: Icon(Icons.info_outline_rounded)),
           Tab(text: 'مراحل المشروع', icon: Icon(Icons.list_alt_rounded)),
           Tab(text: 'اختبارات التشغيل', icon: Icon(Icons.checklist_rtl_rounded)),
           Tab(text: 'طلبات المواد', icon: Icon(Icons.build_circle_outlined)),
@@ -1716,6 +1717,13 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDetailsTab(Map<String, dynamic> projectDataMap) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      child: _buildProjectSummaryCard(projectDataMap),
     );
   }
 
@@ -2153,12 +2161,14 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         appBar: _buildAppBar(),
         body: Column(
           children: [
-            if (_projectDataSnapshot != null && _projectDataSnapshot!.exists)
-              _buildProjectSummaryCard(_projectDataSnapshot!.data() as Map<String, dynamic>),
             Expanded(
               child: TabBarView(
                 controller: _tabController,
                 children: [
+                  if (_projectDataSnapshot != null && _projectDataSnapshot!.exists)
+                    _buildDetailsTab(_projectDataSnapshot!.data() as Map<String, dynamic>)
+                  else
+                    const SizedBox.shrink(),
                   _buildPhasesTab(),
                   _buildTestsTab(),
                   _buildMaterialRequestsTab(),
