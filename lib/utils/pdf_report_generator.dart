@@ -5,7 +5,7 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show ByteData, rootBundle;
 import 'dart:ui' as ui;
 
 import 'package:http/http.dart' as http;
