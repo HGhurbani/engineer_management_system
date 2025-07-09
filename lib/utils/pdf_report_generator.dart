@@ -32,9 +32,9 @@ class PdfReportGenerator {
 
   static pw.Font? _arabicFont;
   // Limit the dimensions of embedded images so large photos do not cause
-  // out-of-memory errors when generating huge reports. A 1024px maximum keeps
-  // quality reasonable while dramatically reducing memory usage.
-  static const int _maxImageDimension = 1024;
+  // out-of-memory errors when generating huge reports. Lowering the limit
+  // further reduces peak memory usage when many images are embedded.
+  static const int _maxImageDimension = 512;
   // JPEG quality used when encoding resized images.
   static const int _jpgQuality = 75;
 
