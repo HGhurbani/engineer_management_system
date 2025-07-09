@@ -53,6 +53,7 @@ flutter:
   assets:
     - assets/fonts/ # تأكد من أن هذا المسار صحيح إذا وضعت الخطوط في مجلد فرعي آخر داخل assets
     - assets/images/app_logo.png
+    - assets/images/white_logo.png
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 

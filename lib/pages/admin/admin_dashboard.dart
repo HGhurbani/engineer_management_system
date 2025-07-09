@@ -435,10 +435,10 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(50),
             ),
-            child: Icon(
-              Icons.dashboard_rounded,
-              size: iconSize,
-              color: Colors.white,
+            child: Image.asset(
+              'assets/images/white_logo.png',
+              width: iconSize,
+              height: iconSize,
             ),
           ),
           SizedBox(height: AppConstants.paddingMedium),
