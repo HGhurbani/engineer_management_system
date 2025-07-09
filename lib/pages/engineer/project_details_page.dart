@@ -987,7 +987,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         onProgress: (p) => progress.value = p,
       );
 
-      ProgressDialog.hide(context);
+      await ProgressDialog.hide(context);
       _showFeedbackSnackBar(context, getLocalizedText('تم إنشاء التقرير بنجاح.', 'Report generated successfully.'), isError: false);
       _openPdfPreview(
         pdfBytes,
@@ -995,7 +995,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         getLocalizedText('يرجى الإطلاع على التقرير للمشروع.', 'Please review the project report.'),
       );
     } catch (e) {
-      ProgressDialog.hide(context);
+      await ProgressDialog.hide(context);
       _showFeedbackSnackBar(context, getLocalizedText('فشل إنشاء أو مشاركة التقرير: $e', 'Failed to generate or share report: $e'), isError: true);
       print('Error generating daily report PDF: $e');
     }
