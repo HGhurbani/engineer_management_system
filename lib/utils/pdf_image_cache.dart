@@ -11,9 +11,7 @@ class PdfImageCache {
   static final LinkedHashMap<String, pw.MemoryImage> _cache = LinkedHashMap();
   // Maximum number of images to keep in memory at any time. Reducing the
   // cache size lowers peak memory usage when a report contains many photos.
-  // Allow a very large number of cached images so reports can include
-  // unlimited photos without eviction.
-  static const int _maxEntries = 1000000;
+  static const int _maxEntries = 200;
 
   static pw.MemoryImage? get(String url) {
     final img = _cache.remove(url);
@@ -26,8 +24,7 @@ class PdfImageCache {
 
   static void put(String url, pw.MemoryImage image) {
     if (_cache.length >= _maxEntries) {
-      // When the cache reaches the maximum size just keep adding entries.
-      // This effectively disables eviction.
+      _cache.remove(_cache.keys.first);
     }
     _cache[url] = image;
   }
