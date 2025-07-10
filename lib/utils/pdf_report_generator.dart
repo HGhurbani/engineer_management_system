@@ -164,6 +164,7 @@ class PdfReportGenerator {
     DateTime? end,
     void Function(double progress)? onProgress,
 
+    bool lowMemory = false,
   }) async {
     // Ensure the cache does not retain images from previous reports
     PdfImageCache.clear();
