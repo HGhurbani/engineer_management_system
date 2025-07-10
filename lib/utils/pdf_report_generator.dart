@@ -46,8 +46,8 @@ class PdfReportGenerator {
   static const int _maxImageDimension = 1024;
   static const int _jpgQuality = 85;
   // More aggressive settings for devices with limited memory.
-  static const int _lowMemImageDimension = 512;
-  static const int _lowMemJpgQuality = 70;
+  static const int _lowMemImageDimension = 256;
+  static const int _lowMemJpgQuality = 60;
 
 
   static Future<void> _loadArabicFont() async {
@@ -169,6 +169,7 @@ class PdfReportGenerator {
     // Ensure the cache does not retain images from previous reports
     PdfImageCache.clear();
     onProgress?.call(0.0);
+    try {
 
     final int imgDim =
         lowMemory ? _lowMemImageDimension : _maxImageDimension;
@@ -673,11 +674,13 @@ class PdfReportGenerator {
 
 
     final pdfBytes = await pdf.save();
-    PdfImageCache.clear();
     onProgress?.call(1.0);
     final url = await uploadReportPdf(pdfBytes, fileName, token);
 
     return PdfReportResult(bytes: pdfBytes, downloadUrl: url);
+    } finally {
+      PdfImageCache.clear();
+    }
 
   }
 
@@ -1667,6 +1670,7 @@ class PdfReportGenerator {
   }) async {
     PdfImageCache.clear();
     onProgress?.call(0.0);
+    try {
     final int imgDim =
         lowMemory ? _lowMemImageDimension : _maxImageDimension;
     final int imgQuality = lowMemory ? _lowMemJpgQuality : _jpgQuality;
@@ -1876,10 +1880,12 @@ class PdfReportGenerator {
     );
 
     final bytes = await pdf.save();
-    PdfImageCache.clear();
     onProgress?.call(1.0);
     await uploadReportPdf(bytes, fileName, token);
     return bytes;
+    } finally {
+      PdfImageCache.clear();
+    }
   }
 
   static pw.Widget _buildSimpleEntriesTable(
