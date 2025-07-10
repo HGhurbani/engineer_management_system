@@ -26,7 +26,7 @@ class ReportStorage {
 
       var response = await request
           .send()
-          .timeout(const Duration(seconds: 60));
+          .timeout(const Duration(minutes: 2));
 
       if (response.statusCode == 200) {
         final responseBody = await response.stream.bytesToString();
@@ -60,7 +60,7 @@ class ReportStorage {
     try {
       final response = await http
           .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 60));
+          .timeout(const Duration(minutes: 2));
       if (response.statusCode == 200) {
         return response.bodyBytes;
       } else {

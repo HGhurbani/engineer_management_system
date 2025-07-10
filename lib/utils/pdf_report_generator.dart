@@ -41,11 +41,11 @@ class PdfReportGenerator {
   // out-of-memory errors when generating huge reports. Lowering the limit
   // further reduces peak memory usage when many images are embedded.
   // Lowering the dimension reduces the memory consumed when many
-  // pictures are included in a single report. 256 keeps reasonable
-  // clarity while cutting peak usage roughly in half.
-  static const int _maxImageDimension = 256;
+  // pictures are included in a single report. Using 1024 keeps better
+  // clarity for large photos while still bounding memory usage.
+  static const int _maxImageDimension = 1024;
   // JPEG quality used when encoding resized images.
-  static const int _jpgQuality = 75;
+  static const int _jpgQuality = 85;
 
 
   static Future<void> _loadArabicFont() async {
@@ -113,7 +113,7 @@ class PdfReportGenerator {
         try {
           final response = await http
               .get(Uri.parse(url))
-              .timeout(const Duration(seconds: 60));
+              .timeout(const Duration(seconds: 120));
           final contentType = response.headers['content-type'] ?? '';
           if (response.statusCode == 200 && contentType.startsWith('image/')) {
             final resizedBytes =
