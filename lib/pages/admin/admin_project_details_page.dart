@@ -1911,6 +1911,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           generatedBy: _currentAdminName,
           start: start,
           end: end,
+          onProgress: (p) => progress.value = p,
         );
       } catch (e) {
         // Retry with low-memory settings if initial attempt fails.
@@ -1922,6 +1923,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           generatedBy: _currentAdminName,
           start: start,
           end: end,
+          onProgress: (p) => progress.value = p,
           lowMemory: true,
         );
       }
