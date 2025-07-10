@@ -18,7 +18,7 @@ class ReportStorage {
       final uri = Uri.parse(uploadReportUrl);
       var request = http.MultipartRequest('POST', uri)
         ..files.add(http.MultipartFile.fromBytes(
-          'report_file', // اسم الحقل الذي سيتوقعه الخادم لملف PDF
+          'pdf_file', // اسم الحقل الذي يتوقعه الخادم لملف PDF
           bytes,
           filename: fileName,
           // contentType: MediaType('application', 'pdf'), // قد تحتاج لإضافة هذا إذا كان الخادم يتطلب نوع المحتوى
