@@ -1114,6 +1114,20 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
       }
 
       try {
+        // Skip very large images to prevent memory issues when decoding.
+        try {
+          final head = await http
+              .head(Uri.parse(url))
+              .timeout(const Duration(seconds: 30));
+          final lenStr = head.headers['content-length'];
+          final len = lenStr != null ? int.tryParse(lenStr) : null;
+          if (len != null && len > PdfReportGenerator._maxImageFileSize) {
+            // ignore: avoid_print
+            print('Skipping large image from URL $url: $len bytes');
+            return;
+          }
+        } catch (_) {}
+
         final response = await http
             .get(Uri.parse(url))
             .timeout(const Duration(seconds: 60));

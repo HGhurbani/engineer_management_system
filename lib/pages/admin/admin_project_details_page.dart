@@ -2028,6 +2028,19 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       }
 
       try {
+        // Skip huge images that could cause out-of-memory crashes.
+        try {
+          final head = await http
+              .head(Uri.parse(url))
+              .timeout(const Duration(seconds: 30));
+          final lenStr = head.headers['content-length'];
+          final len = lenStr != null ? int.tryParse(lenStr) : null;
+          if (len != null && len > PdfReportGenerator._maxImageFileSize) {
+            print('Skipping large image from URL $url: $len bytes');
+            return;
+          }
+        } catch (_) {}
+
         final response = await http
             .get(Uri.parse(url))
             .timeout(const Duration(seconds: 60));
