@@ -1901,15 +1901,30 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     final progress = ProgressDialog.show(context, 'جاري تحميل البيانات...');
 
     try {
-      final result = await PdfReportGenerator.generateWithIsolate(
-        projectId: widget.projectId,
-        projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
-        phases: predefinedPhasesStructure,
-        testsStructure: finalCommissioningTests,
-        generatedBy: _currentAdminName,
-        start: start,
-        end: end,
-      );
+      PdfReportResult result;
+      try {
+        result = await PdfReportGenerator.generateWithIsolate(
+          projectId: widget.projectId,
+          projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
+          phases: predefinedPhasesStructure,
+          testsStructure: finalCommissioningTests,
+          generatedBy: _currentAdminName,
+          start: start,
+          end: end,
+        );
+      } catch (e) {
+        // Retry with low-memory settings if initial attempt fails.
+        result = await PdfReportGenerator.generateWithIsolate(
+          projectId: widget.projectId,
+          projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
+          phases: predefinedPhasesStructure,
+          testsStructure: finalCommissioningTests,
+          generatedBy: _currentAdminName,
+          start: start,
+          end: end,
+          lowMemory: true,
+        );
+      }
 
       await ProgressDialog.hide(context);
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
