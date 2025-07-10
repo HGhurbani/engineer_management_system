@@ -1169,13 +1169,6 @@
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
-                    if (fetchedImages[urls[i]] != null)
-                      pw.Image(
-                        fetchedImages[urls[i]]!,
-                        width: 80,
-                        height: 80,
-                        fit: pw.BoxFit.cover,
-                      ),
                     pw.UrlLink(
                       destination: urls[i],
                       child: pw.Text(
@@ -1398,13 +1391,6 @@
                 ),
               ),
               pw.SizedBox(height: 10),
-              if (fetchedImages[imgUrl] != null)
-                pw.Image(
-                  fetchedImages[imgUrl]!,
-                  width: 80,
-                  height: 80,
-                  fit: pw.BoxFit.cover,
-                ),
               pw.UrlLink(
                 destination: imgUrl,
                 child: pw.Text(
@@ -1965,13 +1951,6 @@
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
-                  if (images[url] != null)
-                    pw.Image(
-                      images[url]!,
-                      width: 80,
-                      height: 80,
-                      fit: pw.BoxFit.cover,
-                    ),
                   pw.UrlLink(
                     destination: url,
                     child: pw.Text(
@@ -2098,13 +2077,6 @@
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
-                  if (images[url] != null)
-                    pw.Image(
-                      images[url]!,
-                      width: 80,
-                      height: 80,
-                      fit: pw.BoxFit.cover,
-                    ),
                   pw.UrlLink(
                     destination: url,
                     child: pw.Text(
