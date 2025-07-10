@@ -2184,9 +2184,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('صور قبل:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const Text('صور قبل:',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    textAlign: TextAlign.right),
                                 const SizedBox(height: 4),
                                 Wrap(
+                                  textDirection: ui.TextDirection.rtl,
                                   spacing: AppConstants.paddingSmall / 2,
                                   runSpacing: AppConstants.paddingSmall / 2,
                                   children: beforeUrls.map((url) {
@@ -2209,9 +2212,12 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('صور بعد:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const Text('صور بعد:',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    textAlign: TextAlign.right),
                                 const SizedBox(height: 4),
                                 Wrap(
+                                  textDirection: ui.TextDirection.rtl,
                                   spacing: AppConstants.paddingSmall / 2,
                                   runSpacing: AppConstants.paddingSmall / 2,
                                   children: afterUrls.map((url) {
@@ -2232,6 +2238,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                           Padding(
                             padding: EdgeInsets.only(bottom: note.isNotEmpty ? AppConstants.paddingSmall : 0),
                             child: Wrap(
+                              textDirection: ui.TextDirection.rtl,
                               spacing: AppConstants.paddingSmall / 1.5,
                               runSpacing: AppConstants.paddingSmall / 1.5,
                               children: imageUrlsToDisplay.map((url) {

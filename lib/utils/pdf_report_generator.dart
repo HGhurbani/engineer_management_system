@@ -1148,6 +1148,7 @@ class PdfReportGenerator {
       spacing: 10,
       runSpacing: 10,
       alignment: pw.WrapAlignment.end,
+      textDirection: pw.TextDirection.rtl,
       children: [
         for (int i = 0; i < urls.length; i++)
           pw.UrlLink(
