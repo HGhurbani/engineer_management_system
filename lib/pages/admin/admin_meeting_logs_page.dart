@@ -1164,7 +1164,6 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
       imageUrls.add(data['imageUrl'] as String);
     }
 
-    final fetchedImages = await _fetchImagesForUrls(imageUrls);
 
     final pdf = pw.Document();
     final fileName =
@@ -1211,11 +1210,20 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
             widgets.add(pw.SizedBox(height: 10));
           }
           for (final url in imageUrls) {
-            final imgMem = fetchedImages[url];
-            if (imgMem != null) {
-              widgets.add(pw.Image(imgMem, width: 400, fit: pw.BoxFit.contain));
-              widgets.add(pw.SizedBox(height: 10));
-            }
+            widgets.add(
+              pw.UrlLink(
+                destination: url,
+                child: pw.Text(
+                  'عرض',
+                  style: pw.TextStyle(
+                    color: PdfColors.blue,
+                    decoration: pw.TextDecoration.underline,
+                  ),
+                  textDirection: pw.TextDirection.rtl,
+                ),
+              ),
+            );
+            widgets.add(pw.SizedBox(height: 10));
           }
           return widgets;
         },
