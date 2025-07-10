@@ -11,6 +11,7 @@ import 'dart:ui' as ui;
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'package:meta/meta.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:pdf/pdf.dart';
 
@@ -138,7 +139,7 @@ class PdfReportGenerator {
 
     required String projectId,
 
-    required DocumentSnapshot? projectSnapshot,
+    required Map<String, dynamic>? projectData,
 
     required List<Map<String, dynamic>> phases,
 
@@ -367,7 +368,7 @@ class PdfReportGenerator {
     final qrLink = buildReportDownloadUrl(fileName, token);
 
 
-    final projectDataMap = projectSnapshot?.data() as Map<String, dynamic>?;
+    final projectDataMap = projectData;
 
     final String projectName = projectDataMap?['name'] ?? 'مشروع غير مسمى';
 
@@ -657,6 +658,27 @@ class PdfReportGenerator {
 
     return PdfReportResult(bytes: pdfBytes, downloadUrl: url);
 
+  }
+
+  static Future<PdfReportResult> generateWithIsolate({
+    required String projectId,
+    required Map<String, dynamic>? projectData,
+    required List<Map<String, dynamic>> phases,
+    required List<Map<String, dynamic>> testsStructure,
+    String? generatedBy,
+    DateTime? start,
+    DateTime? end,
+  }) {
+    final _IsolateParams params = _IsolateParams(
+      projectId: projectId,
+      projectData: projectData,
+      phases: phases,
+      testsStructure: testsStructure,
+      generatedBy: generatedBy,
+      start: start,
+      end: end,
+    );
+    return compute(_generateInIsolate, params);
   }
 
   static pw.Widget _buildProjectDetailsTable(
@@ -2098,5 +2120,37 @@ class PdfReportGenerator {
     );
   }
 
+}
+
+class _IsolateParams {
+  final String projectId;
+  final Map<String, dynamic>? projectData;
+  final List<Map<String, dynamic>> phases;
+  final List<Map<String, dynamic>> testsStructure;
+  final String? generatedBy;
+  final DateTime? start;
+  final DateTime? end;
+
+  const _IsolateParams({
+    required this.projectId,
+    required this.projectData,
+    required this.phases,
+    required this.testsStructure,
+    this.generatedBy,
+    this.start,
+    this.end,
+  });
+}
+
+Future<PdfReportResult> _generateInIsolate(_IsolateParams params) {
+  return PdfReportGenerator.generate(
+    projectId: params.projectId,
+    projectData: params.projectData,
+    phases: params.phases,
+    testsStructure: params.testsStructure,
+    generatedBy: params.generatedBy,
+    start: params.start,
+    end: params.end,
+  );
 }
 

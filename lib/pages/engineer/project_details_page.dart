@@ -976,15 +976,14 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
     final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
     try {
-      final result = await PdfReportGenerator.generate(
+      final result = await PdfReportGenerator.generateWithIsolate(
         projectId: widget.projectId,
-        projectSnapshot: _projectDataSnapshot,
+        projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
         phases: predefinedPhasesStructure,
         testsStructure: finalCommissioningTests,
         generatedBy: _currentEngineerName,
         start: start,
         end: end,
-        onProgress: (p) => progress.value = p,
       );
 
       await ProgressDialog.hide(context);
