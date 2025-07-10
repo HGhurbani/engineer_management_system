@@ -1143,39 +1143,38 @@
         List<String> urls,
         PdfColor borderColor) {
       if (urls.isEmpty) return pw.SizedBox();
-  
+
       return pw.Directionality(
         textDirection: pw.TextDirection.rtl,
         child: pw.Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          alignment: pw.WrapAlignment.end, // لجعل العناصر تتكدس من اليمين
-          children: [
-            for (int i = 0; i < urls.length; i++)
-              pw.Container(
-                alignment: pw.Alignment.centerRight,
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
-                  children: [
-                    pw.UrlLink(
-                      destination: urls[i],
-                      child: pw.Text(
-                        'عرض',
-                        style: pw.TextStyle(
-                          color: PdfColors.blue,
-                          decoration: pw.TextDecoration.underline,
-                        ),
-                        textAlign: pw.TextAlign.right,
-                        textDirection: pw.TextDirection.rtl,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
+          alignment: pw.WrapAlignment.end,
+          spacing: 4,
+          children: _buildImageLinkWidgets(urls),
         ),
       );
-  
+    }
+
+    static List<pw.Widget> _buildImageLinkWidgets(List<String> urls) {
+      final widgets = <pw.Widget>[];
+      for (int i = 0; i < urls.length; i++) {
+        widgets.add(
+          pw.UrlLink(
+            destination: urls[i],
+            child: pw.Text(
+              'عرض صورة رقم ${i + 1}',
+              style: pw.TextStyle(
+                color: PdfColors.blue,
+                decoration: pw.TextDecoration.underline,
+              ),
+              textDirection: pw.TextDirection.rtl,
+            ),
+          ),
+        );
+        if (i < urls.length - 1) {
+          widgets.add(pw.Text('|', textDirection: pw.TextDirection.rtl));
+        }
+      }
+      return widgets;
     }
   
   
@@ -1381,7 +1380,7 @@
               pw.UrlLink(
                 destination: imgUrl,
                 child: pw.Text(
-                  'عرض',
+                  'عرض صورة رقم 1',
                   style: pw.TextStyle(
                     color: PdfColors.blue,
                     decoration: pw.TextDecoration.underline,
@@ -1922,27 +1921,7 @@
           final note = item['note']?.toString() ?? '';
           final imgs =
               (item['imageUrls'] as List?)?.map((it) => it.toString()).toList() ?? [];
-          final imgWidgets = <pw.Widget>[];
-          for (final url in imgs) {
-            imgWidgets.add(
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
-                children: [
-                  pw.UrlLink(
-                    destination: url,
-                    child: pw.Text(
-                      'عرض',
-                      style: pw.TextStyle(
-                        color: PdfColors.blue,
-                        decoration: pw.TextDecoration.underline,
-                      ),
-                      textDirection: pw.TextDirection.rtl,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
+          final imgWidgets = _buildImageLinkWidgets(imgs);
   
           widgets.add(
             pw.Table(
@@ -2047,27 +2026,7 @@
         for (final item in items) {
           final note = item['note']?.toString() ?? '';
           final url = item['imageUrl'] as String?;
-          final imgWidgets = <pw.Widget>[];
-          if (url != null) {
-            imgWidgets.add(
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
-                children: [
-                  pw.UrlLink(
-                    destination: url,
-                    child: pw.Text(
-                      'عرض',
-                      style: pw.TextStyle(
-                        color: PdfColors.blue,
-                        decoration: pw.TextDecoration.underline,
-                      ),
-                      textDirection: pw.TextDirection.rtl,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
+          final imgWidgets = url != null ? _buildImageLinkWidgets([url]) : <pw.Widget>[];
   
           widgets.add(
             pw.Table(
