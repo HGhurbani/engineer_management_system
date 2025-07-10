@@ -1115,12 +1115,23 @@ class PdfReportGenerator {
             ),
             pw.SizedBox(height: 10),
 
-            if (beforeUrls.isNotEmpty)
+            if (beforeUrls.isNotEmpty) ...[
+              pw.Text('صور قبل:', style: labelStyle, textAlign: pw.TextAlign.right, textDirection: pw.TextDirection.rtl),
+              pw.SizedBox(height: 5),
               _buildImagesGrid(beforeUrls, fetchedImages, borderColor),
-            if (afterUrls.isNotEmpty)
+              pw.SizedBox(height: 10),
+            ],
+            if (afterUrls.isNotEmpty) ...[
+              pw.Text('صور بعد:', style: labelStyle, textAlign: pw.TextAlign.right, textDirection: pw.TextDirection.rtl),
+              pw.SizedBox(height: 5),
               _buildImagesGrid(afterUrls, fetchedImages, borderColor),
-            if (imageUrls.isNotEmpty)
+              pw.SizedBox(height: 10),
+            ],
+            if (imageUrls.isNotEmpty) ...[
+              pw.Text('صور إضافية:', style: labelStyle, textAlign: pw.TextAlign.right, textDirection: pw.TextDirection.rtl),
+              pw.SizedBox(height: 5),
               _buildImagesGrid(imageUrls, fetchedImages, borderColor),
+            ],
           ],
         ],
       ),
@@ -1137,19 +1148,20 @@ class PdfReportGenerator {
       spacing: 10,
       runSpacing: 10,
       alignment: pw.WrapAlignment.end,
-      children: urls
-          .map((url) => pw.UrlLink(
-                destination: url,
-                child: pw.Text(
-                  'عرض',
-                  style: pw.TextStyle(
-                    color: PdfColors.blue,
-                    decoration: pw.TextDecoration.underline,
-                  ),
-                  textDirection: pw.TextDirection.rtl,
-                ),
-              ))
-          .toList(),
+      children: [
+        for (int i = 0; i < urls.length; i++)
+          pw.UrlLink(
+            destination: urls[i],
+            child: pw.Text(
+              'عرض ${i + 1}',
+              style: pw.TextStyle(
+                color: PdfColors.blue,
+                decoration: pw.TextDecoration.underline,
+              ),
+              textDirection: pw.TextDirection.rtl,
+            ),
+          ),
+      ],
     );
   }
 
