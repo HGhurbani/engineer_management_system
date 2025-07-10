@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:math';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:engineer_management_system/theme/app_constants.dart'; // تأكد من استيراد هذا
 
@@ -30,9 +31,18 @@ class ReportStorage {
 
       if (response.statusCode == 200) {
         final responseBody = await response.stream.bytesToString();
-        // افترض أن الخادم يعيد مسار URL المباشر للملف المرفوع
-        // قد تحتاج إلى تحليل JSON هنا إذا كان الخادم يعيد JSON
-        return responseBody; // هذا هو رابط التنزيل الذي سيعيده الخادم
+        try {
+          final data = jsonDecode(responseBody) as Map<String, dynamic>;
+          final path = data['file_path'] as String?;
+          if (path != null) {
+            return path.startsWith('http')
+                ? path
+                : '${AppConstants.baseUrl}/$path';
+          }
+        } catch (_) {
+          // Ignore JSON parse errors and fall back to raw response
+        }
+        return responseBody; // في حال كان الخادم يعيد رابطاً مباشراً كنص
       } else {
         final errorBody = await response.stream.bytesToString();
         print('Error uploading PDF: ${response.statusCode}, $errorBody');
