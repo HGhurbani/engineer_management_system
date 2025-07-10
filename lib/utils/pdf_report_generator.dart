@@ -40,7 +40,10 @@ class PdfReportGenerator {
   // Limit the dimensions of embedded images so large photos do not cause
   // out-of-memory errors when generating huge reports. Lowering the limit
   // further reduces peak memory usage when many images are embedded.
-  static const int _maxImageDimension = 512;
+  // Lowering the dimension reduces the memory consumed when many
+  // pictures are included in a single report. 256 keeps reasonable
+  // clarity while cutting peak usage roughly in half.
+  static const int _maxImageDimension = 256;
   // JPEG quality used when encoding resized images.
   static const int _jpgQuality = 75;
 
@@ -94,7 +97,8 @@ class PdfReportGenerator {
   static Future<Map<String, pw.MemoryImage>> _fetchImagesForUrls(
       List<String> urls, {
       void Function(double progress)? onProgress,
-      int concurrency = 5,
+      // Reduce concurrent downloads to lower simultaneous memory pressure.
+      int concurrency = 3,
     }) async {
     final Map<String, pw.MemoryImage> fetched = {};
     final uniqueUrls = urls.toSet().toList();

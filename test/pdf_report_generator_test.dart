@@ -9,8 +9,8 @@ void main() {
     final bytes = Uint8List.fromList(img.encodeJpg(image));
     final resized = await PdfReportGenerator.resizeImageForTest(bytes);
     final decoded = img.decodeImage(resized)!;
-    // Images should be resized to at most 512 pixels on the longest side
-    expect(decoded.width <= 512, isTrue);
-    expect(decoded.height <= 512, isTrue);
+    // Images should be resized to at most 256 pixels on the longest side
+    expect(decoded.width <= 256, isTrue);
+    expect(decoded.height <= 256, isTrue);
   });
 }
