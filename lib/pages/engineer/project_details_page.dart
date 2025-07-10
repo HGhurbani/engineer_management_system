@@ -3071,9 +3071,12 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('صور قبل:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const Text('صور قبل:',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    textAlign: TextAlign.right),
                                 const SizedBox(height: 4),
                                 Wrap(
+                                  textDirection: ui.TextDirection.rtl,
                                   spacing: AppConstants.paddingSmall / 2,
                                   runSpacing: AppConstants.paddingSmall / 2,
                                   children: beforeUrls.map((url) {
@@ -3096,9 +3099,12 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('صور بعد:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const Text('صور بعد:',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    textAlign: TextAlign.right),
                                 const SizedBox(height: 4),
                                 Wrap(
+                                  textDirection: ui.TextDirection.rtl,
                                   spacing: AppConstants.paddingSmall / 2,
                                   runSpacing: AppConstants.paddingSmall / 2,
                                   children: afterUrls.map((url) {
@@ -3121,9 +3127,12 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('صور إضافية:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const Text('صور إضافية:',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    textAlign: TextAlign.right),
                                 const SizedBox(height: 4),
                                 Wrap(
+                                  textDirection: ui.TextDirection.rtl,
                                   spacing: AppConstants.paddingSmall / 2,
                                   runSpacing: AppConstants.paddingSmall / 2,
                                   children: imageUrls.map((url) {
