@@ -976,15 +976,30 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
     final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
     try {
-      final result = await PdfReportGenerator.generateWithIsolate(
-        projectId: widget.projectId,
-        projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
-        phases: predefinedPhasesStructure,
-        testsStructure: finalCommissioningTests,
-        generatedBy: _currentEngineerName,
-        start: start,
-        end: end,
-      );
+      PdfReportResult result;
+      try {
+        result = await PdfReportGenerator.generateWithIsolate(
+          projectId: widget.projectId,
+          projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
+          phases: predefinedPhasesStructure,
+          testsStructure: finalCommissioningTests,
+          generatedBy: _currentEngineerName,
+          start: start,
+          end: end,
+        );
+      } catch (e) {
+        // Retry with low-memory settings if initial attempt fails.
+        result = await PdfReportGenerator.generateWithIsolate(
+          projectId: widget.projectId,
+          projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
+          phases: predefinedPhasesStructure,
+          testsStructure: finalCommissioningTests,
+          generatedBy: _currentEngineerName,
+          start: start,
+          end: end,
+          lowMemory: true,
+        );
+      }
 
       await ProgressDialog.hide(context);
       _showFeedbackSnackBar(context, getLocalizedText('تم إنشاء التقرير بنجاح.', 'Report generated successfully.'), isError: false);

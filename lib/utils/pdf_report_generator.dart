@@ -44,8 +44,10 @@ class PdfReportGenerator {
   // pictures are included in a single report. Using 1024 keeps better
   // clarity for large photos while still bounding memory usage.
   static const int _maxImageDimension = 1024;
-  // JPEG quality used when encoding resized images.
   static const int _jpgQuality = 85;
+  // More aggressive settings for devices with limited memory.
+  static const int _lowMemImageDimension = 512;
+  static const int _lowMemJpgQuality = 70;
 
 
   static Future<void> _loadArabicFont() async {
@@ -67,11 +69,14 @@ class PdfReportGenerator {
 
   }
 
-  static Future<Uint8List> _resizeImageIfNeeded(Uint8List bytes) async {
+  static Future<Uint8List> _resizeImageIfNeeded(Uint8List bytes,
+      {int? maxDimension, int? quality}) async {
+    final dim = maxDimension ?? _maxImageDimension;
+    final q = quality ?? _jpgQuality;
     final ui.Codec codec = await ui.instantiateImageCodec(
       bytes,
-      targetWidth: _maxImageDimension,
-      targetHeight: _maxImageDimension,
+      targetWidth: dim,
+      targetHeight: dim,
       allowUpscaling: false,
     );
     final ui.FrameInfo frame = await codec.getNextFrame();
@@ -84,12 +89,14 @@ class PdfReportGenerator {
       height: image.height,
       bytes: raw.buffer,
     );
-    return Uint8List.fromList(img.encodeJpg(converted, quality: _jpgQuality));
+    return Uint8List.fromList(img.encodeJpg(converted, quality: q));
   }
 
   @visibleForTesting
-  static Future<Uint8List> resizeImageForTest(Uint8List bytes) =>
-      _resizeImageIfNeeded(bytes);
+  static Future<Uint8List> resizeImageForTest(Uint8List bytes,
+          {int? maxDimension, int? quality}) =>
+      _resizeImageIfNeeded(bytes,
+          maxDimension: maxDimension, quality: quality);
 
 
 
@@ -99,6 +106,8 @@ class PdfReportGenerator {
       void Function(double progress)? onProgress,
       // Reduce concurrent downloads to lower simultaneous memory pressure.
       int concurrency = 3,
+      int? maxDimension,
+      int? quality,
     }) async {
     final Map<String, pw.MemoryImage> fetched = {};
     final uniqueUrls = urls.toSet().toList();
@@ -116,8 +125,8 @@ class PdfReportGenerator {
               .timeout(const Duration(seconds: 120));
           final contentType = response.headers['content-type'] ?? '';
           if (response.statusCode == 200 && contentType.startsWith('image/')) {
-            final resizedBytes =
-                await _resizeImageIfNeeded(response.bodyBytes);
+            final resizedBytes = await _resizeImageIfNeeded(response.bodyBytes,
+                maxDimension: maxDimension, quality: quality);
             final memImg = pw.MemoryImage(resizedBytes);
             fetched[url] = memImg;
             PdfImageCache.put(url, memImg);
@@ -159,6 +168,11 @@ class PdfReportGenerator {
     // Ensure the cache does not retain images from previous reports
     PdfImageCache.clear();
     onProgress?.call(0.0);
+
+    final int imgDim =
+        lowMemory ? _lowMemImageDimension : _maxImageDimension;
+    final int imgQuality = lowMemory ? _lowMemJpgQuality : _jpgQuality;
+    final int fetchConcurrency = lowMemory ? 1 : 3;
 
     DateTime now = DateTime.now();
 
@@ -329,6 +343,9 @@ class PdfReportGenerator {
     final fetchedImages = await _fetchImagesForUrls(
       imageUrls.toList(),
       onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
+      concurrency: fetchConcurrency,
+      maxDimension: imgDim,
+      quality: imgQuality,
     );
     onProgress?.call(0.9);
 
@@ -671,6 +688,7 @@ class PdfReportGenerator {
     String? generatedBy,
     DateTime? start,
     DateTime? end,
+    bool lowMemory = false,
   }) async {
     final fontData =
         await rootBundle.load('assets/fonts/Tajawal-Medium.ttf');
@@ -686,6 +704,7 @@ class PdfReportGenerator {
       generatedBy: generatedBy,
       start: start,
       end: end,
+      lowMemory: lowMemory,
     );
   }
 
@@ -1641,9 +1660,14 @@ class PdfReportGenerator {
     DateTime? start,
     DateTime? end,
     void Function(double progress)? onProgress,
+    bool lowMemory = false,
   }) async {
     PdfImageCache.clear();
     onProgress?.call(0.0);
+    final int imgDim =
+        lowMemory ? _lowMemImageDimension : _maxImageDimension;
+    final int imgQuality = lowMemory ? _lowMemJpgQuality : _jpgQuality;
+    final int fetchConcurrency = lowMemory ? 1 : 3;
     DateTime now = DateTime.now();
     bool useRange = start != null || end != null;
     if (useRange) {
@@ -1775,6 +1799,9 @@ class PdfReportGenerator {
     final fetchedImages = await _fetchImagesForUrls(
       imageUrls.toList(),
       onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
+      concurrency: fetchConcurrency,
+      maxDimension: imgDim,
+      quality: imgQuality,
     );
     onProgress?.call(0.9);
 
