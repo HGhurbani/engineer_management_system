@@ -19,6 +19,7 @@ class PdfPreviewScreen extends StatelessWidget {
   final String shareText;
   final String? clientPhone; // This already exists
   final String? shareLink;
+  final String? imageUrl;
 
   const PdfPreviewScreen({
     Key? key,
@@ -27,6 +28,7 @@ class PdfPreviewScreen extends StatelessWidget {
     required this.shareText,
     this.clientPhone, // This already exists
     this.shareLink,
+    this.imageUrl,
   }) : super(key: key);
 
   Future<void> _sharePdf(BuildContext context) async {
@@ -72,6 +74,44 @@ class PdfPreviewScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _viewImageDialog(BuildContext context, String imageUrl) async {
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.transparent,
+        contentPadding: EdgeInsets.zero,
+        insetPadding: const EdgeInsets.all(10),
+        content: InteractiveViewer(
+          panEnabled: true,
+          boundaryMargin: const EdgeInsets.all(20),
+          minScale: 0.5,
+          maxScale: 4,
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.contain,
+            loadingBuilder: (ctx, child, progress) => progress == null
+                ? child
+                : const Center(
+                    child: CircularProgressIndicator(
+                        color: AppConstants.primaryColor)),
+            errorBuilder: (ctx, err, st) => const Center(
+                child: Icon(Icons.error_outline,
+                    color: AppConstants.errorColor, size: 50)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            style:
+                TextButton.styleFrom(backgroundColor: Colors.black.withOpacity(0.5)),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('إغلاق', style: TextStyle(color: Colors.white)),
+          )
+        ],
+        actionsAlignment: MainAxisAlignment.center,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -79,6 +119,16 @@ class PdfPreviewScreen extends StatelessWidget {
         title: const Text('معاينة PDF', style: TextStyle(color: Colors.white)),
         backgroundColor: AppConstants.primaryColor,
         actions: [
+          if (imageUrl != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: Colors.white),
+                onPressed: () => _viewImageDialog(context, imageUrl!),
+                icon: const Icon(Icons.image_outlined, color: Colors.white),
+                label: const Text('عرض الصورة'),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: TextButton.icon(
