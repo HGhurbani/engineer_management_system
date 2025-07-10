@@ -50,7 +50,8 @@ class PdfReportGenerator {
   static const int _lowMemJpgQuality = 60;
   // Skip downloading images that exceed this size in bytes to avoid
   // exhausting memory on devices with limited resources.
-  static const int _maxImageFileSize = 5 * 1024 * 1024; // 5 MB
+  // Made public so other libraries can reference this limit.
+  static const int maxImageFileSize = 5 * 1024 * 1024; // 5 MB
 
 
   static Future<void> _loadArabicFont() async {
@@ -131,7 +132,7 @@ class PdfReportGenerator {
                 .timeout(const Duration(seconds: 30));
             final lenStr = head.headers['content-length'];
             final len = lenStr != null ? int.tryParse(lenStr) : null;
-            if (len != null && len > _maxImageFileSize) {
+            if (len != null && len > maxImageFileSize) {
               // Skip oversized images
               print('Skipping large image from URL $url: $len bytes');
               return;
