@@ -30,9 +30,10 @@ class PdfPreviewScreen extends StatelessWidget {
   }) : super(key: key);
 
   Future<void> _sharePdf(BuildContext context) async {
-    if (shareLink != null) {
-      final text = '$shareText\n$shareLink';
-      if (kIsWeb) {
+    final text = shareLink != null ? '$shareText\n$shareLink' : shareText;
+
+    if (kIsWeb) {
+      if (shareLink != null) {
         if (clientPhone != null && clientPhone!.isNotEmpty) {
           String normalizedPhone =
               clientPhone!.replaceAll(RegExp(r'[^0-9]'), '');
@@ -47,83 +48,28 @@ class PdfPreviewScreen extends StatelessWidget {
           await Share.share(text);
         }
       } else {
-        if (clientPhone != null && clientPhone!.isNotEmpty) {
-          String normalizedPhone =
-              clientPhone!.replaceAll(RegExp(r'[^0-9]'), '');
-          if (normalizedPhone.startsWith('0')) {
-            normalizedPhone = '966${normalizedPhone.substring(1)}';
-          }
-          final Uri whatsappUri = Uri.parse(
-            'whatsapp://send?phone=$normalizedPhone&text=${Uri.encodeComponent(text)}',
-          );
-          if (await canLaunchUrl(whatsappUri)) {
-            await launchUrl(whatsappUri,
-                mode: LaunchMode.externalApplication);
-          } else {
-            await Share.share(text);
-          }
-        } else {
-          await Share.share(text);
-        }
+        // Fallback to downloading the PDF if no link is provided.
+        final blob = html.Blob([pdfBytes], 'application/pdf');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute('download', fileName)
+          ..click();
+        html.Url.revokeObjectUrl(url);
       }
       return;
     }
 
-    if (kIsWeb) {
-      // On web, trigger PDF download then open WhatsApp Web in a new tab.
-      final blob = html.Blob([pdfBytes], 'application/pdf');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download', fileName)
-        ..click();
-      html.Url.revokeObjectUrl(url);
+    // Save the PDF file temporarily on non-web platforms and share it.
+    final dir = await getTemporaryDirectory();
+    final path = '${dir.path}/$fileName';
+    final file = File(path);
+    await file.writeAsBytes(pdfBytes, flush: true);
 
-      if (clientPhone != null && clientPhone!.isNotEmpty) {
-        String normalizedPhone = clientPhone!.replaceAll(RegExp(r'[^0-9]'), '');
-        if (normalizedPhone.startsWith('0')) {
-          normalizedPhone = '966${normalizedPhone.substring(1)}';
-        }
-        final Uri whatsappWebUri = Uri.parse(
-          'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent(shareText)}',
-        );
-        await launchUrl(whatsappWebUri, webOnlyWindowName: '_blank');
-      }
-    } else {
-      // Save the PDF file temporarily on mobile/desktop platforms.
-      final dir = await getTemporaryDirectory();
-      final path = '${dir.path}/$fileName';
-      final file = File(path);
-      await file.writeAsBytes(pdfBytes, flush: true);
-
-      if (clientPhone != null && clientPhone!.isNotEmpty) {
-        // Normalize phone number: remove non-digits and add country code if missing
-        String normalizedPhone =
-            clientPhone!.replaceAll(RegExp(r'[^0-9]'), '');
-        if (normalizedPhone.startsWith('0')) {
-          normalizedPhone = '966${normalizedPhone.substring(1)}';
-        }
-
-        final Uri whatsappUri = Uri.parse(
-          'whatsapp://send?phone=$normalizedPhone&text=${Uri.encodeComponent(shareText)}',
-        );
-
-        if (await canLaunchUrl(whatsappUri)) {
-          await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
-        } else {
-          await Share.shareXFiles(
-            [XFile(path)],
-            text: shareText,
-            subject: 'تقرير المشروع',
-          );
-        }
-      } else {
-        await Share.shareXFiles(
-          [XFile(path)],
-          text: shareText,
-          subject: 'تقرير المشروع',
-        );
-      }
-    }
+    await Share.shareXFiles(
+      [XFile(path)],
+      text: text,
+      subject: 'تقرير المشروع',
+    );
   }
 
   @override
