@@ -3512,36 +3512,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
     contentWidgets.add(pw.Divider(height: 20, thickness: 1, color: PdfColors.grey400));
 
-    // --- NEW: Fetch all images before building the PDF ---
-    final Map<String, pw.MemoryImage> fetchedImages = {};
-
-    // Helper to fetch and store images with basic validation
-    Future<void> _fetchAndStoreImages(List<String> imageUrls) async {
-      for (final url in imageUrls) {
-        if (fetchedImages.containsKey(url)) continue;
-        try {
-          final response = await http.get(Uri.parse(url));
-          final contentType = response.headers['content-type'] ?? '';
-          if (response.statusCode == 200 && contentType.startsWith('image/')) {
-            try {
-              final decoded = img.decodeImage(response.bodyBytes);
-              if (decoded != null) {
-                fetchedImages[url] = pw.MemoryImage(response.bodyBytes);
-              } else {
-                print('Invalid image bytes for URL $url');
-              }
-            } catch (e) {
-              // If the bytes cannot be decoded into an image, skip this URL
-              print('Invalid image data for URL $url: $e');
-            }
-          } else {
-            print('Failed to load image from URL $url: status ${response.statusCode}, content-type $contentType');
-          }
-        } catch (e) {
-          print('Error fetching image from URL $url: $e');
-        }
-      }
-    }
+    // Skip fetching images to speed up PDF generation
 
     // Identify all image URLs that might be needed in the PDF
     List<String> allImageUrlsToFetch = [];
@@ -3587,9 +3558,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       }
     }
 
-    // Now, fetch all identified images concurrently
-    await _fetchAndStoreImages(allImageUrlsToFetch.toSet().toList()); // Use toSet to avoid duplicate fetches
-    // --- END NEW: Fetch all images before building the PDF ---
+    // Images are not fetched; use links instead for faster PDF generation
 
 
     if (isTestSection) {
@@ -3606,8 +3575,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         contentWidgets.add(pw.Text('الملاحظات: $testNote', style: regularStyle, textDirection: pw.TextDirection.rtl));
       }
       contentWidgets.add(pw.SizedBox(height: 10));
-      if (testImageUrl != null && fetchedImages.containsKey(testImageUrl)) {
-        final image = fetchedImages[testImageUrl]!;
+      if (testImageUrl != null) {
         contentWidgets.add(pw.Container(
             alignment: pw.Alignment.centerRight,
             child: pw.Column(
@@ -3615,12 +3583,20 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 children: [
                   pw.Text('صورة الاختبار:', style: boldStyle, textDirection: pw.TextDirection.rtl),
                   pw.SizedBox(height: 5),
-                  pw.Image(image, width: 200, height: 200, fit: pw.BoxFit.contain),
+                  pw.UrlLink(
+                    destination: testImageUrl,
+                    child: pw.Text(
+                      'عرض',
+                      style: pw.TextStyle(
+                        color: PdfColors.blue,
+                        decoration: pw.TextDecoration.underline,
+                      ),
+                      textDirection: pw.TextDirection.rtl,
+                    ),
+                  ),
                 ]
             )
         ));
-      } else if (testImageUrl != null) {
-        contentWidgets.add(pw.Text('فشل تحميل صورة الاختبار من: $testImageUrl', style: regularStyle, textDirection: pw.TextDirection.rtl));
       }
     } else {
       if (isSubPhase) {
@@ -3674,13 +3650,20 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       if (note.isNotEmpty) pw.Text('ملاحظة: $note', style: regularStyle, textDirection: pw.TextDirection.rtl),
                       pw.SizedBox(height: 3),
                       for (String imgUrl in imageUrls)
-                        if (fetchedImages.containsKey(imgUrl))
-                          pw.Padding(
-                            padding: pw.EdgeInsets.symmetric(vertical: 2),
-                            child: pw.Image(fetchedImages[imgUrl]!, width: 150, height: 100, fit: pw.BoxFit.contain),
-                          )
-                        else
-                          pw.Text('  فشل تحميل الصورة من: $imgUrl', style: smallGreyStyle.copyWith(color: PdfColors.red), textDirection: pw.TextDirection.rtl),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.symmetric(vertical: 2),
+                          child: pw.UrlLink(
+                            destination: imgUrl,
+                            child: pw.Text(
+                              'عرض',
+                              style: pw.TextStyle(
+                                color: PdfColors.blue,
+                                decoration: pw.TextDecoration.underline,
+                              ),
+                              textDirection: pw.TextDirection.rtl,
+                            ),
+                          ),
+                        ),
                       pw.Text('بواسطة: $entryEngineer - $entryDate', style: smallGreyStyle, textDirection: pw.TextDirection.rtl),
                     ]
                 )
@@ -3741,13 +3724,20 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       if (note.isNotEmpty) pw.Text('ملاحظة: $note', style: regularStyle, textDirection: pw.TextDirection.rtl),
                       pw.SizedBox(height: 3),
                       for (String imgUrl in imageUrls)
-                        if (fetchedImages.containsKey(imgUrl))
-                          pw.Padding(
-                            padding: pw.EdgeInsets.symmetric(vertical: 2),
-                            child: pw.Image(fetchedImages[imgUrl]!, width: 150, height: 100, fit: pw.BoxFit.contain),
-                          )
-                        else
-                          pw.Text('  فشل تحميل الصورة من: $imgUrl', style: smallGreyStyle.copyWith(color: PdfColors.red), textDirection: pw.TextDirection.rtl),
+                        pw.Padding(
+                          padding: pw.EdgeInsets.symmetric(vertical: 2),
+                          child: pw.UrlLink(
+                            destination: imgUrl,
+                            child: pw.Text(
+                              'عرض',
+                              style: pw.TextStyle(
+                                color: PdfColors.blue,
+                                decoration: pw.TextDecoration.underline,
+                              ),
+                              textDirection: pw.TextDirection.rtl,
+                            ),
+                          ),
+                        ),
                       pw.Text('بواسطة: $entryEngineer - $entryDate', style: smallGreyStyle, textDirection: pw.TextDirection.rtl),
                     ]
                 )
@@ -3826,13 +3816,20 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                           if (note.isNotEmpty) pw.Text('  $note', style: regularStyle, textDirection: pw.TextDirection.rtl),
                           pw.SizedBox(height: 2),
                           for (String imgUrl in imageUrls)
-                            if (fetchedImages.containsKey(imgUrl))
-                              pw.Padding(
-                                padding: pw.EdgeInsets.symmetric(vertical: 2),
-                                child: pw.Image(fetchedImages[imgUrl]!, width: 150, height: 100, fit: pw.BoxFit.contain),
-                              )
-                            else
-                              pw.Text('  فشل تحميل الصورة من: $imgUrl', style: smallGreyStyle.copyWith(color: PdfColors.red), textDirection: pw.TextDirection.rtl),
+                            pw.Padding(
+                              padding: pw.EdgeInsets.symmetric(vertical: 2),
+                              child: pw.UrlLink(
+                                destination: imgUrl,
+                                child: pw.Text(
+                                  'عرض',
+                                  style: pw.TextStyle(
+                                    color: PdfColors.blue,
+                                    decoration: pw.TextDecoration.underline,
+                                  ),
+                                  textDirection: pw.TextDirection.rtl,
+                                ),
+                              ),
+                            ),
                           pw.Text('  بواسطة: $entryEngineer - $entryDate', style: smallGreyStyle, textDirection: pw.TextDirection.rtl),
                         ]
                     )

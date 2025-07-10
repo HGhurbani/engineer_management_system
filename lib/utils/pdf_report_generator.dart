@@ -1131,48 +1131,26 @@ class PdfReportGenerator {
       List<String> urls,
       Map<String, pw.MemoryImage> fetchedImages,
       PdfColor borderColor) {
-    final availableImages =
-        urls.where((u) => fetchedImages.containsKey(u)).toList();
-    if (availableImages.isEmpty) return pw.SizedBox();
+    if (urls.isEmpty) return pw.SizedBox();
 
-    List<pw.Widget> rows = [];
-    for (int i = 0; i < availableImages.length; i += 3) {
-      final rowImages = availableImages.skip(i).take(3).toList();
-      rows.add(
-        pw.Container(
-          margin: const pw.EdgeInsets.only(bottom: 15),
-          child: pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-            children: rowImages
-                .map((imageUrl) => pw.Container(
-                      width: 180,
-                      height: 210,
-                      decoration: pw.BoxDecoration(
-                        border: pw.Border.all(color: borderColor, width: 1.5),
-                        borderRadius: pw.BorderRadius.zero,
-                        boxShadow: [
-                          pw.BoxShadow(
-                            color: PdfColors.grey300,
-                            blurRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: pw.ClipRRect(
-                        horizontalRadius: 0,
-                        verticalRadius: 0,
-                        child: pw.Image(
-                          fetchedImages[imageUrl]!,
-                          fit: pw.BoxFit.cover,
-                        ),
-                      ),
-                    ))
-                .toList(),
-          ),
-        ),
-      );
-    }
-
-    return pw.Column(children: rows);
+    return pw.Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      alignment: pw.WrapAlignment.end,
+      children: urls
+          .map((url) => pw.UrlLink(
+                destination: url,
+                child: pw.Text(
+                  'عرض',
+                  style: pw.TextStyle(
+                    color: PdfColors.blue,
+                    decoration: pw.TextDecoration.underline,
+                  ),
+                  textDirection: pw.TextDirection.rtl,
+                ),
+              ))
+          .toList(),
+    );
   }
 
 
@@ -1354,7 +1332,7 @@ class PdfReportGenerator {
           ),
 
           // Image Section
-          if (imgUrl != null && fetchedImages.containsKey(imgUrl)) ...[
+          if (imgUrl != null) ...[
             pw.SizedBox(height: 20),
             pw.Container(
               width: double.infinity,
@@ -1376,29 +1354,15 @@ class PdfReportGenerator {
               ),
             ),
             pw.SizedBox(height: 10),
-
-            pw.Center(
-              child: pw.Container(
-                width: 230,
-                height: 280,
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: borderColor, width: 1.5),
-                  borderRadius: pw.BorderRadius.zero,
-                  boxShadow: [
-                    pw.BoxShadow(
-                      color: PdfColors.grey300,
-                      blurRadius: 2,
-                    ),
-                  ],
+            pw.UrlLink(
+              destination: imgUrl,
+              child: pw.Text(
+                'عرض',
+                style: pw.TextStyle(
+                  color: PdfColors.blue,
+                  decoration: pw.TextDecoration.underline,
                 ),
-                child: pw.ClipRRect(
-                  horizontalRadius: 0,
-                  verticalRadius: 0,
-                  child: pw.Image(
-                    fetchedImages[imgUrl]!,
-                    fit: pw.BoxFit.cover,
-                  ),
-                ),
+                textDirection: pw.TextDirection.rtl,
               ),
             ),
           ],
@@ -1946,16 +1910,19 @@ class PdfReportGenerator {
             (item['imageUrls'] as List?)?.map((it) => it.toString()).toList() ?? [];
         final imgWidgets = <pw.Widget>[];
         for (final url in imgs) {
-          final img = images[url];
-          if (img != null) {
-            imgWidgets.add(
-              pw.Container(
-                margin: const pw.EdgeInsets.all(2),
-                child: pw.Image(img,
-                    width: 120, height: 120, fit: pw.BoxFit.cover),
+          imgWidgets.add(
+            pw.UrlLink(
+              destination: url,
+              child: pw.Text(
+                'عرض',
+                style: pw.TextStyle(
+                  color: PdfColors.blue,
+                  decoration: pw.TextDecoration.underline,
+                ),
+                textDirection: pw.TextDirection.rtl,
               ),
-            );
-          }
+            ),
+          );
         }
 
         widgets.add(
@@ -2062,14 +2029,19 @@ class PdfReportGenerator {
       for (final item in items) {
         final note = item['note']?.toString() ?? '';
         final url = item['imageUrl'] as String?;
-        final img = url != null ? images[url] : null;
         final imgWidgets = <pw.Widget>[];
-        if (img != null) {
+        if (url != null) {
           imgWidgets.add(
-            pw.Container(
-              margin: const pw.EdgeInsets.all(2),
-              child:
-                  pw.Image(img, width: 120, height: 120, fit: pw.BoxFit.cover),
+            pw.UrlLink(
+              destination: url,
+              child: pw.Text(
+                'عرض',
+                style: pw.TextStyle(
+                  color: PdfColors.blue,
+                  decoration: pw.TextDecoration.underline,
+                ),
+                textDirection: pw.TextDirection.rtl,
+              ),
             ),
           );
         }
