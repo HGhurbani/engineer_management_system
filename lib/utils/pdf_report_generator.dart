@@ -61,7 +61,7 @@ class PdfReportGenerator {
     try {
 
       // Use a slightly bolder font for a more formal look
-      final fontData = await rootBundle.load('assets/fonts/Tajawal-Medium.ttf');
+      final fontData = await rootBundle.load('assets/fonts/Tajawal-Bold.ttf');
 
       _arabicFont = pw.Font.ttf(fontData);
 
@@ -1144,26 +1144,30 @@ class PdfReportGenerator {
       PdfColor borderColor) {
     if (urls.isEmpty) return pw.SizedBox();
 
-    return pw.Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      alignment: pw.WrapAlignment.end,
+    return pw.Directionality(
       textDirection: pw.TextDirection.rtl,
-      children: [
-        for (int i = 0; i < urls.length; i++)
-          pw.UrlLink(
-            destination: urls[i],
-            child: pw.Text(
-              'عرض ${i + 1}',
-              style: pw.TextStyle(
-                color: PdfColors.blue,
-                decoration: pw.TextDecoration.underline,
+      child: pw.Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        alignment: pw.WrapAlignment.end, // لجعل العناصر تتكدس من اليمين
+        children: [
+          for (int i = 0; i < urls.length; i++)
+            pw.UrlLink(
+              destination: urls[i],
+              child: pw.Text(
+                'عرض ${i + 1}',
+                style: pw.TextStyle(
+                  color: PdfColors.blue,
+                  decoration: pw.TextDecoration.underline,
+                ),
+                textAlign: pw.TextAlign.right,
+                textDirection: pw.TextDirection.rtl,
               ),
-              textDirection: pw.TextDirection.rtl,
             ),
-          ),
-      ],
+        ],
+      ),
     );
+
   }
 
 
