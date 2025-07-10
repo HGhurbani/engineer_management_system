@@ -3392,7 +3392,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               .timeout(const Duration(seconds: 30));
           final lenStr = head.headers['content-length'];
           final len = lenStr != null ? int.tryParse(lenStr) : null;
-          if (len != null && len > PdfReportGenerator._maxImageFileSize) {
+          if (len != null && len > PdfReportGenerator.maxImageFileSize) {
             print('Skipping large image from URL $url: $len bytes');
             return;
           }

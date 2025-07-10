@@ -1121,7 +1121,7 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
               .timeout(const Duration(seconds: 30));
           final lenStr = head.headers['content-length'];
           final len = lenStr != null ? int.tryParse(lenStr) : null;
-          if (len != null && len > PdfReportGenerator._maxImageFileSize) {
+          if (len != null && len > PdfReportGenerator.maxImageFileSize) {
             // ignore: avoid_print
             print('Skipping large image from URL $url: $len bytes');
             return;
