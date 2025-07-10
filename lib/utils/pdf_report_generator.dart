@@ -48,6 +48,9 @@ class PdfReportGenerator {
   // More aggressive settings for devices with limited memory.
   static const int _lowMemImageDimension = 256;
   static const int _lowMemJpgQuality = 60;
+  // Skip downloading images that exceed this size in bytes to avoid
+  // exhausting memory on devices with limited resources.
+  static const int _maxImageFileSize = 5 * 1024 * 1024; // 5 MB
 
 
   static Future<void> _loadArabicFont() async {
@@ -120,6 +123,23 @@ class PdfReportGenerator {
         fetched[url] = cached;
       } else {
         try {
+          // Check the file size first to avoid downloading extremely large
+          // images that could cause memory issues during decoding.
+          try {
+            final head = await http
+                .head(Uri.parse(url))
+                .timeout(const Duration(seconds: 30));
+            final lenStr = head.headers['content-length'];
+            final len = lenStr != null ? int.tryParse(lenStr) : null;
+            if (len != null && len > _maxImageFileSize) {
+              // Skip oversized images
+              print('Skipping large image from URL $url: $len bytes');
+              return;
+            }
+          } catch (_) {
+            // Ignore HEAD errors and attempt full download.
+          }
+
           final response = await http
               .get(Uri.parse(url))
               .timeout(const Duration(seconds: 120));

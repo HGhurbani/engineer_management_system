@@ -1068,6 +1068,19 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
       }
 
       try {
+        // Protect against very large images which may trigger OOM errors.
+        try {
+          final head = await http
+              .head(Uri.parse(url))
+              .timeout(const Duration(seconds: 30));
+          final lenStr = head.headers['content-length'];
+          final len = lenStr != null ? int.tryParse(lenStr) : null;
+          if (len != null && len > PdfReportGenerator._maxImageFileSize) {
+            print('Skipping large image from URL $url: $len bytes');
+            return;
+          }
+        } catch (_) {}
+
         final response = await http
             .get(Uri.parse(url))
             .timeout(const Duration(seconds: 60));
