@@ -1172,14 +1172,14 @@
                     if (fetchedImages[urls[i]] != null)
                       pw.Image(
                         fetchedImages[urls[i]]!,
-                        width: 120,
-                        height: 120,
+                        width: 80,
+                        height: 80,
                         fit: pw.BoxFit.cover,
                       ),
                     pw.UrlLink(
                       destination: urls[i],
                       child: pw.Text(
-                        'عرض الصورة بجودة عالية',
+                        'عرض',
                         style: pw.TextStyle(
                           color: PdfColors.blue,
                           decoration: pw.TextDecoration.underline,
@@ -1401,14 +1401,14 @@
               if (fetchedImages[imgUrl] != null)
                 pw.Image(
                   fetchedImages[imgUrl]!,
-                  width: 150,
-                  height: 150,
+                  width: 80,
+                  height: 80,
                   fit: pw.BoxFit.cover,
                 ),
               pw.UrlLink(
                 destination: imgUrl,
                 child: pw.Text(
-                  'عرض الصورة بجودة عالية',
+                  'عرض',
                   style: pw.TextStyle(
                     color: PdfColors.blue,
                     decoration: pw.TextDecoration.underline,
@@ -1968,14 +1968,14 @@
                   if (images[url] != null)
                     pw.Image(
                       images[url]!,
-                      width: 100,
-                      height: 100,
+                      width: 80,
+                      height: 80,
                       fit: pw.BoxFit.cover,
                     ),
                   pw.UrlLink(
                     destination: url,
                     child: pw.Text(
-                      'عرض الصورة بجودة عالية',
+                      'عرض',
                       style: pw.TextStyle(
                         color: PdfColors.blue,
                         decoration: pw.TextDecoration.underline,
@@ -2101,14 +2101,14 @@
                   if (images[url] != null)
                     pw.Image(
                       images[url]!,
-                      width: 100,
-                      height: 100,
+                      width: 80,
+                      height: 80,
                       fit: pw.BoxFit.cover,
                     ),
                   pw.UrlLink(
                     destination: url,
                     child: pw.Text(
-                      'عرض الصورة بجودة عالية',
+                      'عرض',
                       style: pw.TextStyle(
                         color: PdfColors.blue,
                         decoration: pw.TextDecoration.underline,
