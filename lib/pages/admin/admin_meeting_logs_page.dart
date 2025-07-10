@@ -1120,12 +1120,14 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
   }
 
   void _openPdfPreview(
-      Uint8List pdfBytes, String fileName, String text, String? link) {
+      Uint8List pdfBytes, String fileName, String text, String? link,
+      {String? imageUrl}) {
     Navigator.of(context).pushNamed('/pdf_preview', arguments: {
       'bytes': pdfBytes,
       'fileName': fileName,
       'text': text,
       'link': link,
+      'image': imageUrl,
     });
   }
 
