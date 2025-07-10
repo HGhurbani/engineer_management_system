@@ -36,6 +36,7 @@ class PdfPreviewScreen extends StatelessWidget {
 
     if (kIsWeb) {
       if (shareLink != null) {
+        final linkOnly = shareLink!;
         if (clientPhone != null && clientPhone!.isNotEmpty) {
           String normalizedPhone =
               clientPhone!.replaceAll(RegExp(r'[^0-9]'), '');
@@ -43,11 +44,11 @@ class PdfPreviewScreen extends StatelessWidget {
             normalizedPhone = '966${normalizedPhone.substring(1)}';
           }
           final Uri whatsappWebUri = Uri.parse(
-            'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent(text)}',
+            'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent(linkOnly)}',
           );
           await launchUrl(whatsappWebUri, webOnlyWindowName: '_blank');
         } else {
-          await Share.share(text);
+          await Share.share(linkOnly);
         }
       } else {
         // Fallback to downloading the PDF if no link is provided.
