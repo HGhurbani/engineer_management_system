@@ -363,13 +363,7 @@
       }
   
   
-      final fetchedImages = await _fetchImagesForUrls(
-        imageUrls.toList(),
-        onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
-        concurrency: fetchConcurrency,
-        maxDimension: imgDim,
-        quality: imgQuality,
-      );
+      // Skip fetching images since the report only includes text links
       onProgress?.call(0.9);
   
       pw.Font? emojiFont;
@@ -582,8 +576,6 @@
   
                     entry,
   
-                    fetchedImages,
-  
                     i + 1,
   
                     headerStyle,
@@ -624,8 +616,6 @@
                 widgets.add(_buildTestCard(
   
                     test,
-  
-                    fetchedImages,
   
                     i + 1,
   
@@ -914,7 +904,6 @@
   
     static pw.Widget _buildEntryCard(
         Map<String, dynamic> entry,
-        Map<String, pw.MemoryImage> fetchedImages,
         int index,
         pw.TextStyle subHeaderStyle,
         pw.TextStyle regularStyle,
@@ -1126,7 +1115,7 @@
                   ),
                 ),
                 pw.SizedBox(height: 5),
-                _buildImagesGrid(beforeUrls, fetchedImages, borderColor),
+                _buildImagesGrid(beforeUrls, borderColor),
                 pw.SizedBox(height: 10),
               ],
               if (afterUrls.isNotEmpty) ...[
@@ -1134,7 +1123,7 @@
                   textAlign: pw.TextAlign.right,
                   textDirection: pw.TextDirection.rtl,),
                 pw.SizedBox(height: 5),
-                _buildImagesGrid(afterUrls, fetchedImages, borderColor),
+                _buildImagesGrid(afterUrls, borderColor),
                 pw.SizedBox(height: 10),
               ],
               if (imageUrls.isNotEmpty) ...[
@@ -1142,7 +1131,7 @@
                   textAlign: pw.TextAlign.right,
                   textDirection: pw.TextDirection.rtl,),
                 pw.SizedBox(height: 5),
-                _buildImagesGrid(imageUrls, fetchedImages, borderColor),
+                _buildImagesGrid(imageUrls, borderColor),
               ],
             ],
           ],
@@ -1152,7 +1141,6 @@
   
     static pw.Widget _buildImagesGrid(
         List<String> urls,
-        Map<String, pw.MemoryImage> fetchedImages,
         PdfColor borderColor) {
       if (urls.isEmpty) return pw.SizedBox();
   
@@ -1193,7 +1181,6 @@
   
     static pw.Widget _buildTestCard(
         Map<String, dynamic> test,
-        Map<String, pw.MemoryImage> fetchedImages,
         int index,
         pw.TextStyle subHeaderStyle,
         pw.TextStyle regularStyle,
@@ -1824,14 +1811,7 @@
         print('Error preparing simple report details: $e');
       }
   
-      // Fetch all images referenced in entries and tests
-      final fetchedImages = await _fetchImagesForUrls(
-        imageUrls.toList(),
-        onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
-        concurrency: fetchConcurrency,
-        maxDimension: imgDim,
-        quality: imgQuality,
-      );
+      // Skip fetching images since only URL links are embedded
       onProgress?.call(0.9);
   
       await _loadArabicFont();
@@ -1878,7 +1858,6 @@
                 ? pw.Text('لا توجد بيانات', style: cellStyle)
                 : _buildSimpleEntriesTable(
                     dayEntries,
-                    fetchedImages,
                     headerStyle,
                     cellStyle,
                     PdfColors.grey300,
@@ -1891,7 +1870,6 @@
                 ? pw.Text('لا توجد بيانات', style: cellStyle)
                 : _buildSimpleTestsTable(
                     dayTests,
-                    fetchedImages,
                     headerStyle,
                     cellStyle,
                     PdfColors.grey300,
@@ -1912,7 +1890,6 @@
   
     static pw.Widget _buildSimpleEntriesTable(
       List<Map<String, dynamic>> entries,
-      Map<String, pw.MemoryImage> images,
       pw.TextStyle headerStyle,
       pw.TextStyle cellStyle,
       PdfColor headerColor,
@@ -2041,7 +2018,6 @@
     }
     static pw.Widget _buildSimpleTestsTable(
       List<Map<String, dynamic>> tests,
-      Map<String, pw.MemoryImage> images,
       pw.TextStyle headerStyle,
       pw.TextStyle cellStyle,
       PdfColor headerColor,
