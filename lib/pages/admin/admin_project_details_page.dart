@@ -1901,15 +1901,14 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     final progress = ProgressDialog.show(context, 'جاري تحميل البيانات...');
 
     try {
-      final result = await PdfReportGenerator.generate(
+      final result = await PdfReportGenerator.generateWithIsolate(
         projectId: widget.projectId,
-        projectSnapshot: _projectDataSnapshot,
+        projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
         phases: predefinedPhasesStructure,
         testsStructure: finalCommissioningTests,
         generatedBy: _currentAdminName,
         start: start,
         end: end,
-        onProgress: (p) => progress.value = p,
       );
 
       await ProgressDialog.hide(context);
