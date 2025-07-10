@@ -668,7 +668,9 @@ class PdfReportGenerator {
     String? generatedBy,
     DateTime? start,
     DateTime? end,
-  }) {
+  }) async {
+    final fontData =
+        (await rootBundle.load('assets/fonts/Tajawal-Medium.ttf')).buffer;
     final _IsolateParams params = _IsolateParams(
       projectId: projectId,
       projectData: projectData,
@@ -677,6 +679,7 @@ class PdfReportGenerator {
       generatedBy: generatedBy,
       start: start,
       end: end,
+      arabicFontBytes: fontData.asUint8List(),
     );
     return compute(_generateInIsolate, params);
   }
@@ -2130,12 +2133,14 @@ class _IsolateParams {
   final String? generatedBy;
   final DateTime? start;
   final DateTime? end;
+  final Uint8List arabicFontBytes;
 
   const _IsolateParams({
     required this.projectId,
     required this.projectData,
     required this.phases,
     required this.testsStructure,
+    required this.arabicFontBytes,
     this.generatedBy,
     this.start,
     this.end,
@@ -2143,6 +2148,8 @@ class _IsolateParams {
 }
 
 Future<PdfReportResult> _generateInIsolate(_IsolateParams params) {
+  PdfReportGenerator._arabicFont =
+      pw.Font.ttf(ByteData.view(params.arabicFontBytes.buffer));
   return PdfReportGenerator.generate(
     projectId: params.projectId,
     projectData: params.projectData,
