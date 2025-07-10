@@ -669,7 +669,7 @@ class PdfReportGenerator {
     DateTime? end,
   }) async {
     final fontData =
-        (await rootBundle.load('assets/fonts/Tajawal-Medium.ttf')).buffer;
+        await rootBundle.load('assets/fonts/Tajawal-Medium.ttf');
     _arabicFont = pw.Font.ttf(fontData);
 
     // Running the generation directly on the main isolate avoids issues with
