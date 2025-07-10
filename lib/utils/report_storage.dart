@@ -37,7 +37,7 @@ class ReportStorage {
           if (path != null) {
             return path.startsWith('http')
                 ? path
-                : '${AppConstants.baseUrl}/$path';
+                : '${AppConstants.baseUrl}/reports/$path';
           }
         } catch (_) {
           // Ignore JSON parse errors and fall back to raw response
