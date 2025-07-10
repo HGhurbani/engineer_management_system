@@ -1215,6 +1215,8 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
       imageUrls.add(data['imageUrl'] as String);
     }
 
+    final fetchedImages = await _fetchImagesForUrls(imageUrls);
+
 
     final pdf = pw.Document();
     final fileName =
@@ -1255,11 +1257,16 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
             widgets.add(pw.SizedBox(height: 10));
           }
           for (final url in imageUrls) {
+            final img = fetchedImages[url];
+            if (img != null) {
+              widgets.add(pw.Image(img, width: 150, height: 150, fit: pw.BoxFit.cover));
+              widgets.add(pw.SizedBox(height: 5));
+            }
             widgets.add(
               pw.UrlLink(
                 destination: url,
                 child: pw.Text(
-                  'عرض',
+                  'عرض الصورة بجودة عالية',
                   style: pw.TextStyle(
                     color: PdfColors.blue,
                     decoration: pw.TextDecoration.underline,

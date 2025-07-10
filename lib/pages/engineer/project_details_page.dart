@@ -3577,7 +3577,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       }
     }
 
-    // Images are not fetched; use links instead for faster PDF generation
+    final fetchedImages = await _fetchImagesForUrls(allImageUrlsToFetch);
 
 
     if (isTestSection) {
@@ -3602,10 +3602,17 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 children: [
                   pw.Text('صورة الاختبار:', style: boldStyle, textDirection: pw.TextDirection.rtl),
                   pw.SizedBox(height: 5),
+                  if (fetchedImages[testImageUrl] != null)
+                    pw.Image(
+                      fetchedImages[testImageUrl]!,
+                      width: 120,
+                      height: 120,
+                      fit: pw.BoxFit.cover,
+                    ),
                   pw.UrlLink(
                     destination: testImageUrl,
                     child: pw.Text(
-                      'عرض',
+                      'عرض الصورة بجودة عالية',
                       style: pw.TextStyle(
                         color: PdfColors.blue,
                         decoration: pw.TextDecoration.underline,
@@ -3671,16 +3678,28 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       for (String imgUrl in imageUrls)
                         pw.Padding(
                           padding: pw.EdgeInsets.symmetric(vertical: 2),
-                          child: pw.UrlLink(
-                            destination: imgUrl,
-                            child: pw.Text(
-                              'عرض',
-                              style: pw.TextStyle(
-                                color: PdfColors.blue,
-                                decoration: pw.TextDecoration.underline,
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.end,
+                            children: [
+                              if (fetchedImages[imgUrl] != null)
+                                pw.Image(
+                                  fetchedImages[imgUrl]!,
+                                  width: 120,
+                                  height: 120,
+                                  fit: pw.BoxFit.cover,
+                                ),
+                              pw.UrlLink(
+                                destination: imgUrl,
+                                child: pw.Text(
+                                  'عرض الصورة بجودة عالية',
+                                  style: pw.TextStyle(
+                                    color: PdfColors.blue,
+                                    decoration: pw.TextDecoration.underline,
+                                  ),
+                                  textDirection: pw.TextDirection.rtl,
+                                ),
                               ),
-                              textDirection: pw.TextDirection.rtl,
-                            ),
+                            ],
                           ),
                         ),
                       pw.Text('بواسطة: $entryEngineer - $entryDate', style: smallGreyStyle, textDirection: pw.TextDirection.rtl),
@@ -3745,16 +3764,28 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                       for (String imgUrl in imageUrls)
                         pw.Padding(
                           padding: pw.EdgeInsets.symmetric(vertical: 2),
-                          child: pw.UrlLink(
-                            destination: imgUrl,
-                            child: pw.Text(
-                              'عرض',
-                              style: pw.TextStyle(
-                                color: PdfColors.blue,
-                                decoration: pw.TextDecoration.underline,
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.end,
+                            children: [
+                              if (fetchedImages[imgUrl] != null)
+                                pw.Image(
+                                  fetchedImages[imgUrl]!,
+                                  width: 120,
+                                  height: 120,
+                                  fit: pw.BoxFit.cover,
+                                ),
+                              pw.UrlLink(
+                                destination: imgUrl,
+                                child: pw.Text(
+                                  'عرض الصورة بجودة عالية',
+                                  style: pw.TextStyle(
+                                    color: PdfColors.blue,
+                                    decoration: pw.TextDecoration.underline,
+                                  ),
+                                  textDirection: pw.TextDirection.rtl,
+                                ),
                               ),
-                              textDirection: pw.TextDirection.rtl,
-                            ),
+                            ],
                           ),
                         ),
                       pw.Text('بواسطة: $entryEngineer - $entryDate', style: smallGreyStyle, textDirection: pw.TextDirection.rtl),
@@ -3837,16 +3868,28 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                           for (String imgUrl in imageUrls)
                             pw.Padding(
                               padding: pw.EdgeInsets.symmetric(vertical: 2),
-                              child: pw.UrlLink(
-                                destination: imgUrl,
-                                child: pw.Text(
-                                  'عرض',
-                                  style: pw.TextStyle(
-                                    color: PdfColors.blue,
-                                    decoration: pw.TextDecoration.underline,
+                              child: pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                                children: [
+                                  if (fetchedImages[imgUrl] != null)
+                                    pw.Image(
+                                      fetchedImages[imgUrl]!,
+                                      width: 120,
+                                      height: 120,
+                                      fit: pw.BoxFit.cover,
+                                    ),
+                                  pw.UrlLink(
+                                    destination: imgUrl,
+                                    child: pw.Text(
+                                      'عرض الصورة بجودة عالية',
+                                      style: pw.TextStyle(
+                                        color: PdfColors.blue,
+                                        decoration: pw.TextDecoration.underline,
+                                      ),
+                                      textDirection: pw.TextDirection.rtl,
+                                    ),
                                   ),
-                                  textDirection: pw.TextDirection.rtl,
-                                ),
+                                ],
                               ),
                             ),
                           pw.Text('  بواسطة: $entryEngineer - $entryDate', style: smallGreyStyle, textDirection: pw.TextDirection.rtl),
