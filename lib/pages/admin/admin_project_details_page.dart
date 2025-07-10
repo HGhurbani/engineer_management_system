@@ -1938,9 +1938,30 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         result.downloadUrl,
       );
     } catch (e) {
-      await ProgressDialog.hide(context);
-      _showFeedbackSnackBar(context, 'فشل إنشاء أو مشاركة التقرير: $e', isError: true);
-      print('Error generating daily report PDF: $e');
+      try {
+        progress.value = 0.0;
+        final bytes = await PdfReportGenerator.generateSimpleTables(
+          projectId: widget.projectId,
+          phases: predefinedPhasesStructure,
+          testsStructure: finalCommissioningTests,
+          start: start,
+          end: end,
+          onProgress: (p) => progress.value = p,
+          lowMemory: true,
+        );
+        await ProgressDialog.hide(context);
+        _showFeedbackSnackBar(context, 'تم إنشاء تقرير مبسط بسبب نقص الذاكرة.', isError: false);
+        _openPdfPreview(
+          bytes,
+          fileName,
+          'يرجى الإطلاع على $headerText للمشروع.',
+          null,
+        );
+      } catch (e2) {
+        await ProgressDialog.hide(context);
+        _showFeedbackSnackBar(context, 'فشل إنشاء أو مشاركة التقرير: $e2', isError: true);
+        print('Error generating daily report PDF: $e2');
+      }
     }
   }
 
