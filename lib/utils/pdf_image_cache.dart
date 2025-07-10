@@ -13,7 +13,7 @@ class PdfImageCache {
   // cache size lowers peak memory usage when a report contains many photos.
   // Fewer cached images further limit memory usage when generating
   // very large reports with hundreds of pictures.
-  static const int _maxEntries = 50;
+  static const int _maxEntries = 20;
 
   static pw.MemoryImage? get(String url) {
     final img = _cache.remove(url);
