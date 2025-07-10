@@ -1608,7 +1608,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     leading: const Icon(Icons.attach_file_outlined),
                     title: Text(fileName),
                     subtitle: Text('بواسطة: $uploader'),
-                    onTap: fileUrl != null ? () => launchUrl(Uri.parse(fileUrl)) : null,
+                    onTap: fileUrl != null ? () => _handleFileTap(fileUrl) : null,
                   );
                 },
               );
@@ -2342,6 +2342,16 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         actionsAlignment: MainAxisAlignment.center,
       ),
     );
+  }
+
+  void _handleFileTap(String url) {
+    final lower = url.toLowerCase();
+    const exts = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'];
+    if (exts.any((e) => lower.endsWith(e))) {
+      _viewImageDialog(url);
+    } else {
+      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    }
   }
 
   void _showSingleImageSourceActionSheet(BuildContext context, Function(XFile?) onImageSelected) {
