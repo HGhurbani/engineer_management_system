@@ -972,7 +972,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final bool isArabic = Localizations.localeOf(context).languageCode == 'ar';
     String getLocalizedText(String ar, String en) => isArabic ? ar : en;
 
-    final progress = ProgressDialog.show(context, getLocalizedText('جاري إنشاء التقرير...', 'Generating Report...'));
+    final progress = ProgressDialog.show(
+        context, getLocalizedText('جاري إنشاء التقرير...', 'Generating Report...'));
 
     final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
     try {
@@ -986,6 +987,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           generatedBy: _currentEngineerName,
           start: start,
           end: end,
+          onProgress: (p) => progress.value = p,
         );
       } catch (e) {
         // Retry with low-memory settings if initial attempt fails.
@@ -997,6 +999,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           generatedBy: _currentEngineerName,
           start: start,
           end: end,
+          onProgress: (p) => progress.value = p,
           lowMemory: true,
         );
       }

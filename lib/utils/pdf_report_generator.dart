@@ -689,6 +689,7 @@ class PdfReportGenerator {
     String? generatedBy,
     DateTime? start,
     DateTime? end,
+    void Function(double progress)? onProgress,
     bool lowMemory = false,
   }) async {
     final fontData =
@@ -705,6 +706,7 @@ class PdfReportGenerator {
       generatedBy: generatedBy,
       start: start,
       end: end,
+      onProgress: onProgress,
       lowMemory: lowMemory,
     );
   }
