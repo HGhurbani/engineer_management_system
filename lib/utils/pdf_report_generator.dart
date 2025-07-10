@@ -11,7 +11,6 @@ import 'dart:ui' as ui;
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'package:meta/meta.dart';
-import 'package:flutter/foundation.dart';
 
 import 'package:pdf/pdf.dart';
 
@@ -671,7 +670,11 @@ class PdfReportGenerator {
   }) async {
     final fontData =
         (await rootBundle.load('assets/fonts/Tajawal-Medium.ttf')).buffer;
-    final _IsolateParams params = _IsolateParams(
+    _arabicFont = pw.Font.ttf(fontData);
+
+    // Running the generation directly on the main isolate avoids issues with
+    // Firebase and asset loading which require initialized bindings.
+    return PdfReportGenerator.generate(
       projectId: projectId,
       projectData: projectData,
       phases: phases,
@@ -679,9 +682,7 @@ class PdfReportGenerator {
       generatedBy: generatedBy,
       start: start,
       end: end,
-      arabicFontBytes: fontData.asUint8List(),
     );
-    return compute(_generateInIsolate, params);
   }
 
   static pw.Widget _buildProjectDetailsTable(
@@ -2125,39 +2126,7 @@ class PdfReportGenerator {
 
 }
 
-class _IsolateParams {
-  final String projectId;
-  final Map<String, dynamic>? projectData;
-  final List<Map<String, dynamic>> phases;
-  final List<Map<String, dynamic>> testsStructure;
-  final String? generatedBy;
-  final DateTime? start;
-  final DateTime? end;
-  final Uint8List arabicFontBytes;
-
-  const _IsolateParams({
-    required this.projectId,
-    required this.projectData,
-    required this.phases,
-    required this.testsStructure,
-    required this.arabicFontBytes,
-    this.generatedBy,
-    this.start,
-    this.end,
-  });
-}
-
-Future<PdfReportResult> _generateInIsolate(_IsolateParams params) {
-  PdfReportGenerator._arabicFont =
-      pw.Font.ttf(ByteData.view(params.arabicFontBytes.buffer));
-  return PdfReportGenerator.generate(
-    projectId: params.projectId,
-    projectData: params.projectData,
-    phases: params.phases,
-    testsStructure: params.testsStructure,
-    generatedBy: params.generatedBy,
-    start: params.start,
-    end: params.end,
-  );
-}
+// The isolate implementation previously used for offloading PDF generation
+// has been removed. Generating the report directly simplifies asset and
+// Firebase usage, ensuring compatibility across all platforms.
 
