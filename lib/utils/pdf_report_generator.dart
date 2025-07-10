@@ -1164,21 +1164,32 @@
           alignment: pw.WrapAlignment.end, // لجعل العناصر تتكدس من اليمين
           children: [
             for (int i = 0; i < urls.length; i++)
-              pw.UrlLink(
-                destination: urls[i],
-                child: pw.Container(
-                  alignment: pw.Alignment.centerRight,
-                  child: pw.Text(
-                    'عرض ${i + 1}',
-                    style: pw.TextStyle(
-                      color: PdfColors.blue,
-                      decoration: pw.TextDecoration.underline,
+              pw.Container(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    if (fetchedImages[urls[i]] != null)
+                      pw.Image(
+                        fetchedImages[urls[i]]!,
+                        width: 120,
+                        height: 120,
+                        fit: pw.BoxFit.cover,
+                      ),
+                    pw.UrlLink(
+                      destination: urls[i],
+                      child: pw.Text(
+                        'عرض الصورة بجودة عالية',
+                        style: pw.TextStyle(
+                          color: PdfColors.blue,
+                          decoration: pw.TextDecoration.underline,
+                        ),
+                        textAlign: pw.TextAlign.right,
+                        textDirection: pw.TextDirection.rtl,
+                      ),
                     ),
-                    textAlign: pw.TextAlign.right,
-                    textDirection: pw.TextDirection.rtl,
-                  ),
+                  ],
                 ),
-
               ),
           ],
         ),
@@ -1387,10 +1398,17 @@
                 ),
               ),
               pw.SizedBox(height: 10),
+              if (fetchedImages[imgUrl] != null)
+                pw.Image(
+                  fetchedImages[imgUrl]!,
+                  width: 150,
+                  height: 150,
+                  fit: pw.BoxFit.cover,
+                ),
               pw.UrlLink(
                 destination: imgUrl,
                 child: pw.Text(
-                  'عرض',
+                  'عرض الصورة بجودة عالية',
                   style: pw.TextStyle(
                     color: PdfColors.blue,
                     decoration: pw.TextDecoration.underline,
@@ -1944,16 +1962,28 @@
           final imgWidgets = <pw.Widget>[];
           for (final url in imgs) {
             imgWidgets.add(
-              pw.UrlLink(
-                destination: url,
-                child: pw.Text(
-                  'عرض',
-                  style: pw.TextStyle(
-                    color: PdfColors.blue,
-                    decoration: pw.TextDecoration.underline,
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  if (images[url] != null)
+                    pw.Image(
+                      images[url]!,
+                      width: 100,
+                      height: 100,
+                      fit: pw.BoxFit.cover,
+                    ),
+                  pw.UrlLink(
+                    destination: url,
+                    child: pw.Text(
+                      'عرض الصورة بجودة عالية',
+                      style: pw.TextStyle(
+                        color: PdfColors.blue,
+                        decoration: pw.TextDecoration.underline,
+                      ),
+                      textDirection: pw.TextDirection.rtl,
+                    ),
                   ),
-                  textDirection: pw.TextDirection.rtl,
-                ),
+                ],
               ),
             );
           }
@@ -2065,16 +2095,28 @@
           final imgWidgets = <pw.Widget>[];
           if (url != null) {
             imgWidgets.add(
-              pw.UrlLink(
-                destination: url,
-                child: pw.Text(
-                  'عرض',
-                  style: pw.TextStyle(
-                    color: PdfColors.blue,
-                    decoration: pw.TextDecoration.underline,
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  if (images[url] != null)
+                    pw.Image(
+                      images[url]!,
+                      width: 100,
+                      height: 100,
+                      fit: pw.BoxFit.cover,
+                    ),
+                  pw.UrlLink(
+                    destination: url,
+                    child: pw.Text(
+                      'عرض الصورة بجودة عالية',
+                      style: pw.TextStyle(
+                        color: PdfColors.blue,
+                        decoration: pw.TextDecoration.underline,
+                      ),
+                      textDirection: pw.TextDirection.rtl,
+                    ),
                   ),
-                  textDirection: pw.TextDirection.rtl,
-                ),
+                ],
               ),
             );
           }
