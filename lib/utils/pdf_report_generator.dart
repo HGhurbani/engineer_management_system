@@ -1188,7 +1188,7 @@ import 'package:flutter/foundation.dart';
         widgets.add(
           pw.Container(
             width: 80,
-            height: 80,
+            height: 100,
             decoration:
                 pw.BoxDecoration(border: pw.Border.all(color: borderColor)),
             child: pw.Image(img, fit: pw.BoxFit.cover),
@@ -1203,7 +1203,7 @@ import 'package:flutter/foundation.dart';
     return pw.Directionality(
       textDirection: pw.TextDirection.rtl,
       child: pw.Wrap(
-        alignment: pw.WrapAlignment.end,
+        alignment: pw.WrapAlignment.center,
         spacing: 4,
         runSpacing: 4,
         children: widgets,
@@ -1217,7 +1217,7 @@ import 'package:flutter/foundation.dart';
       for (int i = 0; i < urls.length; i++) {
         final img = images[urls[i]];
         if (img != null) {
-          widgets.add(pw.Image(img, width: 80, height: 80));
+          widgets.add(pw.Image(img, width: 80, height: 100));
         }
         if (i < urls.length - 1) {
           widgets.add(pw.SizedBox(width: 4));
