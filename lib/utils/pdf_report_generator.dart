@@ -6,7 +6,6 @@
   import 'package:cloud_firestore/cloud_firestore.dart';
   
   import 'package:flutter/services.dart' show ByteData, rootBundle;
-  import 'dart:ui' as ui;
   
   import 'package:http/http.dart' as http;
   import 'package:image/image.dart' as img;
@@ -18,7 +17,8 @@
   
   import 'package:intl/intl.dart';
   
-  import 'package:printing/printing.dart';
+import 'package:printing/printing.dart';
+import 'package:flutter/foundation.dart';
   
   
   import 'pdf_styles.dart';
@@ -46,12 +46,22 @@
     static const int _maxImageDimension = 1024;
     static const int _jpgQuality = 85;
     // More aggressive settings for devices with limited memory.
-    static const int _lowMemImageDimension = 256;
-    static const int _lowMemJpgQuality = 60;
-    // Skip downloading images that exceed this size in bytes to avoid
-    // exhausting memory on devices with limited resources.
-    // Made public so other libraries can reference this limit.
-    static const int maxImageFileSize = 5 * 1024 * 1024; // 5 MB
+  static const int _lowMemImageDimension = 256;
+  static const int _lowMemJpgQuality = 60;
+  // Skip downloading images that exceed this size in bytes to avoid
+  // exhausting memory on devices with limited resources.
+  // Made public so other libraries can reference this limit.
+  static const int maxImageFileSize = 5 * 1024 * 1024; // 5 MB
+
+  /// Determines the target image dimension based on the number of images in
+  /// the report. More photos means we aggressively downscale to keep memory
+  /// and file size low.
+  static int _adaptiveDimension(int count) {
+    if (count >= 200) return 256;
+    if (count >= 100) return 384;
+    if (count >= 50) return 512;
+    return _maxImageDimension;
+  }
 
 
     static Future<void> _loadArabicFont() async {
@@ -73,28 +83,22 @@
   
     }
   
-    static Future<Uint8List> _resizeImageIfNeeded(Uint8List bytes,
-        {int? maxDimension, int? quality}) async {
-      final dim = maxDimension ?? _maxImageDimension;
-      final q = quality ?? _jpgQuality;
-      final ui.Codec codec = await ui.instantiateImageCodec(
-        bytes,
-        targetWidth: dim,
-        targetHeight: dim,
-        allowUpscaling: false,
-      );
-      final ui.FrameInfo frame = await codec.getNextFrame();
-      final ui.Image image = frame.image;
-      final ByteData? raw =
-          await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-      if (raw == null) return bytes;
-      final img.Image converted = img.Image.fromBytes(
-        width: image.width,
-        height: image.height,
-        bytes: raw.buffer,
-      );
-      return Uint8List.fromList(img.encodeJpg(converted, quality: q));
+  static Future<Uint8List> _resizeImageIfNeeded(Uint8List bytes,
+      {int? maxDimension, int? quality}) async {
+    // Fallback to max dimension when none provided.
+    final dim = maxDimension ?? _maxImageDimension;
+    final q = quality ?? _jpgQuality;
+    final image = img.decodeImage(bytes);
+    if (image == null) return bytes;
+    // Skip resizing when the image is already within the limit.
+    if (image.width <= dim && image.height <= dim) {
+      return Uint8List.fromList(img.encodeJpg(image, quality: q));
     }
+    final resized = img.copyResize(image,
+        width: image.width >= image.height ? dim : null,
+        height: image.height > image.width ? dim : null);
+    return Uint8List.fromList(img.encodeJpg(resized, quality: q));
+  }
   
     @visibleForTesting
     static Future<Uint8List> resizeImageForTest(Uint8List bytes,
@@ -158,10 +162,12 @@
         }
         onProgress?.call(++completed / uniqueUrls.length);
       }
-  
+
       for (int i = 0; i < uniqueUrls.length; i += concurrency) {
         final batch = uniqueUrls.skip(i).take(concurrency).toList();
         await Future.wait(batch.map(handleUrl));
+        // Drop references to the batch images once they are cached
+        PdfImageCache.clearPrecache();
         // Allow GC to run between batches
         await Future.delayed(const Duration(milliseconds: 10));
       }
@@ -192,8 +198,6 @@
       onProgress?.call(0.0);
       try {
   
-      final int imgDim =
-          lowMemory ? _lowMemImageDimension : _maxImageDimension;
       final int imgQuality = lowMemory ? _lowMemJpgQuality : _jpgQuality;
       final int fetchConcurrency = lowMemory ? 1 : 3;
   
@@ -362,6 +366,10 @@
 
       }
 
+      final int imgDim = lowMemory
+          ? _lowMemImageDimension
+          : _adaptiveDimension(imageUrls.length);
+
       final fetchedImages = await _fetchImagesForUrls(
         imageUrls.toList(),
         onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
@@ -398,9 +406,12 @@
       if (emojiFont != null) commonFontFallback.add(emojiFont);
   
   
-      // Enable compression to keep memory usage manageable when many pages are
-      // generated.
-      final pdf = pw.Document(compress: true);
+      // Enable aggressive compression to keep the final document size small.
+      final pdf = pw.Document(
+        compress: true,
+        version: PdfVersion.pdf_1_5,
+        deflateLevel: PdfDeflateLevel.max,
+      );
   
       final fileName =
   
@@ -683,8 +694,9 @@
         ),
   
       );
-  
-  
+      // Release any cached images once the page is rendered.
+      PdfImageCache.clear();
+
       final pdfBytes = await pdf.save();
       onProgress?.call(1.0);
       final url = await uploadReportPdf(pdfBytes, fileName, token);
@@ -696,7 +708,7 @@
   
     }
   
-    static Future<PdfReportResult> generateWithIsolate({
+  static Future<PdfReportResult> generateWithIsolate({
       required String projectId,
       required Map<String, dynamic>? projectData,
       required List<Map<String, dynamic>> phases,
@@ -707,22 +719,46 @@
       void Function(double progress)? onProgress,
       bool lowMemory = false,
     }) async {
-      final fontData =
-          await rootBundle.load('assets/fonts/Tajawal-Medium.ttf');
-      _arabicFont = pw.Font.ttf(fontData);
-  
-      // Running the generation directly on the main isolate avoids issues with
-      // Firebase and asset loading which require initialized bindings.
+      if (!lowMemory) {
+        // For modern devices it's faster to run on the main isolate.
+        return PdfReportGenerator.generate(
+          projectId: projectId,
+          projectData: projectData,
+          phases: phases,
+          testsStructure: testsStructure,
+          generatedBy: generatedBy,
+          start: start,
+          end: end,
+          onProgress: onProgress,
+          lowMemory: lowMemory,
+        );
+      }
+
+      // Older low-memory devices benefit from offloading the heavy work.
+      return compute(_generateIsolate, {
+        'projectId': projectId,
+        'projectData': projectData,
+        'phases': phases,
+        'testsStructure': testsStructure,
+        'generatedBy': generatedBy,
+        'start': start,
+        'end': end,
+      });
+    }
+
+    static Future<PdfReportResult> _generateIsolate(
+        Map<String, dynamic> args) async {
       return PdfReportGenerator.generate(
-        projectId: projectId,
-        projectData: projectData,
-        phases: phases,
-        testsStructure: testsStructure,
-        generatedBy: generatedBy,
-        start: start,
-        end: end,
-        onProgress: onProgress,
-        lowMemory: lowMemory,
+        projectId: args['projectId'] as String,
+        projectData:
+            args['projectData'] as Map<String, dynamic>?,
+        phases: List<Map<String, dynamic>>.from(args['phases'] as List),
+        testsStructure:
+            List<Map<String, dynamic>>.from(args['testsStructure'] as List),
+        generatedBy: args['generatedBy'] as String?,
+        start: args['start'] as DateTime?,
+        end: args['end'] as DateTime?,
+        lowMemory: true,
       );
     }
   
@@ -1156,22 +1192,7 @@
             height: 80,
             decoration:
                 pw.BoxDecoration(border: pw.Border.all(color: borderColor)),
-            child: pw.UrlLink(destination: url, child: pw.Image(img, fit: pw.BoxFit.cover)),
-          ),
-        );
-      } else {
-        widgets.add(
-          pw.UrlLink(
-            destination: url,
-            child: pw.Text(
-              'عرض صورة رقم ${i + 1}',
-              style: pw.TextStyle(
-                color: PdfColors.blue,
-                decoration: pw.TextDecoration.underline,
-              ),
-              textAlign: pw.TextAlign.right,
-              textDirection: pw.TextDirection.rtl,
-            ),
+            child: pw.Image(img, fit: pw.BoxFit.cover),
           ),
         );
       }
@@ -1191,27 +1212,16 @@
     );
   }
 
-    static List<pw.Widget> _buildImageLinkWidgets(List<String> urls) {
+    static List<pw.Widget> _buildImageLinkWidgets(
+        List<String> urls, Map<String, pw.MemoryImage> images) {
       final widgets = <pw.Widget>[];
       for (int i = 0; i < urls.length; i++) {
-        widgets.add(
-          pw.UrlLink(
-            destination: urls[i],
-            child: pw.Container(
-              alignment: pw.Alignment.centerRight,
-              child: pw.Text(
-              'عرض صورة رقم ${i + 1}',
-              style: pw.TextStyle(
-                color: PdfColors.blue,
-                decoration: pw.TextDecoration.underline,
-              ),
-              textDirection: pw.TextDirection.rtl,
-            ),
-          ),
-          ),
-        );
+        final img = images[urls[i]];
+        if (img != null) {
+          widgets.add(pw.Image(img, width: 80, height: 80));
+        }
         if (i < urls.length - 1) {
-          widgets.add(pw.Text('|', textDirection: pw.TextDirection.rtl));
+          widgets.add(pw.SizedBox(width: 4));
         }
       }
       return widgets;
@@ -1418,21 +1428,7 @@
               ),
               pw.SizedBox(height: 10),
               if (images?[imgUrl] != null)
-                pw.UrlLink(
-                    destination: imgUrl,
-                    child: pw.Image(images![imgUrl]!, width: 120, height: 120))
-              else
-                pw.UrlLink(
-                  destination: imgUrl,
-                  child: pw.Text(
-                    'عرض صورة رقم 1',
-                    style: pw.TextStyle(
-                      color: PdfColors.blue,
-                      decoration: pw.TextDecoration.underline,
-                    ),
-                    textDirection: pw.TextDirection.rtl,
-                  ),
-                ),
+                pw.Image(images![imgUrl]!, width: 120, height: 120),
             ],
           ],
         ),
@@ -1724,8 +1720,6 @@
       PdfImageCache.clear();
       onProgress?.call(0.0);
       try {
-      final int imgDim =
-          lowMemory ? _lowMemImageDimension : _maxImageDimension;
       final int imgQuality = lowMemory ? _lowMemJpgQuality : _jpgQuality;
       final int fetchConcurrency = lowMemory ? 1 : 3;
       DateTime now = DateTime.now();
@@ -1855,7 +1849,18 @@
         print('Error preparing simple report details: $e');
       }
   
-      // Skip fetching images since only URL links are embedded
+      final int imgDim = lowMemory
+          ? _lowMemImageDimension
+          : _adaptiveDimension(imageUrls.length);
+
+      final fetchedImages = await _fetchImagesForUrls(
+        imageUrls.toList(),
+        onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
+        concurrency: fetchConcurrency,
+        maxDimension: imgDim,
+        quality: imgQuality,
+      );
+
       onProgress?.call(0.9);
   
       await _loadArabicFont();
@@ -1863,9 +1868,12 @@
         throw Exception('Arabic font not available');
       }
   
-      // Enable compression here as well for consistent behaviour and lower
-      // memory usage.
-      final pdf = pw.Document(compress: true);
+      // Use maximum compression for the simplified report as well.
+      final pdf = pw.Document(
+        compress: true,
+        version: PdfVersion.pdf_1_5,
+        deflateLevel: PdfDeflateLevel.max,
+      );
       final fileName =
           'simple_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
       final token = generateReportToken();
@@ -1906,6 +1914,7 @@
                     cellStyle,
                     PdfColors.grey300,
                     PdfColors.grey400,
+                    fetchedImages,
                   ),
             pw.SizedBox(height: 20),
             pw.Text('الاختبارات والفحوصات', style: headerStyle),
@@ -1918,11 +1927,14 @@
                     cellStyle,
                     PdfColors.grey300,
                     PdfColors.grey400,
+                    fetchedImages,
                   ),
           ],
         ),
       );
-  
+      // Clear the cache after rendering the page.
+      PdfImageCache.clear();
+
       final bytes = await pdf.save();
       onProgress?.call(1.0);
       await uploadReportPdf(bytes, fileName, token);
@@ -1938,6 +1950,7 @@
       pw.TextStyle cellStyle,
       PdfColor headerColor,
       PdfColor borderColor,
+      Map<String, pw.MemoryImage> images,
     ) {
       final Map<String, List<Map<String, dynamic>>> grouped = {};
       for (final entry in entries) {
@@ -1966,7 +1979,7 @@
           final note = item['note']?.toString() ?? '';
           final imgs =
               (item['imageUrls'] as List?)?.map((it) => it.toString()).toList() ?? [];
-          final imgWidgets = _buildImageLinkWidgets(imgs);
+          final imgWidgets = _buildImageLinkWidgets(imgs, images);
   
           widgets.add(
             pw.Table(
@@ -2046,6 +2059,7 @@
       pw.TextStyle cellStyle,
       PdfColor headerColor,
       PdfColor borderColor,
+      Map<String, pw.MemoryImage> images,
     ) {
       final Map<String, List<Map<String, dynamic>>> grouped = {};
       for (final t in tests) {
@@ -2071,7 +2085,8 @@
         for (final item in items) {
           final note = item['note']?.toString() ?? '';
           final url = item['imageUrl'] as String?;
-          final imgWidgets = url != null ? _buildImageLinkWidgets([url]) : <pw.Widget>[];
+          final imgWidgets =
+              url != null ? _buildImageLinkWidgets([url], images) : <pw.Widget>[];
   
           widgets.add(
             pw.Table(
