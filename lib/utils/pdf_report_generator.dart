@@ -35,7 +35,7 @@
   
   
   class PdfReportGenerator {
-  
+
     static pw.Font? _arabicFont;
     // Limit the dimensions of embedded images so large photos do not cause
     // out-of-memory errors when generating huge reports. Lowering the limit
@@ -52,8 +52,8 @@
     // exhausting memory on devices with limited resources.
     // Made public so other libraries can reference this limit.
     static const int maxImageFileSize = 5 * 1024 * 1024; // 5 MB
-  
-  
+
+
     static Future<void> _loadArabicFont() async {
   
       if (_arabicFont != null) return;
@@ -1139,7 +1139,7 @@
         ),
       );
     }
-  
+
   static pw.Widget _buildImagesGrid(
       List<String> urls, PdfColor borderColor,
       {Map<String, pw.MemoryImage>? images}) {
@@ -1169,6 +1169,7 @@
                 color: PdfColors.blue,
                 decoration: pw.TextDecoration.underline,
               ),
+              textAlign: pw.TextAlign.right,
               textDirection: pw.TextDirection.rtl,
             ),
           ),
@@ -1196,7 +1197,9 @@
         widgets.add(
           pw.UrlLink(
             destination: urls[i],
-            child: pw.Text(
+            child: pw.Container(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
               'عرض صورة رقم ${i + 1}',
               style: pw.TextStyle(
                 color: PdfColors.blue,
@@ -1204,6 +1207,7 @@
               ),
               textDirection: pw.TextDirection.rtl,
             ),
+          ),
           ),
         );
         if (i < urls.length - 1) {
@@ -2179,7 +2183,7 @@
         ],
       );
     }
-  
+
   }
   
   // The isolate implementation previously used for offloading PDF generation
