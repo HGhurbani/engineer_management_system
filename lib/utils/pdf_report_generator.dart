@@ -410,7 +410,6 @@ import 'package:flutter/foundation.dart';
       final pdf = pw.Document(
         compress: true,
         version: PdfVersion.pdf_1_5,
-        deflateLevel: PdfDeflateLevel.max,
       );
   
       final fileName =
@@ -1872,7 +1871,6 @@ import 'package:flutter/foundation.dart';
       final pdf = pw.Document(
         compress: true,
         version: PdfVersion.pdf_1_5,
-        deflateLevel: PdfDeflateLevel.max,
       );
       final fileName =
           'simple_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
