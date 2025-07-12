@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../utils/pdf_report_generator.dart';
 
 class EditPhasePage extends StatefulWidget {
   final String projectId;
@@ -72,7 +73,10 @@ class _EditPhasePageState extends State<EditPhasePage> {
     if (_image360File != null) {
       final ref360 = FirebaseStorage.instance
           .ref('project_phases/${widget.projectId}/${widget.phaseId}_360.jpg');
-      await ref360.putFile(_image360File!);
+      final bytes = await _image360File!.readAsBytes();
+      final compressed =
+          await PdfReportGenerator.resizeImageForTest(bytes);
+      await ref360.putData(compressed);
       image360Url = await ref360.getDownloadURL();
     }
 
@@ -84,8 +88,10 @@ class _EditPhasePageState extends State<EditPhasePage> {
     if (_imageFile != null) {
       final ref = FirebaseStorage.instance
           .ref('project_phases/${widget.projectId}/${widget.phaseId}.jpg');
-
-      await ref.putFile(_imageFile!);
+      final bytes = await _imageFile!.readAsBytes();
+      final compressed =
+          await PdfReportGenerator.resizeImageForTest(bytes);
+      await ref.putData(compressed);
       imageUrl = await ref.getDownloadURL();
     }
 

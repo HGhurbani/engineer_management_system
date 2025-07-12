@@ -355,15 +355,21 @@
   
   
       await _loadArabicFont();
-  
+
       if (_arabicFont == null) {
-  
+
         throw Exception('Arabic font not available');
-  
+
       }
-  
-  
-      // Skip fetching images since the report only includes text links
+
+      final fetchedImages = await _fetchImagesForUrls(
+        imageUrls.toList(),
+        onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
+        concurrency: fetchConcurrency,
+        maxDimension: imgDim,
+        quality: imgQuality,
+      );
+
       onProgress?.call(0.9);
   
       pw.Font? emojiFont;
@@ -573,22 +579,15 @@
                 final entry = dayEntries[i];
   
                 widgets.add(_buildEntryCard(
-  
                     entry,
-  
                     i + 1,
-  
                     headerStyle,
-  
                     regularStyle,
-  
                     regularStyle,
-  
                     smallGrey,
-  
                     PdfColors.grey400,
-  
-                    PdfColors.grey100));
+                    PdfColors.grey100,
+                    images: fetchedImages));
   
                 widgets.add(pw.SizedBox(height: 15));
   
@@ -614,22 +613,24 @@
                 final test = dayTests[i];
   
                 widgets.add(_buildTestCard(
-  
+
                     test,
-  
+
                     i + 1,
-  
+
                     headerStyle,
-  
+
                     regularStyle,
-  
+
                     regularStyle,
-  
+
                     smallGrey,
-  
+
                     PdfColors.grey400,
-  
-                    PdfColors.grey100));
+
+                    PdfColors.grey100,
+
+                    images: fetchedImages));
   
                 widgets.add(pw.SizedBox(height: 15));
   
@@ -911,7 +912,7 @@
         pw.TextStyle metaStyle,
         PdfColor borderColor,
         PdfColor lightGrey,
-        ) {
+        {Map<String, pw.MemoryImage>? images}) {
       final note = entry['note'] ?? '';
       final engineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
       final ts = (entry['timestamp'] as Timestamp?)?.toDate();
@@ -1115,7 +1116,7 @@
                   ),
                 ),
                 pw.SizedBox(height: 5),
-                _buildImagesGrid(beforeUrls, borderColor),
+                _buildImagesGrid(beforeUrls, borderColor, images: images),
                 pw.SizedBox(height: 10),
               ],
               if (afterUrls.isNotEmpty) ...[
@@ -1123,7 +1124,7 @@
                   textAlign: pw.TextAlign.right,
                   textDirection: pw.TextDirection.rtl,),
                 pw.SizedBox(height: 5),
-                _buildImagesGrid(afterUrls, borderColor),
+                _buildImagesGrid(afterUrls, borderColor, images: images),
                 pw.SizedBox(height: 10),
               ],
               if (imageUrls.isNotEmpty) ...[
@@ -1131,7 +1132,7 @@
                   textAlign: pw.TextAlign.right,
                   textDirection: pw.TextDirection.rtl,),
                 pw.SizedBox(height: 5),
-                _buildImagesGrid(imageUrls, borderColor),
+                _buildImagesGrid(imageUrls, borderColor, images: images),
               ],
             ],
           ],
@@ -1139,20 +1140,55 @@
       );
     }
   
-    static pw.Widget _buildImagesGrid(
-        List<String> urls,
-        PdfColor borderColor) {
-      if (urls.isEmpty) return pw.SizedBox();
+  static pw.Widget _buildImagesGrid(
+      List<String> urls, PdfColor borderColor,
+      {Map<String, pw.MemoryImage>? images}) {
+    if (urls.isEmpty) return pw.SizedBox();
 
-      return pw.Directionality(
-        textDirection: pw.TextDirection.rtl,
-        child: pw.Wrap(
-          alignment: pw.WrapAlignment.end,
-          spacing: 4,
-          children: _buildImageLinkWidgets(urls),
-        ),
-      );
+    final widgets = <pw.Widget>[];
+    for (int i = 0; i < urls.length; i++) {
+      final url = urls[i];
+      final img = images?[url];
+      if (img != null) {
+        widgets.add(
+          pw.Container(
+            width: 80,
+            height: 80,
+            decoration:
+                pw.BoxDecoration(border: pw.Border.all(color: borderColor)),
+            child: pw.UrlLink(destination: url, child: pw.Image(img, fit: pw.BoxFit.cover)),
+          ),
+        );
+      } else {
+        widgets.add(
+          pw.UrlLink(
+            destination: url,
+            child: pw.Text(
+              'عرض صورة رقم ${i + 1}',
+              style: pw.TextStyle(
+                color: PdfColors.blue,
+                decoration: pw.TextDecoration.underline,
+              ),
+              textDirection: pw.TextDirection.rtl,
+            ),
+          ),
+        );
+      }
+      if (i < urls.length - 1) {
+        widgets.add(pw.SizedBox(width: 4));
+      }
     }
+
+    return pw.Directionality(
+      textDirection: pw.TextDirection.rtl,
+      child: pw.Wrap(
+        alignment: pw.WrapAlignment.end,
+        spacing: 4,
+        runSpacing: 4,
+        children: widgets,
+      ),
+    );
+  }
 
     static List<pw.Widget> _buildImageLinkWidgets(List<String> urls) {
       final widgets = <pw.Widget>[];
@@ -1187,7 +1223,7 @@
         pw.TextStyle metaStyle,
         PdfColor borderColor,
         PdfColor lightGrey,
-        ) {
+        {Map<String, pw.MemoryImage>? images}) {
       final note = test['note'] ?? '';
       final engineer = test['engineerName'] ?? 'مهندس';
       final ts = (test['lastUpdatedAt'] as Timestamp?)?.toDate();
@@ -1377,17 +1413,22 @@
                 ),
               ),
               pw.SizedBox(height: 10),
-              pw.UrlLink(
-                destination: imgUrl,
-                child: pw.Text(
-                  'عرض صورة رقم 1',
-                  style: pw.TextStyle(
-                    color: PdfColors.blue,
-                    decoration: pw.TextDecoration.underline,
+              if (images?[imgUrl] != null)
+                pw.UrlLink(
+                    destination: imgUrl,
+                    child: pw.Image(images![imgUrl]!, width: 120, height: 120))
+              else
+                pw.UrlLink(
+                  destination: imgUrl,
+                  child: pw.Text(
+                    'عرض صورة رقم 1',
+                    style: pw.TextStyle(
+                      color: PdfColors.blue,
+                      decoration: pw.TextDecoration.underline,
+                    ),
+                    textDirection: pw.TextDirection.rtl,
                   ),
-                  textDirection: pw.TextDirection.rtl,
                 ),
-              ),
             ],
           ],
         ),

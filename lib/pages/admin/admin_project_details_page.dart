@@ -511,7 +511,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                                   ? 'project_entries/${widget.projectId}/$phaseId/$imageName'
                                   : 'project_entries/${widget.projectId}/$subPhaseId/$imageName';
                               final ref = FirebaseStorage.instance.ref().child(refPath);
-                              await ref.putFile(pickedImageFile!);
+                              final bytes = await pickedImageFile!.readAsBytes();
+                              final compressed = await PdfReportGenerator.resizeImageForTest(bytes);
+                              await ref.putData(compressed);
                               finalImageUrl = await ref.getDownloadURL();
                             } catch (e) {
                               if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة: $e', isError: true);
@@ -2699,11 +2701,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                               ? 'project_entries/${widget.projectId}/$phaseId/$imageName'
                               : 'project_entries/${widget.projectId}/$subPhaseId/$imageName';
                           final ref = FirebaseStorage.instance.ref().child(refPath);
-                          if (kIsWeb) {
-                            await ref.putData(await imageFile.readAsBytes());
-                          } else {
-                            await ref.putFile(File(imageFile.path));
-                          }
+                          final bytes = await imageFile.readAsBytes();
+                          final compressed = await PdfReportGenerator.resizeImageForTest(bytes);
+                          await ref.putData(compressed);
                           final url = await ref.getDownloadURL();
                           store.add(url);
                         } catch (e) {
@@ -3112,7 +3112,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         try {
                           final refPath = 'project_tests/${widget.projectId}/$testId/${DateTime.now().millisecondsSinceEpoch}.jpg';
                           final ref = FirebaseStorage.instance.ref().child(refPath);
-                          await ref.putFile(pickedImageFile!);
+                          final bytes = await pickedImageFile!.readAsBytes();
+                          final compressed = await PdfReportGenerator.resizeImageForTest(bytes);
+                          await ref.putData(compressed);
                           finalImageUrl = await ref.getDownloadURL();
                         } catch (e) {
                           if(mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع صورة الاختبار: $e', isError: true);
