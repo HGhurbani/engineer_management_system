@@ -1187,8 +1187,8 @@ import 'package:flutter/foundation.dart';
       if (img != null) {
         widgets.add(
           pw.Container(
-            width: (PdfPageFormat.a4.availableWidth - 8) / 3,
-            height: (PdfPageFormat.a4.availableWidth - 8) / 3,
+            width: 80,
+            height: 80,
             decoration:
                 pw.BoxDecoration(border: pw.Border.all(color: borderColor)),
             child: pw.Image(img, fit: pw.BoxFit.cover),
@@ -1211,16 +1211,14 @@ import 'package:flutter/foundation.dart';
     );
   }
 
-  static List<pw.Widget> _buildImageLinkWidgets(
-      List<String> urls, Map<String, pw.MemoryImage> images) {
-    final widgets = <pw.Widget>[];
-    for (int i = 0; i < urls.length; i++) {
-      final img = images[urls[i]];
-      if (img != null) {
-        widgets.add(pw.Image(img,
-            width: (PdfPageFormat.a4.availableWidth - 8) / 3,
-            height: (PdfPageFormat.a4.availableWidth - 8) / 3));
-      }
+    static List<pw.Widget> _buildImageLinkWidgets(
+        List<String> urls, Map<String, pw.MemoryImage> images) {
+      final widgets = <pw.Widget>[];
+      for (int i = 0; i < urls.length; i++) {
+        final img = images[urls[i]];
+        if (img != null) {
+          widgets.add(pw.Image(img, width: 80, height: 80));
+        }
         if (i < urls.length - 1) {
           widgets.add(pw.SizedBox(width: 4));
         }
