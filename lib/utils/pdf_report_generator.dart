@@ -411,28 +411,6 @@ import 'package:flutter/foundation.dart';
         compress: true,
         version: PdfVersion.pdf_1_5,
       );
-
-      final List<pw.Page> previewPages = [];
-      final Set<String> previewed = {};
-      void addPreviewPage(String url) {
-        if (previewed.contains(url)) return;
-        final img = fetchedImages[url];
-        if (img != null) {
-          previewed.add(url);
-          previewPages.add(
-            pw.Page(
-              pageFormat: PdfPageFormat.a4,
-              textDirection: pw.TextDirection.rtl,
-              build: (context) => pw.Center(
-                child: pw.Anchor(
-                  name: url,
-                  child: pw.Image(img, width: 400, height: 400),
-                ),
-              ),
-            ),
-          );
-        }
-      }
   
       final fileName =
   
@@ -662,8 +640,7 @@ import 'package:flutter/foundation.dart';
 
                     PdfColors.grey100,
 
-                    images: fetchedImages,
-                    addPreviewPage: addPreviewPage));
+                    images: fetchedImages));
   
                 widgets.add(pw.SizedBox(height: 15));
   
@@ -716,9 +693,6 @@ import 'package:flutter/foundation.dart';
         ),
   
       );
-      for (final p in previewPages) {
-        pdf.addPage(p);
-      }
       // Release any cached images once the page is rendered.
       PdfImageCache.clear();
 
@@ -1177,8 +1151,7 @@ import 'package:flutter/foundation.dart';
                   ),
                 ),
                 pw.SizedBox(height: 5),
-                _buildImagesGrid(beforeUrls, borderColor,
-                    images: images, addPreviewPage: addPreviewPage),
+                _buildImagesGrid(beforeUrls, borderColor, images: images),
                 pw.SizedBox(height: 10),
               ],
               if (afterUrls.isNotEmpty) ...[
@@ -1186,8 +1159,7 @@ import 'package:flutter/foundation.dart';
                   textAlign: pw.TextAlign.right,
                   textDirection: pw.TextDirection.rtl,),
                 pw.SizedBox(height: 5),
-                _buildImagesGrid(afterUrls, borderColor,
-                    images: images, addPreviewPage: addPreviewPage),
+                _buildImagesGrid(afterUrls, borderColor, images: images),
                 pw.SizedBox(height: 10),
               ],
               if (imageUrls.isNotEmpty) ...[
@@ -1195,8 +1167,7 @@ import 'package:flutter/foundation.dart';
                   textAlign: pw.TextAlign.right,
                   textDirection: pw.TextDirection.rtl,),
                 pw.SizedBox(height: 5),
-                _buildImagesGrid(imageUrls, borderColor,
-                    images: images, addPreviewPage: addPreviewPage),
+                _buildImagesGrid(imageUrls, borderColor, images: images),
               ],
             ],
           ],
@@ -1204,80 +1175,99 @@ import 'package:flutter/foundation.dart';
       );
     }
 
-  static pw.Widget _buildImagesGrid(
-      List<String> urls, PdfColor borderColor,
-      {Map<String, pw.MemoryImage>? images,
-      void Function(String url)? addPreviewPage}) {
-    if (urls.isEmpty) return pw.SizedBox();
+    static pw.Widget _buildImagesGrid(
+        List<String> urls,
+        PdfColor borderColor, {
+          Map<String, pw.MemoryImage>? images,
+        }) {
+      if (urls.isEmpty) return pw.SizedBox();
 
-    final widgets = <pw.Widget>[];
-    for (int i = 0; i < urls.length; i++) {
-      final url = urls[i];
-      final img = images?[url];
-      if (img != null) {
-        addPreviewPage?.call(url);
+      final widgets = <pw.Widget>[];
+
+      for (final url in urls) {
+        final memImg = images?[url];
+        if (memImg == null) continue;
+
         widgets.add(
-          pw.Container(
-            width: 80,
-            child: pw.Column(
-              children: [
-                pw.Container(
-                  width: 80,
-                  height: 80,
-                  decoration:
-                      pw.BoxDecoration(border: pw.Border.all(color: borderColor)),
-                  child: pw.Image(img, fit: pw.BoxFit.cover),
+          pw.Column(                      // <-- حاوية لكل صورة وزرها
+            mainAxisSize: pw.MainAxisSize.min,
+            children: [
+              pw.Container(
+                width: 80,
+                height: 80,
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: borderColor),
                 ),
-                pw.SizedBox(height: 2),
-                pw.UrlLink(
-                  destinationName: url,
-                  child: pw.Text(
-                    'معاينة الصورة',
-                    style: pw.TextStyle(
-                      color: PdfColors.blue,
-                      decoration: pw.TextDecoration.underline,
-                      fontSize: 10,
-                    ),
-                    textDirection: pw.TextDirection.rtl,
+                child: pw.Image(memImg, fit: pw.BoxFit.cover),
+              ),
+              pw.SizedBox(height: 4),
+              pw.UrlLink(                 // <-- زر/رابط «معاينة»
+                destination: url,
+                child: pw.Text(
+                  'معاينة',
+                  style: pw.TextStyle(
+                    font: _arabicFont,
+                    fontSize: 10,
+                    color: PdfColors.blue,
+                    decoration: pw.TextDecoration.underline,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       }
-      if (i < urls.length - 1) {
-        widgets.add(pw.SizedBox(width: 4));
-      }
+
+      // التفاف العناصر من اليمين (RTL ⇒ start)
+      return pw.Container(
+        width: double.infinity,
+        alignment: pw.Alignment.topRight,
+        child: pw.Directionality(
+          textDirection: pw.TextDirection.rtl,
+          child: pw.Wrap(
+            alignment: pw.WrapAlignment.start,     // <-- البداية = يمين
+            runAlignment: pw.WrapAlignment.start,  // <-- كل الأسطر تبدأ يمين
+            spacing: 6,
+            runSpacing: 6,
+            children: widgets,
+          ),
+        ),
+      );
     }
 
-    return pw.Directionality(
-      textDirection: pw.TextDirection.rtl,
-      child: pw.Wrap(
-        alignment: pw.WrapAlignment.center,
-        spacing: 4,
-        runSpacing: 4,
-        children: widgets,
-      ),
-    );
-  }
+
 
     static List<pw.Widget> _buildImageLinkWidgets(
-        List<String> urls, Map<String, pw.MemoryImage> images) {
-      final widgets = <pw.Widget>[];
-      for (int i = 0; i < urls.length; i++) {
-        final img = images[urls[i]];
-        if (img != null) {
-          widgets.add(pw.Image(img, width: 80, height: 80));
-        }
-        if (i < urls.length - 1) {
-          widgets.add(pw.SizedBox(width: 4));
-        }
-      }
-      return widgets;
+        List<String> urls,
+        Map<String, pw.MemoryImage> images,
+        ) {
+      return urls.map((url) {
+        final img = images[url];
+        if (img == null) return pw.SizedBox();
+        return pw.Column(
+          mainAxisSize: pw.MainAxisSize.min,
+          children: [
+            pw.Image(img, width: 80, height: 80),
+            pw.SizedBox(height: 4),
+            pw.UrlLink(
+              destination: url,
+              child: pw.Text(
+                'معاينة',
+                style: pw.TextStyle(
+                  font: _arabicFont,
+                  fontSize: 10,
+                  color: PdfColors.blue,
+                  decoration: pw.TextDecoration.underline,
+                ),
+              ),
+            ),
+          ],
+        );
+      }).toList();
     }
-  
-  
+
+
+
     static pw.Widget _buildTestCard(
         Map<String, dynamic> test,
         int index,
@@ -1287,8 +1277,7 @@ import 'package:flutter/foundation.dart';
         pw.TextStyle metaStyle,
         PdfColor borderColor,
         PdfColor lightGrey,
-        {Map<String, pw.MemoryImage>? images,
-        void Function(String url)? addPreviewPage}) {
+        {Map<String, pw.MemoryImage>? images}) {
       final note = test['note'] ?? '';
       final engineer = test['engineerName'] ?? 'مهندس';
       final ts = (test['lastUpdatedAt'] as Timestamp?)?.toDate();
