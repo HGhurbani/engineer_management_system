@@ -165,14 +165,14 @@ class PartRequestPdfGenerator {
 
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.grey300),
-      columnWidths: const {0: pw.FixedColumnWidth(60)},
+      columnWidths: const {2: pw.FixedColumnWidth(60)},
       children: [
         pw.TableRow(
           decoration: pw.BoxDecoration(color: PdfColor.fromHex('#21206C')),
           children: [
             pw.Padding(
               padding: const pw.EdgeInsets.all(4),
-              child: pw.Text('الصورة', style: headerStyle, textAlign: pw.TextAlign.center),
+              child: pw.Text('الكمية', style: headerStyle, textAlign: pw.TextAlign.center),
             ),
             pw.Padding(
               padding: const pw.EdgeInsets.all(4),
@@ -180,7 +180,7 @@ class PartRequestPdfGenerator {
             ),
             pw.Padding(
               padding: const pw.EdgeInsets.all(4),
-              child: pw.Text('الكمية', style: headerStyle, textAlign: pw.TextAlign.center),
+              child: pw.Text('الصورة', style: headerStyle, textAlign: pw.TextAlign.center),
             ),
           ],
         ),
@@ -198,7 +198,7 @@ class PartRequestPdfGenerator {
             children: [
               pw.Padding(
                 padding: const pw.EdgeInsets.all(4),
-                child: pw.Center(child: imgWidget),
+                child: pw.Text(row['qty'] ?? '', style: cellStyle, textAlign: pw.TextAlign.center),
               ),
               pw.Padding(
                 padding: const pw.EdgeInsets.all(4),
@@ -206,7 +206,7 @@ class PartRequestPdfGenerator {
               ),
               pw.Padding(
                 padding: const pw.EdgeInsets.all(4),
-                child: pw.Text(row['qty'] ?? '', style: cellStyle, textAlign: pw.TextAlign.center),
+                child: pw.Center(child: imgWidget),
               ),
             ],
           );
