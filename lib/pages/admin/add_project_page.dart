@@ -352,7 +352,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
                     onTap: widget.lockClientSelection
                         ? null
                         : () async {
-                            final result = await showSearch<QueryDocumentSnapshot>(
+                            final result = await showSearch<QueryDocumentSnapshot?>(
                               context: context,
                               delegate: ClientSearchDelegate(widget.availableClients),
                             );
@@ -400,7 +400,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
   }
 }
 
-class ClientSearchDelegate extends SearchDelegate<QueryDocumentSnapshot> {
+class ClientSearchDelegate extends SearchDelegate<QueryDocumentSnapshot?> {
   final List<QueryDocumentSnapshot> clients;
 
   ClientSearchDelegate(this.clients);
