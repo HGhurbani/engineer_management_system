@@ -1370,7 +1370,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         color: AppConstants.primaryColor),
                     tooltip: 'تقرير PDF',
                     onPressed: () async {
-                      final bytes = await PartRequestPdfGenerator.generate(data);
+                      final bytes = await PartRequestPdfGenerator.generate(
+                          data,
+                          generatedByRole: 'المسؤول');
                       if (!mounted) return;
                       Navigator.pushNamed(context, '/pdf_preview', arguments: {
                         'bytes': bytes,
@@ -1911,6 +1913,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           phases: predefinedPhasesStructure,
           testsStructure: finalCommissioningTests,
           generatedBy: _currentAdminName,
+          generatedByRole: 'المسؤول',
           start: start,
           end: end,
           onProgress: (p) => progress.value = p,
@@ -1923,6 +1926,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           phases: predefinedPhasesStructure,
           testsStructure: finalCommissioningTests,
           generatedBy: _currentAdminName,
+          generatedByRole: 'المسؤول',
           start: start,
           end: end,
           onProgress: (p) => progress.value = p,

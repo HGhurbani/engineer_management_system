@@ -685,10 +685,8 @@ import 'package:flutter/foundation.dart';
               fontFallback: commonFontFallback,
   
               qrData: qrLink,
-  
               generatedByText:
-  
-              'المهندس: ${generatedBy ?? 'غير محدد'}'),
+              '${generatedByRole ?? 'المهندس'}: ${generatedBy ?? 'غير محدد'}'),
   
         ),
   
@@ -713,6 +711,7 @@ import 'package:flutter/foundation.dart';
       required List<Map<String, dynamic>> phases,
       required List<Map<String, dynamic>> testsStructure,
       String? generatedBy,
+      String? generatedByRole,
       DateTime? start,
       DateTime? end,
       void Function(double progress)? onProgress,
@@ -726,6 +725,7 @@ import 'package:flutter/foundation.dart';
           phases: phases,
           testsStructure: testsStructure,
           generatedBy: generatedBy,
+          generatedByRole: generatedByRole,
           start: start,
           end: end,
           onProgress: onProgress,
@@ -740,6 +740,7 @@ import 'package:flutter/foundation.dart';
         'phases': phases,
         'testsStructure': testsStructure,
         'generatedBy': generatedBy,
+        'generatedByRole': generatedByRole,
         'start': start,
         'end': end,
       });
@@ -755,6 +756,7 @@ import 'package:flutter/foundation.dart';
         testsStructure:
             List<Map<String, dynamic>>.from(args['testsStructure'] as List),
         generatedBy: args['generatedBy'] as String?,
+        generatedByRole: args['generatedByRole'] as String?,
         start: args['start'] as DateTime?,
         end: args['end'] as DateTime?,
         lowMemory: true,

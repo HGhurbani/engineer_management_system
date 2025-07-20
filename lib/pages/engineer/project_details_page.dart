@@ -985,6 +985,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           phases: predefinedPhasesStructure,
           testsStructure: finalCommissioningTests,
           generatedBy: _currentEngineerName,
+          generatedByRole: 'المهندس',
           start: start,
           end: end,
           onProgress: (p) => progress.value = p,
@@ -997,6 +998,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           phases: predefinedPhasesStructure,
           testsStructure: finalCommissioningTests,
           generatedBy: _currentEngineerName,
+          generatedByRole: 'المهندس',
           start: start,
           end: end,
           onProgress: (p) => progress.value = p,
@@ -3363,7 +3365,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 ),
                 TextButton(
                   onPressed: () async {
-                    final bytes = await PartRequestPdfGenerator.generate(data);
+                    final bytes = await PartRequestPdfGenerator.generate(
+                        data,
+                        generatedByRole: 'المهندس');
                     if (!mounted) return;
                     Navigator.pop(ctx);
                     Navigator.pushNamed(context, '/pdf_preview', arguments: {

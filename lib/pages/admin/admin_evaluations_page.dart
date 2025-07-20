@@ -1395,7 +1395,7 @@ class _AdminEvaluationsPageState extends State<AdminEvaluationsPage> {
             font: _arabicFont!,
             fontFallback: commonFontFallback,
             qrData: qrLink,
-            generatedByText: 'المهندس: ${FirebaseAuth.instance.currentUser?.displayName ?? ''}'),
+            generatedByText: 'المسؤول: ${FirebaseAuth.instance.currentUser?.displayName ?? ''}'),
       ),
     );
 
