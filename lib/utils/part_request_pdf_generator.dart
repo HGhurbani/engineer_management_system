@@ -66,7 +66,8 @@ class PartRequestPdfGenerator {
     return fetched;
   }
 
-  static Future<Uint8List> generate(Map<String, dynamic> data) async {
+  static Future<Uint8List> generate(Map<String, dynamic> data,
+      {String generatedByRole = 'المهندس'}) async {
     await _loadArabicFont();
     if (_arabicFont == null) {
       throw Exception('Arabic font not available');
@@ -130,7 +131,7 @@ class PartRequestPdfGenerator {
           clientName: 'غير محدد',
         ),
         build: (context) => [
-          pw.Text('المهندس: $engineerName',
+          pw.Text('$generatedByRole: $engineerName',
               style: pw.TextStyle(
                   font: _arabicFont,
                   fontWeight: pw.FontWeight.bold,
@@ -145,7 +146,7 @@ class PartRequestPdfGenerator {
         footer: (context) => PdfStyles.buildFooter(
           context,
           font: _arabicFont!,
-          generatedByText: 'المهندس: $engineerName',
+          generatedByText: '$generatedByRole: $engineerName',
         ),
       ),
     );
