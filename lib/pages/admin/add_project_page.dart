@@ -429,15 +429,14 @@ class ClientSearchDelegate extends SearchDelegate<QueryDocumentSnapshot?> {
 
   @override
   Widget buildResults(BuildContext context) {
-    return _buildList();
-  }
+    return _buildList(context);  }
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    return _buildList();
+    return _buildList(context);
   }
 
-  Widget _buildList() {
+  Widget _buildList(BuildContext context) {
     final filtered = clients.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
       final name = (data['name'] ?? '').toString();
