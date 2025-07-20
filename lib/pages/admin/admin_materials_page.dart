@@ -312,68 +312,74 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
           onPressed: () => _showAddMaterialDialog(),
           child: const Icon(Icons.add, color: Colors.white),
         ),
-        body: StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('materials')
-              .orderBy('name')
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                  child: CircularProgressIndicator(color: AppConstants.primaryColor));
-            }
-            if (snapshot.hasError) {
-              return const Center(child: Text('فشل تحميل المواد'));
-            }
-            final docs = snapshot.data?.docs ?? [];
-            final filtered = _filterMaterials(docs);
-            if (filtered.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.inventory_2_outlined,
-                        size: 100, color: AppConstants.textSecondary),
-                    SizedBox(height: AppConstants.itemSpacing),
-                    Text('لا توجد مواد',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              );
-            }
-            return ListView(
-              padding: const EdgeInsets.all(AppConstants.paddingMedium),
-              children: [
-                _buildSearchBar(),
-                ...filtered.map((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
-                    child: ListTile(
-                      leading: data['imageUrl'] != null
-                          ? Image.network(data['imageUrl'], width: 50, height: 50, fit: BoxFit.cover)
-                          : const Icon(Icons.photo_outlined),
-                      title: Text(data['name'] ?? ''),
-                      subtitle: Text('الوحدة: ${data['unit'] ?? ''}'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit, color: AppConstants.infoColor),
-                            onPressed: () => _showAddMaterialDialog(doc: doc),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: AppConstants.deleteColor),
-                            onPressed: () => _deleteMaterial(doc),
-                          ),
+        body: Column(
+          children: [
+            _buildSearchBar(),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('materials')
+                    .orderBy('name')
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                        child: CircularProgressIndicator(color: AppConstants.primaryColor));
+                  }
+                  if (snapshot.hasError) {
+                    return const Center(child: Text('فشل تحميل المواد'));
+                  }
+                  final docs = snapshot.data?.docs ?? [];
+                  final filtered = _filterMaterials(docs);
+                  if (filtered.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.inventory_2_outlined,
+                              size: 100, color: AppConstants.textSecondary),
+                          SizedBox(height: AppConstants.itemSpacing),
+                          Text('لا توجد مواد',
+                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                         ],
                       ),
-                    ),
+                    );
+                  }
+                  return ListView(
+                    padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                    children: [
+                      ...filtered.map((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
+                          child: ListTile(
+                            leading: data['imageUrl'] != null
+                                ? Image.network(data['imageUrl'], width: 50, height: 50, fit: BoxFit.cover)
+                                : const Icon(Icons.photo_outlined),
+                            title: Text(data['name'] ?? ''),
+                            subtitle: Text('الوحدة: ${data['unit'] ?? ''}'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit, color: AppConstants.infoColor),
+                                  onPressed: () => _showAddMaterialDialog(doc: doc),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, color: AppConstants.deleteColor),
+                                  onPressed: () => _deleteMaterial(doc),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      })
+                    ],
                   );
-                })
-              ],
-            );
-          },
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
