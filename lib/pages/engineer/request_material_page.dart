@@ -116,11 +116,13 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
       // Collect requested items as a list of maps
       final List<Map<String, dynamic>> items = [];
       for (int i = 0; i < _materialControllers.length; i++) {
-        final name = _selectedMaterials.length > i && _selectedMaterials[i] != null
-            ? _selectedMaterials[i]!.name
+        final selected = _selectedMaterials.length > i ? _selectedMaterials[i] : null;
+        final name = selected != null
+            ? selected.name
             : _materialControllers[i].text.trim();
         final qty = int.tryParse(_quantityControllers[i].text.trim()) ?? 1;
-        items.add({'name': name, 'quantity': qty});
+        final imageUrl = selected?.imageUrl ?? '';
+        items.add({'name': name, 'quantity': qty, 'imageUrl': imageUrl});
       }
 
       await FirebaseFirestore.instance.collection('partRequests').add({
