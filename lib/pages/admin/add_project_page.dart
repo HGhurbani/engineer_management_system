@@ -37,6 +37,7 @@ class AddProjectPage extends StatefulWidget {
 class _AddProjectPageState extends State<AddProjectPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final TextEditingController _clientController = TextEditingController();
   List<String> _selectedEngineerIds = [];
   String? _selectedClientId;
   bool _isLoading = false;
@@ -51,6 +52,13 @@ class _AddProjectPageState extends State<AddProjectPage> {
     _getCurrentAdminName(); // Fetch admin name when the page loads
     if (widget.initialClientId != null) {
       _selectedClientId = widget.initialClientId;
+      try {
+        final doc = widget.availableClients.firstWhere(
+          (d) => d.id == widget.initialClientId,
+        );
+        final data = doc.data() as Map<String, dynamic>;
+        _clientController.text = data['name'] ?? '';
+      } catch (_) {}
     }
     if (widget.defaultProjectName != null) {
       _nameController.text = widget.defaultProjectName!;
@@ -99,6 +107,7 @@ class _AddProjectPageState extends State<AddProjectPage> {
   @override
   void dispose() {
     _nameController.dispose();
+    _clientController.dispose();
     super.dispose();
   }
 
@@ -332,44 +341,35 @@ class _AddProjectPageState extends State<AddProjectPage> {
                     ),
                   )
                 else
-                  DropdownButtonFormField<String>(
-                    value: _selectedClientId,
+                  TextFormField(
+                    controller: _clientController,
+                    readOnly: true,
                     decoration: const InputDecoration(
                       labelText: 'اختر العميل',
                       prefixIcon: Icon(Icons.person_outline_rounded, color: AppConstants.primaryColor),
                       border: OutlineInputBorder(),
                     ),
-                    items: widget.availableClients.map((doc) {
-                      final user = doc.data() as Map<String, dynamic>;
-                      return DropdownMenuItem<String>(
-                        value: doc.id,
-                        child: Text(user['name'] ?? 'عميل غير مسمى'),
-                      );
-                    }).toList(),
-                    onChanged: widget.lockClientSelection
+                    onTap: widget.lockClientSelection
                         ? null
-                        : (value) {
-                            setState(() {
-                              _selectedClientId = value;
-                            });
+                        : () async {
+                            final result = await showSearch<QueryDocumentSnapshot>(
+                              context: context,
+                              delegate: ClientSearchDelegate(widget.availableClients),
+                            );
+                            if (result != null) {
+                              setState(() {
+                                _selectedClientId = result.id;
+                                final data = result.data() as Map<String, dynamic>;
+                                _clientController.text = data['name'] ?? '';
+                              });
+                            }
                           },
                     validator: (value) {
-                      if (value == null) {
+                      if (_selectedClientId == null) {
                         return 'الرجاء اختيار العميل.';
                       }
                       return null;
                     },
-                    isExpanded: true,
-                    menuMaxHeight: MediaQuery.of(context).size.height * 0.3,
-                    disabledHint: Text(
-                      (widget.availableClients
-                                  .firstWhere(
-                                    (d) => d.id == _selectedClientId,
-                                    orElse: () => widget.availableClients.first,
-                                  )
-                                  .data() as Map<String, dynamic>)['name'] ??
-                          'عميل',
-                    ),
                   ),
 
                 const SizedBox(height: AppConstants.paddingLarge * 1.5),
@@ -396,6 +396,63 @@ class _AddProjectPageState extends State<AddProjectPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class ClientSearchDelegate extends SearchDelegate<QueryDocumentSnapshot> {
+  final List<QueryDocumentSnapshot> clients;
+
+  ClientSearchDelegate(this.clients);
+
+  @override
+  String? get searchFieldLabel => 'ابحث عن عميل';
+
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      if (query.isNotEmpty)
+        IconButton(
+          icon: const Icon(Icons.clear),
+          onPressed: () => query = '',
+        ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => close(context, null),
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    return _buildList();
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    return _buildList();
+  }
+
+  Widget _buildList() {
+    final filtered = clients.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final name = (data['name'] ?? '').toString();
+      return name.contains(query);
+    }).toList();
+
+    return ListView(
+      children: filtered.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final name = data['name'] ?? '';
+        return ListTile(
+          title: Text(name),
+          onTap: () => close(context, doc),
+        );
+      }).toList(),
     );
   }
 }
