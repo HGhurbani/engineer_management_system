@@ -174,23 +174,24 @@ import 'package:flutter/foundation.dart';
       return fetched;
     }
   
-    static Future<PdfReportResult> generate({
-  
+  static Future<PdfReportResult> generate({
+
       required String projectId,
-  
+
       required Map<String, dynamic>? projectData,
-  
+
       required List<Map<String, dynamic>> phases,
-  
+
       required List<Map<String, dynamic>> testsStructure,
-  
+
       String? generatedBy,
-  
+      String? generatedByRole,
+
       DateTime? start,
-  
+
       DateTime? end,
       void Function(double progress)? onProgress,
-  
+
       bool lowMemory = false,
     }) async {
       // Ensure the cache does not retain images from previous reports
