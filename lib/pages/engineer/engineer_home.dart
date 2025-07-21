@@ -926,6 +926,11 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
               )
           ],
         ),
+        IconButton(
+          icon: const Icon(Icons.event_available, color: Colors.white),
+          tooltip: 'الحجوزات',
+          onPressed: () => Navigator.pushNamed(context, '/bookings'),
+        ),
         // --- ADDITION END ---
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert, color: Colors.white),
