@@ -37,6 +37,7 @@ import 'package:engineer_management_system/pages/admin/admin_materials_page.dart
 import 'package:engineer_management_system/pages/common/change_password_page.dart';
 import 'package:engineer_management_system/pages/common/pdf_preview_screen.dart';
 import 'package:engineer_management_system/pages/common/bookings_page.dart';
+import 'package:engineer_management_system/pages/admin/admin_evaluations_page.dart'; // استيراد صفحة التقييم الجديدة
 
 late AndroidNotificationChannel channel;
 late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
@@ -44,11 +45,6 @@ late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
-
-// --- ADDITION START ---
-import 'package:engineer_management_system/pages/admin/admin_evaluations_page.dart'; // استيراد صفحة التقييم الجديدة
-// --- ADDITION END ---
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
