@@ -32,6 +32,7 @@ import 'package:engineer_management_system/pages/admin/admin_meeting_logs_page.d
 import 'package:engineer_management_system/pages/admin/admin_materials_page.dart';
 import 'package:engineer_management_system/pages/common/change_password_page.dart';
 import 'package:engineer_management_system/pages/common/pdf_preview_screen.dart';
+import 'package:engineer_management_system/pages/common/bookings_page.dart';
 
 // --- ADDITION START ---
 import 'package:engineer_management_system/pages/admin/admin_evaluations_page.dart'; // استيراد صفحة التقييم الجديدة
@@ -146,6 +147,7 @@ class MyApp extends StatelessWidget {
         '/admin/attendance': (context) => const AdminAttendancePage(),
         '/admin/attendance_report': (context) => const AdminAttendanceReportPage(),
         '/notifications': (context) => const NotificationsPage(),
+        '/bookings': (context) => const BookingsPage(),
         '/admin/change_password': (context) => const ChangePasswordPage(role: 'admin'),
         '/engineer/change_password': (context) => const ChangePasswordPage(role: 'engineer'),
         '/client/change_password': (context) => const ChangePasswordPage(role: 'client'),

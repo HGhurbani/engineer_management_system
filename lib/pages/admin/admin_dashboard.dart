@@ -353,6 +353,11 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
               )
           ],
         ),
+        IconButton(
+          icon: Icon(Icons.event_available, color: Colors.white, size: screenWidth > _tabletBreakpoint ? 28 : 24),
+          tooltip: 'الحجوزات',
+          onPressed: () => Navigator.pushNamed(context, '/bookings'),
+        ),
         PopupMenuButton<String>(
           icon: Icon(Icons.more_vert, color: Colors.white, size: screenWidth > _tabletBreakpoint ? 28 : 24),
           onSelected: (value) {
