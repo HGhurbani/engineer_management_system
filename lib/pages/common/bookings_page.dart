@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../models/booking.dart';
 import '../../theme/app_constants.dart';
 import '../../main.dart';
+import 'package:flutter/material.dart' as ui;
+
 
 class BookingsPage extends StatefulWidget {
   const BookingsPage({super.key});
@@ -71,7 +73,7 @@ class _BookingsPageState extends State<BookingsPage> {
       barrierDismissible: false,
       builder: (context) {
         return Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: ui.TextDirection.rtl,
           child: AlertDialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppConstants.borderRadius),
@@ -249,7 +251,7 @@ class _BookingsPageState extends State<BookingsPage> {
       )));
     }
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppConstants.backgroundColor,
         appBar: AppBar(
@@ -314,6 +316,7 @@ class _BookingsPageState extends State<BookingsPage> {
           );
         },
       ),
+    ),
     );
   }
 }
