@@ -7,9 +7,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:typed_data';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'firebase_options.dart';
 import 'package:engineer_management_system/pages/admin/admin_daily_schedule_page.dart'; // افترض هذا المسار
 import 'package:engineer_management_system/pages/auth/login_page.dart';
@@ -34,6 +38,13 @@ import 'package:engineer_management_system/pages/common/change_password_page.dar
 import 'package:engineer_management_system/pages/common/pdf_preview_screen.dart';
 import 'package:engineer_management_system/pages/common/bookings_page.dart';
 
+late AndroidNotificationChannel channel;
+late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
+
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+}
+
 // --- ADDITION START ---
 import 'package:engineer_management_system/pages/admin/admin_evaluations_page.dart'; // استيراد صفحة التقييم الجديدة
 // --- ADDITION END ---
@@ -52,6 +63,9 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  await _setupPushNotifications();
 
 
   await initializeDateFormatting('ar', null);
@@ -258,6 +272,14 @@ Future<void> sendNotification({
       'timestamp': FieldValue.serverTimestamp(),
       'senderName': senderName ?? 'النظام',
     });
+
+    // Retrieve recipient FCM token
+    final userDoc = await FirebaseFirestore.instance.collection('users').doc(recipientUserId).get();
+    final userData = userDoc.data() as Map<String, dynamic>?;
+    final token = userData != null ? userData['fcmToken'] as String? : null;
+    if (token != null && token.isNotEmpty) {
+      await _sendPushMessage(token, title, body);
+    }
   } catch (e) {
     print('Error sending notification to $recipientUserId: $e');
   }
@@ -295,5 +317,96 @@ Future<List<String>> getAdminUids() async {
   } catch (e) {
     print('Error fetching admin UIDs: $e');
     return [];
+  }
+}
+
+Future<void> _setupPushNotifications() async {
+  channel = const AndroidNotificationChannel(
+    'high_importance_channel',
+    'High Importance Notifications',
+    description: 'This channel is used for important notifications.',
+    importance: Importance.high,
+  );
+
+  flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  const DarwinInitializationSettings initializationSettingsIOS =
+      DarwinInitializationSettings();
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: initializationSettingsIOS,
+  );
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
+
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+  NotificationSettings settings = await messaging.requestPermission();
+  if (settings.authorizationStatus != AuthorizationStatus.denied) {
+    final token = await messaging.getToken();
+    if (token != null) {
+      await _updateUserFcmToken(token);
+    }
+    FirebaseMessaging.onMessage.listen(_showFlutterNotification);
+    FirebaseMessaging.instance.onTokenRefresh.listen(_updateUserFcmToken);
+  }
+}
+
+void _showFlutterNotification(RemoteMessage message) {
+  RemoteNotification? notification = message.notification;
+  AndroidNotification? android = message.notification?.android;
+  if (notification != null && android != null && channel.id.isNotEmpty) {
+    flutterLocalNotificationsPlugin.show(
+      notification.hashCode,
+      notification.title,
+      notification.body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          channel.id,
+          channel.name,
+          channelDescription: channel.description,
+          icon: '@mipmap/ic_launcher',
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _sendPushMessage(
+    String token, String title, String body) async {
+  try {
+    await http.post(
+      Uri.parse('https://fcm.googleapis.com/fcm/send'),
+      headers: <String, String>{
+        'Content-Type': 'application/json',
+        'Authorization': 'key=YOUR_FCM_SERVER_KEY',
+      },
+      body: jsonEncode({
+        'to': token,
+        'notification': {
+          'title': title,
+          'body': body,
+        },
+      }),
+    );
+  } catch (e) {
+    print('Error sending push message: $e');
+  }
+}
+
+Future<void> _updateUserFcmToken(String token) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({'fcmToken': token});
+    } catch (e) {
+      print('Error updating FCM token: $e');
+    }
   }
 }

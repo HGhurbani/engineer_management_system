@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:ui' as ui; // For TextDirection
 import 'package:engineer_management_system/theme/app_constants.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class LoginConstants {
   static const double spacing = 20.0;
@@ -112,6 +113,11 @@ class _LoginPageState extends State<LoginPage> {
         clientType = userData['clientType'];
       }
 
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        await FirebaseFirestore.instance.collection('users').doc(uid).update({'fcmToken': fcmToken});
+      }
+
 
       _showSnackBar('مرحباً $userName! تم تسجيل الدخول بنجاح', isSuccess: true);
       await Future.delayed(const Duration(milliseconds: 1200));
@@ -197,6 +203,11 @@ class _LoginPageState extends State<LoginPage> {
             'clientType': clientType,
           });
         }
+      }
+
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).update({'fcmToken': token});
       }
 
 
