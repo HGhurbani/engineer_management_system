@@ -46,6 +46,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -378,7 +379,7 @@ Future<void> _sendPushMessage(
       Uri.parse('https://fcm.googleapis.com/fcm/send'),
       headers: <String, String>{
         'Content-Type': 'application/json',
-        'Authorization': 'key=YOUR_FCM_SERVER_KEY',
+        'Authorization': 'key=AIzaSyDRvznjDBdA83VNWzmbC2VbU-0UGuYyRCk',
       },
       body: jsonEncode({
         'to': token,
