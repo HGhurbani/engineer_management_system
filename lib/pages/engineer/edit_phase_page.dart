@@ -2,7 +2,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:mime/mime.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../theme/app_constants.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/pdf_report_generator.dart';
 
@@ -70,31 +75,64 @@ class _EditPhasePageState extends State<EditPhasePage> {
     String? image360Url;
 
     // إذا المستخدم رفع صورة 360 من الجهاز
-    if (_image360File != null) {
-      final ref360 = FirebaseStorage.instance
-          .ref('project_phases/${widget.projectId}/${widget.phaseId}_360.jpg');
-      final bytes = await _image360File!.readAsBytes();
-      final compressed =
-          await PdfReportGenerator.resizeImageForTest(bytes);
-      await ref360.putData(compressed);
-      image360Url = await ref360.getDownloadURL();
-    }
 
-// إذا أدخل رابط مباشر
-    else if (_image360LinkController.text.trim().isNotEmpty) {
+    if (_image360File != null) {
+      try {
+        final bytes = await _image360File!.readAsBytes();
+        final compressed = await PdfReportGenerator.resizeImageForTest(bytes);
+        var request = http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
+        request.files.add(http.MultipartFile.fromBytes(
+          'image',
+          compressed,
+          filename: "${widget.phaseId}_360.jpg",
+          contentType: MediaType('image', 'jpeg'),
+        ));
+        var streamed = await request.send();
+        var response = await http.Response.fromStream(streamed);
+        if (response.statusCode == 200) {
+          var data = json.decode(response.body);
+          if (data['status'] == 'success' && data['url'] != null) {
+            image360Url = data['url'];
+          } else {
+            throw Exception(data['message'] ?? 'فشل رفع الصورة من السيرفر.');
+          }
+        } else {
+          throw Exception('خطأ في الاتصال بالسيرفر: ${response.statusCode}');
+        }
+      } catch (e) {
+        // ignore and continue
+      }
+    } else if (_image360LinkController.text.trim().isNotEmpty) {
       image360Url = _image360LinkController.text.trim();
     }
 
     if (_imageFile != null) {
-      final ref = FirebaseStorage.instance
-          .ref('project_phases/${widget.projectId}/${widget.phaseId}.jpg');
-      final bytes = await _imageFile!.readAsBytes();
-      final compressed =
-          await PdfReportGenerator.resizeImageForTest(bytes);
-      await ref.putData(compressed);
-      imageUrl = await ref.getDownloadURL();
+      try {
+        final bytes = await _imageFile!.readAsBytes();
+        final compressed = await PdfReportGenerator.resizeImageForTest(bytes);
+        var request = http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
+        request.files.add(http.MultipartFile.fromBytes(
+          'image',
+          compressed,
+          filename: "${widget.phaseId}.jpg",
+          contentType: MediaType('image', 'jpeg'),
+        ));
+        var streamed = await request.send();
+        var response = await http.Response.fromStream(streamed);
+        if (response.statusCode == 200) {
+          var data = json.decode(response.body);
+          if (data['status'] == 'success' && data['url'] != null) {
+            imageUrl = data['url'];
+          } else {
+            throw Exception(data['message'] ?? 'فشل رفع الصورة من السيرفر.');
+          }
+        } else {
+          throw Exception('خطأ في الاتصال بالسيرفر: ${response.statusCode}');
+        }
+      } catch (e) {
+        // ignore and continue
+      }
     }
-
     await FirebaseFirestore.instance
         .collection('projects')
         .doc(widget.projectId)
