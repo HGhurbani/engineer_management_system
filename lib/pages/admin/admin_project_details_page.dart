@@ -2730,7 +2730,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                             throw Exception('خطأ في الاتصال بالسيرفر: ${response.statusCode}');
                           }
                         } catch (e) {
-                          if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة (${i+1}): $e', isError: true,);
+                          if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة (${i+1}): $e', isError: true);
                         }
                       }
                     }
@@ -2837,13 +2837,23 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                       Navigator.pop(dialogContext);
                       _showFeedbackSnackBar(context, 'تمت إضافة الإدخال بنجاح.', isError: false);
                     } catch (e) {
-                      if (mounted) _showFeedbackSnackBar(stfContext, 'فشل إضافة الإدخال: $e', isError: true,);
+                      if (mounted) _showFeedbackSnackBar(stfContext, 'فشل إضافة الإدخال: $e', isError: true);
                     } finally {
                       if(mounted) setDialogState(() => isUploadingDialog = false);
                     }
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, foregroundColor: Colors.white),
-                  child: isUploadingDialog ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white),)) : const Text('حفظ الإدخال'),
+                  child: isUploadingDialog
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text('حفظ الإدخال'),
                 ),
               ],
             ),
@@ -3290,7 +3300,17 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                       }
                     },
                     style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, foregroundColor: Colors.white),
-                    child: isUploadingDialog ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white),)) : const Text('حفظ الحالة'),
+                      child: isUploadingDialog
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text('حفظ الحالة'),
                   ),
                 ],
               ),
