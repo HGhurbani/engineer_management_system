@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
@@ -503,23 +502,33 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                           setDialogState(() => isUploading = true);
                           String? finalImageUrl = tempImageUrl;
                           if (pickedImageFile != null) {
-                            try {
-                              final currentUser = FirebaseAuth.instance.currentUser;
-                              final timestampForPath = DateTime.now().millisecondsSinceEpoch;
-                              final imageName = '${currentUser?.uid ?? 'user'}_$timestampForPath.jpg';
-                              final refPath = subPhaseId == null
-                                  ? 'project_entries/${widget.projectId}/$phaseId/$imageName'
-                                  : 'project_entries/${widget.projectId}/$subPhaseId/$imageName';
-                              final ref = FirebaseStorage.instance.ref().child(refPath);
-                              final bytes = await pickedImageFile!.readAsBytes();
-                              final compressed = await PdfReportGenerator.resizeImageForTest(bytes);
-                              await ref.putData(compressed);
-                              finalImageUrl = await ref.getDownloadURL();
-                            } catch (e) {
-                              if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة: $e', isError: true);
-                              setDialogState(() => isUploading = false);
-                              return;
+                          try {
+                            final bytes = await pickedImageFile!.readAsBytes();
+                            final compressed = await PdfReportGenerator.resizeImageForTest(bytes);
+                            var request = http.MultipartRequest(
+                                'POST', Uri.parse(AppConstants.uploadUrl));
+                            request.files.add(http.MultipartFile.fromBytes(
+                              'image',
+                              compressed,
+                              filename: "${DateTime.now().millisecondsSinceEpoch}.jpg",
+                              contentType: MediaType('image', 'jpeg'),
+                            ));
+                            var streamedResponse = await request.send();
+                            var response = await http.Response.fromStream(streamedResponse);
+                            if (response.statusCode == 200) {
+                              var data = json.decode(response.body);
+                              if (data['status'] == 'success' && data['url'] != null) {
+                                finalImageUrl = data['url'];
+                              } else {
+                                throw Exception(data['message'] ?? 'فشل رفع الصورة من السيرفر.');
+                              }
+                            } else {
+                              throw Exception('خطأ في الاتصال بالسيرفر: ${response.statusCode}');
                             }
+                          } catch (e) {
+                            if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة: $e', isError: true);
+                            setDialogState(() => isUploading = false);
+                            return;
                           }
 
                           try {
@@ -2694,22 +2703,31 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     List<String> uploadedBeforeUrls = [];
                     List<String> uploadedAfterUrls = [];
                     List<String> uploadedOtherUrls = [];
-
                     Future<void> uploadImages(List<XFile> files, List<String> store) async {
                       for (int i = 0; i < files.length; i++) {
                         final XFile imageFile = files[i];
                         try {
-                          final timestampForPath = DateTime.now().millisecondsSinceEpoch;
-                          final imageName = '${currentUser?.uid ?? 'unknown_user'}_${timestampForPath}_$i.jpg';
-                          final refPath = subPhaseId == null
-                              ? 'project_entries/${widget.projectId}/$phaseId/$imageName'
-                              : 'project_entries/${widget.projectId}/$subPhaseId/$imageName';
-                          final ref = FirebaseStorage.instance.ref().child(refPath);
                           final bytes = await imageFile.readAsBytes();
                           final compressed = await PdfReportGenerator.resizeImageForTest(bytes);
-                          await ref.putData(compressed);
-                          final url = await ref.getDownloadURL();
-                          store.add(url);
+                          var request = http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
+                          request.files.add(http.MultipartFile.fromBytes(
+                            'image',
+                            compressed,
+                            filename: "${DateTime.now().millisecondsSinceEpoch}_$i.jpg",
+                            contentType: MediaType('image', 'jpeg'),
+                          ));
+                          var streamed = await request.send();
+                          var response = await http.Response.fromStream(streamed);
+                          if (response.statusCode == 200) {
+                            final data = json.decode(response.body);
+                            if (data['status'] == 'success' && data['url'] != null) {
+                              store.add(data['url']);
+                            } else {
+                              throw Exception(data['message'] ?? 'فشل رفع الصورة من السيرفر.');
+                            }
+                          } else {
+                            throw Exception('خطأ في الاتصال بالسيرفر: ${response.statusCode}');
+                          }
                         } catch (e) {
                           if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة (${i+1}): $e', isError: true,);
                         }
@@ -3112,21 +3130,36 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     onPressed: isUploadingDialog ? null : () async {
                       setDialogState(() => isUploadingDialog = true);
                       String? finalImageUrl = tempImageUrl;
+
                       if (pickedImageFile != null) {
                         try {
-                          final refPath = 'project_tests/${widget.projectId}/$testId/${DateTime.now().millisecondsSinceEpoch}.jpg';
-                          final ref = FirebaseStorage.instance.ref().child(refPath);
                           final bytes = await pickedImageFile!.readAsBytes();
                           final compressed = await PdfReportGenerator.resizeImageForTest(bytes);
-                          await ref.putData(compressed);
-                          finalImageUrl = await ref.getDownloadURL();
+                          var request = http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
+                          request.files.add(http.MultipartFile.fromBytes(
+                            'image',
+                            compressed,
+                            filename: "${DateTime.now().millisecondsSinceEpoch}.jpg",
+                            contentType: MediaType('image', 'jpeg'),
+                          ));
+                          var streamed = await request.send();
+                          var response = await http.Response.fromStream(streamed);
+                          if (response.statusCode == 200) {
+                            var data = json.decode(response.body);
+                            if (data['status'] == 'success' && data['url'] != null) {
+                              finalImageUrl = data['url'];
+                            } else {
+                              throw Exception(data['message'] ?? 'فشل رفع صورة الاختبار من السيرفر.');
+                            }
+                          } else {
+                            throw Exception('خطأ في الاتصال بالسيرفر: ${response.statusCode}');
+                          }
                         } catch (e) {
                           if(mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع صورة الاختبار: $e', isError: true);
                           setDialogState(() => isUploadingDialog = false);
                           return;
                         }
                       }
-
                       try {
                         final testDocRef = FirebaseFirestore.instance
                             .collection('projects')
