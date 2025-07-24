@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:engineer_management_system/theme/app_constants.dart';
@@ -495,58 +496,48 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                   onPressed: isUploading
                       ? null
                       : () async {
-                          if (noteController.text.trim().isEmpty && pickedImageFile == null && tempImageUrl == null) {
-                            _showFeedbackSnackBar(context, 'الرجاء إدخال ملاحظة أو إضافة صورة.', isError: true);
-                            return;
-                          }
-                          setDialogState(() => isUploading = true);
-                          String? finalImageUrl = tempImageUrl;
-                          if (pickedImageFile != null) {
-                          try {
-                            final bytes = await pickedImageFile!.readAsBytes();
-                            final compressed = await PdfReportGenerator.resizeImageForTest(bytes);
-                            var request = http.MultipartRequest(
-                                'POST', Uri.parse(AppConstants.uploadUrl));
-                            request.files.add(http.MultipartFile.fromBytes(
-                              'image',
-                              compressed,
-                              filename: "${DateTime.now().millisecondsSinceEpoch}.jpg",
-                              contentType: MediaType('image', 'jpeg'),
-                            ));
-                            var streamedResponse = await request.send();
-                            var response = await http.Response.fromStream(streamedResponse);
-                            if (response.statusCode == 200) {
-                              var data = json.decode(response.body);
-                              if (data['status'] == 'success' && data['url'] != null) {
-                                finalImageUrl = data['url'];
-                              } else {
-                                throw Exception(data['message'] ?? 'فشل رفع الصورة من السيرفر.');
-                              }
-                            } else {
-                              throw Exception('خطأ في الاتصال بالسيرفر: ${response.statusCode}');
-                            }
-                          } catch (e) {
-                            if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة: $e', isError: true);
-                            setDialogState(() => isUploading = false);
-                            return;
-                          }
+                    if (noteController.text.trim().isEmpty && pickedImageFile == null && tempImageUrl == null) {
+                      _showFeedbackSnackBar(context, 'الرجاء إدخال ملاحظة أو إضافة صورة.', isError: true);
+                      return;
+                    }
+                    setDialogState(() => isUploading = true);
+                    String? finalImageUrl = tempImageUrl;
+                    if (pickedImageFile != null) {
+                      try {
+                        final currentUser = FirebaseAuth.instance.currentUser;
+                        final timestampForPath = DateTime.now().millisecondsSinceEpoch;
+                        final imageName = '${currentUser?.uid ?? 'user'}_$timestampForPath.jpg';
+                        final refPath = subPhaseId == null
+                            ? 'project_entries/${widget.projectId}/$phaseId/$imageName'
+                            : 'project_entries/${widget.projectId}/$subPhaseId/$imageName';
+                        final ref = FirebaseStorage.instance.ref().child(refPath);
+                        final bytes = await pickedImageFile!.readAsBytes();
+                        final compressed = await PdfReportGenerator.resizeImageForTest(bytes);
+                        await ref.putData(compressed);
+                        finalImageUrl = await ref.getDownloadURL();
+                      } catch (e) {
+                        if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة: $e', isError: true);
+                        setDialogState(() => isUploading = false);
+                        return;
+                      }
+                    }
 
-                          try {
-                            await FirebaseFirestore.instance.collection(collectionPath).doc(entryId).update({
-                              'note': noteController.text.trim(),
-                              'imageUrl': finalImageUrl,
-                              'lastEditedByUid': FirebaseAuth.instance.currentUser?.uid,
-                              'lastEditedByName': _currentAdminName ?? 'المسؤول',
-                              'lastEditedAt': FieldValue.serverTimestamp(),
-                            });
-                            if (mounted) Navigator.pop(dialogContext);
-                            if (mounted) _showFeedbackSnackBar(context, 'تم تحديث الإدخال بنجاح.', isError: false);
-                          } catch (e) {
-                            if (mounted) _showFeedbackSnackBar(stfContext, 'فشل تحديث الإدخال: $e', isError: true);
-                          } finally {
-                            if (mounted) setDialogState(() => isUploading = false);
-                          }
-                        },
+                    try {
+                      await FirebaseFirestore.instance.collection(collectionPath).doc(entryId).update({
+                        'note': noteController.text.trim(),
+                        'imageUrl': finalImageUrl,
+                        'lastEditedByUid': FirebaseAuth.instance.currentUser?.uid,
+                        'lastEditedByName': _currentAdminName ?? 'المسؤول',
+                        'lastEditedAt': FieldValue.serverTimestamp(),
+                      });
+                      if (mounted) Navigator.pop(dialogContext);
+                      if (mounted) _showFeedbackSnackBar(context, 'تم تحديث الإدخال بنجاح.', isError: false);
+                    } catch (e) {
+                      if (mounted) _showFeedbackSnackBar(stfContext, 'فشل تحديث الإدخال: $e', isError: true);
+                    } finally {
+                      if (mounted) setDialogState(() => isUploading = false);
+                    }
+                  },
                   style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, foregroundColor: Colors.white),
                   child: isUploading
                       ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
@@ -1387,7 +1378,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         'bytes': bytes,
                         'fileName': 'part_request_${requestDoc.id}.pdf',
                         'text':
-                            'تقرير طلب مواد للمشروع ${data['projectName'] ?? ''}'
+                        'تقرير طلب مواد للمشروع ${data['projectName'] ?? ''}'
                       });
                     },
                   ),
@@ -1785,9 +1776,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 onPressed: isLoading ? null : upload,
                 style: ElevatedButton.styleFrom(
                     backgroundColor: AppConstants.primaryColor),
-                child: isLoading
-                    ? const CircularProgressIndicator()
-                    : const Text('رفع'),
+                child:
+                isLoading ? const CircularProgressIndicator() : const Text('رفع'),
               ),
             ],
           );
@@ -1909,8 +1899,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     final String headerText = isFullReport
         ? 'التقرير الشامل'
         : useRange
-            ? 'التقرير التراكمي'
-            : 'التقرير اليومي';
+        ? 'التقرير التراكمي'
+        : 'التقرير اليومي';
 
     final progress = ProgressDialog.show(context, 'جاري تحميل البيانات...');
 
@@ -2063,7 +2053,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         final contentType = response.headers['content-type'] ?? '';
         if (response.statusCode == 200 && contentType.startsWith('image/')) {
           final resizedBytes =
-              await PdfReportGenerator.resizeImageForTest(response.bodyBytes);
+          await PdfReportGenerator.resizeImageForTest(response.bodyBytes);
           final memImg = pw.MemoryImage(resizedBytes);
           fetched[url] = memImg;
           PdfImageCache.put(url, memImg);
@@ -2704,33 +2694,24 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     List<String> uploadedBeforeUrls = [];
                     List<String> uploadedAfterUrls = [];
                     List<String> uploadedOtherUrls = [];
+
                     Future<void> uploadImages(List<XFile> files, List<String> store) async {
                       for (int i = 0; i < files.length; i++) {
                         final XFile imageFile = files[i];
                         try {
+                          final timestampForPath = DateTime.now().millisecondsSinceEpoch;
+                          final imageName = '${currentUser?.uid ?? 'unknown_user'}_${timestampForPath}_$i.jpg';
+                          final refPath = subPhaseId == null
+                              ? 'project_entries/${widget.projectId}/$phaseId/$imageName'
+                              : 'project_entries/${widget.projectId}/$subPhaseId/$imageName';
+                          final ref = FirebaseStorage.instance.ref().child(refPath);
                           final bytes = await imageFile.readAsBytes();
                           final compressed = await PdfReportGenerator.resizeImageForTest(bytes);
-                          var request = http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
-                          request.files.add(http.MultipartFile.fromBytes(
-                            'image',
-                            compressed,
-                            filename: "${DateTime.now().millisecondsSinceEpoch}_$i.jpg",
-                            contentType: MediaType('image', 'jpeg'),
-                          ));
-                          var streamed = await request.send();
-                          var response = await http.Response.fromStream(streamed);
-                          if (response.statusCode == 200) {
-                            final data = json.decode(response.body);
-                            if (data['status'] == 'success' && data['url'] != null) {
-                              store.add(data['url']);
-                            } else {
-                              throw Exception(data['message'] ?? 'فشل رفع الصورة من السيرفر.');
-                            }
-                          } else {
-                            throw Exception('خطأ في الاتصال بالسيرفر: ${response.statusCode}');
-                          }
+                          await ref.putData(compressed);
+                          final url = await ref.getDownloadURL();
+                          store.add(url);
                         } catch (e) {
-                          if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة (${i+1}): $e', isError: true);
+                          if (mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع الصورة (${i+1}): $e', isError: true,);
                         }
                       }
                     }
@@ -2837,23 +2818,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                       Navigator.pop(dialogContext);
                       _showFeedbackSnackBar(context, 'تمت إضافة الإدخال بنجاح.', isError: false);
                     } catch (e) {
-                      if (mounted) _showFeedbackSnackBar(stfContext, 'فشل إضافة الإدخال: $e', isError: true);
+                      if (mounted) _showFeedbackSnackBar(stfContext, 'فشل إضافة الإدخال: $e', isError: true,);
                     } finally {
                       if(mounted) setDialogState(() => isUploadingDialog = false);
                     }
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, foregroundColor: Colors.white),
-                  child: isUploadingDialog
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Text('حفظ الإدخال'),
+                  child: isUploadingDialog ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white),)) : const Text('حفظ الإدخال'),
                 ),
               ],
             ),
@@ -3141,36 +3112,21 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                     onPressed: isUploadingDialog ? null : () async {
                       setDialogState(() => isUploadingDialog = true);
                       String? finalImageUrl = tempImageUrl;
-
                       if (pickedImageFile != null) {
                         try {
+                          final refPath = 'project_tests/${widget.projectId}/$testId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+                          final ref = FirebaseStorage.instance.ref().child(refPath);
                           final bytes = await pickedImageFile!.readAsBytes();
                           final compressed = await PdfReportGenerator.resizeImageForTest(bytes);
-                          var request = http.MultipartRequest('POST', Uri.parse(AppConstants.uploadUrl));
-                          request.files.add(http.MultipartFile.fromBytes(
-                            'image',
-                            compressed,
-                            filename: "${DateTime.now().millisecondsSinceEpoch}.jpg",
-                            contentType: MediaType('image', 'jpeg'),
-                          ));
-                          var streamed = await request.send();
-                          var response = await http.Response.fromStream(streamed);
-                          if (response.statusCode == 200) {
-                            var data = json.decode(response.body);
-                            if (data['status'] == 'success' && data['url'] != null) {
-                              finalImageUrl = data['url'];
-                            } else {
-                              throw Exception(data['message'] ?? 'فشل رفع صورة الاختبار من السيرفر.');
-                            }
-                          } else {
-                            throw Exception('خطأ في الاتصال بالسيرفر: ${response.statusCode}');
-                          }
+                          await ref.putData(compressed);
+                          finalImageUrl = await ref.getDownloadURL();
                         } catch (e) {
                           if(mounted) _showFeedbackSnackBar(stfContext, 'فشل رفع صورة الاختبار: $e', isError: true);
                           setDialogState(() => isUploadingDialog = false);
                           return;
                         }
                       }
+
                       try {
                         final testDocRef = FirebaseFirestore.instance
                             .collection('projects')
@@ -3300,17 +3256,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                       }
                     },
                     style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor, foregroundColor: Colors.white),
-                      child: isUploadingDialog
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Text('حفظ الحالة'),
+                    child: isUploadingDialog ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white),)) : const Text('حفظ الحالة'),
                   ),
                 ],
               ),
