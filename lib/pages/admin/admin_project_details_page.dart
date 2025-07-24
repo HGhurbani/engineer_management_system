@@ -1785,8 +1785,9 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 onPressed: isLoading ? null : upload,
                 style: ElevatedButton.styleFrom(
                     backgroundColor: AppConstants.primaryColor),
-                child:
-                isLoading ? const CircularProgressIndicator() : const Text('رفع'),
+                child: isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text('رفع'),
               ),
             ],
           );
