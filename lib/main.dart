@@ -57,6 +57,7 @@ void main() async {
   // } else {
   //   print('Firebase app [DEFAULT] already initialized.');
   // }
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
