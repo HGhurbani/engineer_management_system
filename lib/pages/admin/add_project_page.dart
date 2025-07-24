@@ -20,6 +20,7 @@ class AddProjectPage extends StatefulWidget {
   final String? initialClientId;
   final String? defaultProjectName;
   final bool lockClientSelection;
+  final bool showEngineerSelection;
 
   const AddProjectPage({
     super.key,
@@ -28,6 +29,7 @@ class AddProjectPage extends StatefulWidget {
     this.initialClientId,
     this.defaultProjectName,
     this.lockClientSelection = false,
+    this.showEngineerSelection = true,
   });
 
   @override
@@ -50,6 +52,12 @@ class _AddProjectPageState extends State<AddProjectPage> {
   void initState() { // --- MODIFICATION: Added initState ---
     super.initState();
     _getCurrentAdminName(); // Fetch admin name when the page loads
+    if (!widget.showEngineerSelection) {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        _selectedEngineerIds = [uid];
+      }
+    }
     if (widget.initialClientId != null) {
       _selectedClientId = widget.initialClientId;
       try {
@@ -128,7 +136,9 @@ class _AddProjectPageState extends State<AddProjectPage> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    if (_selectedEngineerIds.isEmpty && widget.availableEngineers.isNotEmpty) {
+    if (widget.showEngineerSelection &&
+        _selectedEngineerIds.isEmpty &&
+        widget.availableEngineers.isNotEmpty) {
       _showFeedbackSnackBar('الرجاء اختيار مهندس واحد على الأقل.', isError: true);
       return;
     }
@@ -145,14 +155,21 @@ class _AddProjectPageState extends State<AddProjectPage> {
 
       if (_selectedEngineerIds.isNotEmpty) {
         for (String engineerId in _selectedEngineerIds) {
-          final engineerDoc = widget.availableEngineers.firstWhere(
-                (doc) => doc.id == engineerId,
-          );
-          final engineerData = engineerDoc.data() as Map<String, dynamic>;
-          assignedEngineersList.add({
-            'uid': engineerId,
-            'name': engineerData['name'] ?? 'مهندس غير مسمى',
-          });
+          if (widget.showEngineerSelection && widget.availableEngineers.isNotEmpty) {
+            final engineerDoc = widget.availableEngineers.firstWhere(
+              (doc) => doc.id == engineerId,
+            );
+            final engineerData = engineerDoc.data() as Map<String, dynamic>;
+            assignedEngineersList.add({
+              'uid': engineerId,
+              'name': engineerData['name'] ?? 'مهندس غير مسمى',
+            });
+          } else {
+            assignedEngineersList.add({
+              'uid': engineerId,
+              'name': _currentAdminName ?? 'المستخدم',
+            });
+          }
           engineerUidsList.add(engineerId);
         }
       }
@@ -246,88 +263,91 @@ class _AddProjectPageState extends State<AddProjectPage> {
                 ),
                 const SizedBox(height: AppConstants.itemSpacing * 1.5),
 
-                const Text(
-                  'اختر المهندسين المسؤولين:',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppConstants.textPrimary,
+                if (widget.showEngineerSelection) ...[
+                  const Text(
+                    'اختر المهندسين المسؤولين:',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppConstants.textPrimary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppConstants.paddingSmall),
-                if (widget.availableEngineers.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: AppConstants.paddingMedium),
-                    child: Text(
-                      'لا يوجد مهندسون متاحون حالياً. يرجى إضافتهم أولاً من قسم إدارة المهندسين.',
-                      style: TextStyle(color: AppConstants.textSecondary),
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                else
-                  Container(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.of(context).size.height * 0.25,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppConstants.textSecondary.withOpacity(0.5)),
-                      borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
-                    ),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: widget.availableEngineers.length,
-                      itemBuilder: (ctx, index) {
-                        final engineerDoc = widget.availableEngineers[index];
-                        final engineer = engineerDoc.data() as Map<String, dynamic>;
-                        final engineerId = engineerDoc.id;
-                        final engineerName = engineer['name'] ?? 'مهندس غير مسمى';
-                        final bool isSelected = _selectedEngineerIds.contains(engineerId);
+                  const SizedBox(height: AppConstants.paddingSmall),
+                  if (widget.availableEngineers.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: AppConstants.paddingMedium),
+                      child: Text(
+                        'لا يوجد مهندسون متاحون حالياً. يرجى إضافتهم أولاً من قسم إدارة المهندسين.',
+                        style: TextStyle(color: AppConstants.textSecondary),
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  else
+                    Container(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.25,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppConstants.textSecondary.withOpacity(0.5)),
+                        borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+                      ),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: widget.availableEngineers.length,
+                        itemBuilder: (ctx, index) {
+                          final engineerDoc = widget.availableEngineers[index];
+                          final engineer = engineerDoc.data() as Map<String, dynamic>;
+                          final engineerId = engineerDoc.id;
+                          final engineerName = engineer['name'] ?? 'مهندس غير مسمى';
+                          final bool isSelected = _selectedEngineerIds.contains(engineerId);
 
-                        return CheckboxListTile(
-                          title: Text(engineerName, style: const TextStyle(color: AppConstants.textPrimary)),
-                          value: isSelected,
-                          onChanged: (bool? value) {
-                            setState(() {
-                              if (value == true) {
-                                if (!_selectedEngineerIds.contains(engineerId)) {
-                                  _selectedEngineerIds.add(engineerId);
+                          return CheckboxListTile(
+                            title: Text(engineerName, style: const TextStyle(color: AppConstants.textPrimary)),
+                            value: isSelected,
+                            onChanged: (bool? value) {
+                              setState(() {
+                                if (value == true) {
+                                  if (!_selectedEngineerIds.contains(engineerId)) {
+                                    _selectedEngineerIds.add(engineerId);
+                                  }
+                                } else {
+                                  _selectedEngineerIds.remove(engineerId);
                                 }
-                              } else {
-                                _selectedEngineerIds.remove(engineerId);
-                              }
-                            });
-                          },
-                          activeColor: AppConstants.primaryColor,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          dense: true,
-                        );
-                      },
+                              });
+                            },
+                            activeColor: AppConstants.primaryColor,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            dense: true,
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                if (widget.availableEngineers.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 0),
-                    child: FormField<List<String>>(
-                      initialValue: _selectedEngineerIds,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'الرجاء اختيار مهندس واحد على الأقل.';
-                        }
-                        return null;
-                      },
-                      builder: (FormFieldState<List<String>> fieldState) {
-                        return fieldState.hasError
-                            ? Padding(
-                          padding: const EdgeInsets.only(top: 5.0),
-                          child: Text(
-                            fieldState.errorText!,
-                            style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
-                          ),
-                        )
-                            : const SizedBox.shrink();
-                      },
+                  if (widget.availableEngineers.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 0),
+                      child: FormField<List<String>>(
+                        initialValue: _selectedEngineerIds,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'الرجاء اختيار مهندس واحد على الأقل.';
+                          }
+                          return null;
+                        },
+                        builder: (FormFieldState<List<String>> fieldState) {
+                          return fieldState.hasError
+                              ? Padding(
+                            padding: const EdgeInsets.only(top: 5.0),
+                            child: Text(
+                              fieldState.errorText!,
+                              style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
+                            ),
+                          )
+                              : const SizedBox.shrink();
+                        },
+                      ),
                     ),
-                  ),
+                  const SizedBox(height: AppConstants.itemSpacing * 1.5),
+                ],
 
                 const SizedBox(height: AppConstants.itemSpacing * 1.5),
 

@@ -13,6 +13,7 @@ import 'dart:ui' as ui;
 import '../../main.dart';
 import 'meeting_logs_page.dart';
 import '../../models/holiday.dart';
+import '../admin/add_project_page.dart';
 
 
 class EngineerHome extends StatefulWidget {
@@ -37,6 +38,9 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     'individual': 'فردي',
     'company': 'شركة',
   };
+
+  List<QueryDocumentSnapshot> _availableClients = [];
+  bool _isLoadingClients = true;
 
   final TextEditingController _projectSearchController = TextEditingController();
   String _projectSearchQuery = '';
@@ -141,6 +145,7 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     setState(() => _isLoading = true);
     await _fetchEngineerData();
     await _checkCurrentAttendanceStatus();
+    await _loadClients();
     if (mounted) {
       setState(() => _isLoading = false);
       _fadeController.forward();
@@ -194,6 +199,29 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
     } catch (e) {
       print('Error checking attendance status: $e');
       if (mounted) _showFeedbackSnackBar(context, 'فشل التحقق من حالة الحضور.', isError: true);
+    }
+  }
+
+  Future<void> _loadClients() async {
+    if (!mounted) return;
+    setState(() => _isLoadingClients = true);
+    try {
+      final cliSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'client')
+          .orderBy('name')
+          .get();
+      if (mounted) {
+        setState(() {
+          _availableClients = cliSnap.docs;
+          _isLoadingClients = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingClients = false);
+        _showFeedbackSnackBar(context, 'فشل تحميل العملاء: $e', isError: true);
+      }
     }
   }
 
@@ -606,16 +634,39 @@ class _EngineerHomeState extends State<EngineerHome> with TickerProviderStateMix
         body: _isLoading
             ? const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor))
             : FadeTransition(
-          opacity: _fadeAnimation,
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildMyProjectsTab(),
-              _buildDailyScheduleTab(),
-              _buildMeetingLogsTab(),
-            ],
-          ),
-        ),
+              opacity: _fadeAnimation,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildMyProjectsTab(),
+                  _buildDailyScheduleTab(),
+                  _buildMeetingLogsTab(),
+                ],
+              ),
+            ),
+        floatingActionButton: (_isLoading || _isLoadingClients || _availableClients.isEmpty)
+            ? null
+            : FloatingActionButton.extended(
+                onPressed: () async {
+                  final result = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AddProjectPage(
+                        availableEngineers: const [],
+                        availableClients: _availableClients,
+                        showEngineerSelection: false,
+                      ),
+                    ),
+                  );
+                  if (result == true && mounted) {
+                    // Projects will refresh via StreamBuilder
+                  }
+                },
+                backgroundColor: AppConstants.primaryColor,
+                icon: const Icon(Icons.add_business_rounded, color: Colors.white),
+                label: const Text('إضافة مشروع',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
       ),
     );
   }
