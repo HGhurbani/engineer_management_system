@@ -977,33 +977,17 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
     try {
       PdfReportResult result;
-      try {
-        result = await PdfReportGenerator.generateWithIsolate(
-          projectId: widget.projectId,
-          projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
-          phases: predefinedPhasesStructure,
-          testsStructure: finalCommissioningTests,
-          generatedBy: _currentEngineerName,
-          generatedByRole: 'المهندس',
-          start: start,
-          end: end,
-          onProgress: (p) => progress.value = p,
-        );
-      } catch (e) {
-        // Retry with low-memory settings if initial attempt fails.
-        result = await PdfReportGenerator.generateWithIsolate(
-          projectId: widget.projectId,
-          projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
-          phases: predefinedPhasesStructure,
-          testsStructure: finalCommissioningTests,
-          generatedBy: _currentEngineerName,
-          generatedByRole: 'المهندس',
-          start: start,
-          end: end,
-          onProgress: (p) => progress.value = p,
-          lowMemory: true,
-        );
-      }
+      result = await PdfReportGenerator.generateWithIsolate(
+        projectId: widget.projectId,
+        projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
+        phases: predefinedPhasesStructure,
+        testsStructure: finalCommissioningTests,
+        generatedBy: _currentEngineerName,
+        generatedByRole: 'المهندس',
+        start: start,
+        end: end,
+        onProgress: (p) => progress.value = p,
+      );
 
       await ProgressDialog.hide(context);
       _showFeedbackSnackBar(context, getLocalizedText('تم إنشاء التقرير بنجاح.', 'Report generated successfully.'), isError: false);
@@ -1013,36 +997,15 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         getLocalizedText('يرجى الإطلاع على التقرير للمشروع.', 'Please review the project report.'),
         result.downloadUrl,
       );
-    } catch (e) {
-      try {
-        progress.value = 0.0;
-        final bytes = await PdfReportGenerator.generateSimpleTables(
-          projectId: widget.projectId,
-          phases: predefinedPhasesStructure,
-          testsStructure: finalCommissioningTests,
-          start: start,
-          end: end,
-          onProgress: (p) => progress.value = p,
-          lowMemory: true,
-        );
+      } catch (e) {
         await ProgressDialog.hide(context);
         _showFeedbackSnackBar(
           context,
-          getLocalizedText('تم إنشاء تقرير مبسط بسبب نقص الذاكرة.', 'Generated simplified report due to low memory.'),
-          isError: false,
+          getLocalizedText('فشل إنشاء أو مشاركة التقرير: $e', 'Failed to generate or share report: $e'),
+          isError: true,
         );
-        _openPdfPreview(
-          bytes,
-          fileName,
-          getLocalizedText('يرجى الإطلاع على التقرير للمشروع.', 'Please review the project report.'),
-          null,
-        );
-      } catch (e2) {
-        await ProgressDialog.hide(context);
-        _showFeedbackSnackBar(context, getLocalizedText('فشل إنشاء أو مشاركة التقرير: $e2', 'Failed to generate or share report: $e2'), isError: true);
-        print('Error generating daily report PDF: $e2');
+        print('Error generating daily report PDF: $e');
       }
-    }
   }
 
 // --- Helper Widgets (modified to accept isArabic and getLocalizedText) ---

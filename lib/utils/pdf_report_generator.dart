@@ -760,7 +760,7 @@ import 'package:flutter/foundation.dart';
         generatedByRole: args['generatedByRole'] as String?,
         start: args['start'] as DateTime?,
         end: args['end'] as DateTime?,
-        lowMemory: true,
+        lowMemory: false,
       );
     }
   
