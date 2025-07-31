@@ -1014,34 +1014,13 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         result.downloadUrl,
       );
     } catch (e) {
-      try {
-        progress.value = 0.0;
-        final bytes = await PdfReportGenerator.generateSimpleTables(
-          projectId: widget.projectId,
-          phases: predefinedPhasesStructure,
-          testsStructure: finalCommissioningTests,
-          start: start,
-          end: end,
-          onProgress: (p) => progress.value = p,
-          lowMemory: true,
-        );
-        await ProgressDialog.hide(context);
-        _showFeedbackSnackBar(
-          context,
-          getLocalizedText('تم إنشاء تقرير مبسط بسبب نقص الذاكرة.', 'Generated simplified report due to low memory.'),
-          isError: false,
-        );
-        _openPdfPreview(
-          bytes,
-          fileName,
-          getLocalizedText('يرجى الإطلاع على التقرير للمشروع.', 'Please review the project report.'),
-          null,
-        );
-      } catch (e2) {
-        await ProgressDialog.hide(context);
-        _showFeedbackSnackBar(context, getLocalizedText('فشل إنشاء أو مشاركة التقرير: $e2', 'Failed to generate or share report: $e2'), isError: true);
-        print('Error generating daily report PDF: $e2');
-      }
+      await ProgressDialog.hide(context);
+      _showFeedbackSnackBar(
+        context,
+        getLocalizedText('فشل إنشاء التقرير بسبب نقص الذاكرة.', 'Failed to generate report due to low memory.'),
+        isError: true,
+      );
+      print('Error generating daily report PDF: $e');
     }
   }
 
