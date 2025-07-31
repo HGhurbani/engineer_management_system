@@ -171,7 +171,7 @@ import 'package:flutter/foundation.dart';
         onProgress?.call(++completed / uniqueUrls.length);
       }
 
-      for (int i = 0; < uniqueUrls.length; i += concurrency) {
+      for (int i = 0; i < uniqueUrls.length; i += concurrency) {
         final batch = uniqueUrls.skip(i).take(concurrency).toList();
         await Future.wait(batch.map(handleUrl));
         // Drop references to the batch images once they are cached
@@ -592,7 +592,7 @@ import 'package:flutter/foundation.dart';
 
             } else {
 
-              for (int i = 0; < dayEntries.length; i++) {
+              for (int i = 0; i < dayEntries.length; i++) {
 
                 final entry = dayEntries[i];
 
@@ -626,7 +626,7 @@ import 'package:flutter/foundation.dart';
 
             } else {
 
-              for (int i = 0; < dayTests.length; i++) {
+              for (int i = 0; i < dayTests.length; i++) {
 
                 final test = dayTests[i];
 
@@ -786,7 +786,7 @@ import 'package:flutter/foundation.dart';
       return pw.Table(
         border: pw.TableBorder.all(color: borderColor),
         columnWidths: {
-          for (int i = 0; < headers.length; i++) i: const pw.FlexColumnWidth()
+          for (int i = 0; i < headers.length; i++) i: const pw.FlexColumnWidth()
         },
         children: [
           pw.TableRow(
