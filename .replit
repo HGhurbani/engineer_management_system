@@ -1,0 +1,4 @@
+modules = ["cpp-clang14", "swift-5.8", "web"]
+
+[nix]
+channel = "stable-25_05"
