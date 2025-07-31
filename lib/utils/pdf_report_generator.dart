@@ -86,16 +86,16 @@ import 'package:flutter/foundation.dart';
   }
 
 
-    static Future<void> _loadArabicFont() async {
+    static Future<void> _loadArabicFont({Uint8List? fontBytes}) async {
 
       if (_arabicFont != null) return;
 
       try {
 
-        // Use a slightly bolder font for a more formal look
-        final fontData = await rootBundle.load('assets/fonts/Tajawal-Bold.ttf');
+        final bytes = fontBytes ??
+            (await rootBundle.load('assets/fonts/Tajawal-Bold.ttf')).buffer.asUint8List();
 
-        _arabicFont = pw.Font.ttf(fontData);
+        _arabicFont = pw.Font.ttf(bytes);
 
       } catch (e) {
 
@@ -213,8 +213,8 @@ import 'package:flutter/foundation.dart';
 
       DateTime? end,
       void Function(double progress)? onProgress,
-
       bool lowMemory = false,
+      Uint8List? arabicFontBytes,
     }) async {
       // Ensure the cache does not retain images from previous reports
       PdfImageCache.clear();
@@ -389,7 +389,7 @@ import 'package:flutter/foundation.dart';
         fetchConcurrency = 1;
       }
 
-      await _loadArabicFont();
+      await _loadArabicFont(fontBytes: arabicFontBytes);
 
       if (_arabicFont == null) {
 
@@ -766,6 +766,9 @@ import 'package:flutter/foundation.dart';
       }
 
       // Older low-memory devices benefit from offloading the heavy work.
+      final fontBytes =
+          (await rootBundle.load('assets/fonts/Tajawal-Bold.ttf')).buffer.asUint8List();
+
       return compute(_generateIsolate, {
         'projectId': projectId,
         'projectData': projectData,
@@ -775,10 +778,11 @@ import 'package:flutter/foundation.dart';
         'generatedByRole': generatedByRole,
         'start': start,
         'end': end,
+        'fontData': fontBytes,
       });
     }
 
-    static Future<PdfReportResult> _generateIsolate(
+  static Future<PdfReportResult> _generateIsolate(
         Map<String, dynamic> args) async {
       return PdfReportGenerator.generate(
         projectId: args['projectId'] as String,
@@ -792,6 +796,7 @@ import 'package:flutter/foundation.dart';
         start: args['start'] as DateTime?,
         end: args['end'] as DateTime?,
         lowMemory: true,
+        arabicFontBytes: args['fontData'] as Uint8List?,
       );
     }
 
@@ -1781,7 +1786,7 @@ import 'package:flutter/foundation.dart';
 
     // Generates a simplified PDF report that lists phase entries and tests in
     // simple tables without headers or footers.
-    static Future<Uint8List> generateSimpleTables({
+  static Future<Uint8List> generateSimpleTables({
       required String projectId,
       required List<Map<String, dynamic>> phases,
       required List<Map<String, dynamic>> testsStructure,
@@ -1789,6 +1794,7 @@ import 'package:flutter/foundation.dart';
       DateTime? end,
       void Function(double progress)? onProgress,
       bool lowMemory = false,
+      Uint8List? arabicFontBytes,
     }) async {
       PdfImageCache.clear();
       onProgress?.call(0.0);
@@ -1945,7 +1951,7 @@ import 'package:flutter/foundation.dart';
 
       onProgress?.call(0.9);
 
-      await _loadArabicFont();
+      await _loadArabicFont(fontBytes: arabicFontBytes);
       if (_arabicFont == null) {
         throw Exception('Arabic font not available');
       }
