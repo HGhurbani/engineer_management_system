@@ -49,6 +49,11 @@ import 'package:flutter/foundation.dart';
   static const int _lowMemImageDimension = 256;
   static const int _veryLowMemImageDimension = 128;
   static const int _lowMemJpgQuality = 60;
+  // Automatically enable low-memory mode when the report contains
+  // a large number of photos. This prevents out-of-memory failures on
+  // devices with limited resources by downscaling images and reducing
+  // concurrency from the start instead of retrying after a crash.
+  static const int _autoLowMemoryThreshold = 100; // photos
   // Skip downloading images that exceed this size in bytes to avoid
   // exhausting memory on devices with limited resources.
   // Made public so other libraries can reference this limit.
@@ -216,8 +221,8 @@ import 'package:flutter/foundation.dart';
       onProgress?.call(0.0);
       try {
 
-      final int imgQuality = lowMemory ? _lowMemJpgQuality : _jpgQuality;
-      final int fetchConcurrency = lowMemory ? 1 : 3;
+      int imgQuality = lowMemory ? _lowMemJpgQuality : _jpgQuality;
+      int fetchConcurrency = lowMemory ? 1 : 3;
 
       DateTime now = DateTime.now();
 
@@ -375,6 +380,14 @@ import 'package:flutter/foundation.dart';
 
       }
 
+
+      // Enable low-memory mode automatically when the number of
+      // collected images exceeds the configured threshold.
+      if (!lowMemory && imageUrls.length > _autoLowMemoryThreshold) {
+        lowMemory = true;
+        imgQuality = _lowMemJpgQuality;
+        fetchConcurrency = 1;
+      }
 
       await _loadArabicFont();
 
@@ -1780,8 +1793,8 @@ import 'package:flutter/foundation.dart';
       PdfImageCache.clear();
       onProgress?.call(0.0);
       try {
-      final int imgQuality = lowMemory ? _lowMemJpgQuality : _jpgQuality;
-      final int fetchConcurrency = lowMemory ? 1 : 3;
+      int imgQuality = lowMemory ? _lowMemJpgQuality : _jpgQuality;
+      int fetchConcurrency = lowMemory ? 1 : 3;
       DateTime now = DateTime.now();
       bool useRange = start != null || end != null;
       if (useRange) {
@@ -1905,6 +1918,14 @@ import 'package:flutter/foundation.dart';
         }());
 
         await Future.wait(fetchTasks);
+
+        // Automatically switch to low-memory mode if too many photos were
+        // collected to avoid running out of memory during generation.
+        if (!lowMemory && imageUrls.length > _autoLowMemoryThreshold) {
+          lowMemory = true;
+          imgQuality = _lowMemJpgQuality;
+          fetchConcurrency = 1;
+        }
       } catch (e) {
         print('Error preparing simple report details: $e');
       }
