@@ -1,39 +1,39 @@
-  import 'dart:async';
-  
+import 'dart:async';
+
   import 'dart:typed_data';
-  
-  
+
+
   import 'package:cloud_firestore/cloud_firestore.dart';
-  
+
   import 'package:flutter/services.dart' show ByteData, rootBundle;
-  
+
   import 'package:http/http.dart' as http;
   import 'package:image/image.dart' as img;
   import 'package:meta/meta.dart';
-  
+
   import 'package:pdf/pdf.dart';
-  
+
   import 'package:pdf/widgets.dart' as pw;
-  
+
   import 'package:intl/intl.dart';
-  
+
 import 'package:printing/printing.dart';
 import 'package:flutter/foundation.dart';
-  
-  
+
+
   import 'pdf_styles.dart';
-  
+
   import 'pdf_image_cache.dart';
-  
+
   import 'report_storage.dart';
-  
+
   class PdfReportResult {
     final Uint8List bytes;
     final String? downloadUrl;
     PdfReportResult({required this.bytes, this.downloadUrl});
   }
-  
-  
+
+
   class PdfReportGenerator {
 
     static pw.Font? _arabicFont;
@@ -63,26 +63,34 @@ import 'package:flutter/foundation.dart';
     return _maxImageDimension;
   }
 
+    /// استخدام أبعاد عالية الجودة بشكل دائم
+  static int _adaptiveHighQualityDimension(int count) {
+    if (count >= 200) return 256;
+    if (count >= 100) return 384;
+    if (count >= 50) return 512;
+    return _maxImageDimension;
+  }
+
 
     static Future<void> _loadArabicFont() async {
-  
+
       if (_arabicFont != null) return;
-  
+
       try {
-  
+
         // Use a slightly bolder font for a more formal look
         final fontData = await rootBundle.load('assets/fonts/Tajawal-Bold.ttf');
-  
+
         _arabicFont = pw.Font.ttf(fontData);
-  
+
       } catch (e) {
-  
+
         print('Error loading Arabic font: $e');
-  
+
       }
-  
+
     }
-  
+
   static Future<Uint8List> _resizeImageIfNeeded(Uint8List bytes,
       {int? maxDimension, int? quality}) async {
     // Fallback to max dimension when none provided.
@@ -99,16 +107,16 @@ import 'package:flutter/foundation.dart';
         height: image.height > image.width ? dim : null);
     return Uint8List.fromList(img.encodeJpg(resized, quality: q));
   }
-  
+
     @visibleForTesting
     static Future<Uint8List> resizeImageForTest(Uint8List bytes,
             {int? maxDimension, int? quality}) =>
         _resizeImageIfNeeded(bytes,
             maxDimension: maxDimension, quality: quality);
-  
-  
-  
-  
+
+
+
+
     static Future<Map<String, pw.MemoryImage>> _fetchImagesForUrls(
         List<String> urls, {
         void Function(double progress)? onProgress,
@@ -120,7 +128,7 @@ import 'package:flutter/foundation.dart';
       final Map<String, pw.MemoryImage> fetched = {};
       final uniqueUrls = urls.toSet().toList();
       int completed = 0;
-  
+
       Future<void> handleUrl(String url) async {
         if (fetched.containsKey(url)) return;
         final cached = PdfImageCache.get(url);
@@ -144,7 +152,7 @@ import 'package:flutter/foundation.dart';
             } catch (_) {
               // Ignore HEAD errors and attempt full download.
             }
-  
+
             final response = await http
                 .get(Uri.parse(url))
                 .timeout(const Duration(seconds: 120));
@@ -163,7 +171,7 @@ import 'package:flutter/foundation.dart';
         onProgress?.call(++completed / uniqueUrls.length);
       }
 
-      for (int i = 0; i < uniqueUrls.length; i += concurrency) {
+      for (int i = 0; < uniqueUrls.length; i += concurrency) {
         final batch = uniqueUrls.skip(i).take(concurrency).toList();
         await Future.wait(batch.map(handleUrl));
         // Drop references to the batch images once they are cached
@@ -173,7 +181,7 @@ import 'package:flutter/foundation.dart';
       }
       return fetched;
     }
-  
+
   static Future<PdfReportResult> generate({
 
       required String projectId,
@@ -198,36 +206,36 @@ import 'package:flutter/foundation.dart';
       PdfImageCache.clear();
       onProgress?.call(0.0);
       try {
-  
+
       final int imgQuality = lowMemory ? _lowMemJpgQuality : _jpgQuality;
       final int fetchConcurrency = lowMemory ? 1 : 3;
-  
+
       DateTime now = DateTime.now();
-  
+
       final bool isFullReport = start == null && end == null;
-  
+
       bool useRange = !isFullReport;
-  
+
       if (useRange) {
-  
+
         start ??= DateTime(now.year, now.month, now.day);
-  
+
         end ??= start.add(const Duration(days: 1));
-  
+
       }
-  
-  
+
+
       final List<Map<String, dynamic>> dayEntries = [];
-  
+
       final List<Map<String, dynamic>> dayTests = [];
-  
+
       final List<Map<String, dynamic>> dayRequests = [];
-  
+
       final Set<String> imageUrls = {};
-  
-  
+
+
       try {
-  
+
         int totalDataTasks = 2; // tests and requests
         for (var p in phases) {
           totalDataTasks++; // phase
@@ -238,7 +246,7 @@ import 'package:flutter/foundation.dart';
           completedTasks++;
           onProgress?.call((completedTasks / totalDataTasks) * 0.6);
         }
-  
+
         for (var phase in phases) {
           final phaseId = phase['id'];
           final phaseName = phase['name'];
@@ -269,7 +277,7 @@ import 'package:flutter/foundation.dart';
             });
           }
           update();
-  
+
           for (var sub in phase['subPhases']) {
             final subId = sub['id'];
             final subName = sub['name'];
@@ -302,7 +310,7 @@ import 'package:flutter/foundation.dart';
             update();
           }
         }
-  
+
         final Map<String, Map<String, String>> testInfo = {};
         for (var section in testsStructure) {
           final sectionName = section['section_name'] as String;
@@ -313,7 +321,7 @@ import 'package:flutter/foundation.dart';
             };
           }
         }
-  
+
         Query<Map<String, dynamic>> qTests = FirebaseFirestore.instance
             .collection('projects')
             .doc(projectId)
@@ -337,7 +345,7 @@ import 'package:flutter/foundation.dart';
           });
         }
         update();
-  
+
         Query<Map<String, dynamic>> qReq = FirebaseFirestore.instance
             .collection('partRequests')
             .where('projectId', isEqualTo: projectId);
@@ -351,14 +359,14 @@ import 'package:flutter/foundation.dart';
           dayRequests.add(doc.data());
         }
         update();
-  
+
       } catch (e) {
-  
+
         print('Error preparing daily report details: $e');
-  
+
       }
-  
-  
+
+
       await _loadArabicFont();
 
       if (_arabicFont == null) {
@@ -367,9 +375,8 @@ import 'package:flutter/foundation.dart';
 
       }
 
-      final int imgDim = lowMemory
-          ? _lowMemImageDimension
-          : _adaptiveDimension(imageUrls.length);
+      // استخدام أبعاد محسنة دائماً بناءً على عدد الصور
+      final int imgDim = _adaptiveHighQualityDimension(imageUrls.length);
 
       final fetchedImages = await _fetchImagesForUrls(
         imageUrls.toList(),
@@ -380,52 +387,52 @@ import 'package:flutter/foundation.dart';
       );
 
       onProgress?.call(0.9);
-  
+
       pw.Font? emojiFont;
-  
+
       try {
-  
+
         emojiFont = await pw.Font.ttf(await rootBundle.load('assets/fonts/NotoColorEmoji.ttf'));
-  
+
       } catch (e) {
-  
+
         try {
-  
+
           emojiFont = await PdfGoogleFonts.notoColorEmoji();
-  
+
         } catch (e) {
-  
+
           print('Error loading emoji font: $e');
-  
+
         }
-  
+
       }
-  
-  
+
+
       final List<pw.Font> commonFontFallback = [];
-  
+
       if (emojiFont != null) commonFontFallback.add(emojiFont);
-  
-  
+
+
       // Enable aggressive compression to keep the final document size small.
       final pdf = pw.Document(
         compress: true,
         version: PdfVersion.pdf_1_5,
       );
-  
+
       final fileName =
-  
+
           'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
-  
+
       final token = generateReportToken();
-  
+
       final qrLink = buildReportDownloadUrl(fileName, token);
-  
-  
+
+
       final projectDataMap = projectData;
-  
+
       final String projectName = projectDataMap?['name'] ?? 'مشروع غير مسمى';
-  
+
       final String clientName = projectDataMap?['clientName'] ?? 'غير معروف';
       final String projectType = projectDataMap?['projectType'] ?? 'غير محدد';
       final List<dynamic> assignedEngineersRaw =
@@ -449,7 +456,7 @@ import 'package:flutter/foundation.dart';
           // ignore
         }
       }
-  
+
       String employeeNames = 'لا يوجد';
       try {
         final empSnap = await FirebaseFirestore.instance
@@ -468,61 +475,61 @@ import 'package:flutter/foundation.dart';
       } catch (e) {
         // ignore
       }
-  
-  
+
+
       final ByteData logoByteData = await rootBundle.load('assets/images/app_logo.png');
-  
+
       final Uint8List logoBytes = logoByteData.buffer.asUint8List();
-  
+
       final pw.MemoryImage appLogo = pw.MemoryImage(logoBytes);
-  
-  
+
+
       final pw.TextStyle headerStyle = pw.TextStyle(
-  
+
           font: _arabicFont,
-  
+
           fontWeight: pw.FontWeight.bold,
-  
+
           fontSize: 18,
-  
+
           fontFallback: commonFontFallback);
-  
+
       final pw.TextStyle regularStyle = pw.TextStyle(
-  
+
           font: _arabicFont, fontSize: 16, fontFallback: commonFontFallback);
-  
+
       final pw.TextStyle smallGrey = pw.TextStyle(
-  
+
           font: _arabicFont,
-  
+
           fontSize: 12,
-  
+
           color: PdfColors.grey600,
-  
+
           fontFallback: commonFontFallback);
-  
-  
+
+
       final String headerText = isFullReport
-  
+
           ? 'التقرير الشامل'
-  
+
           : useRange
-  
+
           ? 'التقرير التراكمي'
-  
+
           : 'التقرير اليومي';
-  
-  
+
+
       pdf.addPage(
-  
+
         pw.MultiPage(
           maxPages: 10000,
           pageTheme: pw.PageTheme(
-  
+
             pageFormat: PdfPageFormat.a4,
-  
+
             textDirection: pw.TextDirection.rtl,
-  
+
             theme: pw.ThemeData.withFont(
               base: _arabicFont,
               bold: _arabicFont,
@@ -530,29 +537,29 @@ import 'package:flutter/foundation.dart';
               boldItalic: _arabicFont,
               fontFallback: commonFontFallback,
             ),
-  
+
             margin: PdfStyles.pageMargins,
-  
+
           ),
-  
+
           header: (context) => PdfStyles.buildHeader(
-  
+
             font: _arabicFont!,
-  
+
             logo: appLogo,
-  
+
             headerText: headerText,
-  
+
             now: now,
-  
+
             projectName: projectName,
-  
+
             clientName: clientName,
-  
+
           ),
-  
+
           build: (context) {
-  
+
             final widgets = <pw.Widget>[];
             widgets.add(
               _buildProjectDetailsTable(
@@ -569,26 +576,26 @@ import 'package:flutter/foundation.dart';
               ),
             );
             widgets.add(pw.SizedBox(height: 20));
-  
-  
-  
+
+
+
             widgets.add(pw.SizedBox(height: 30));
-  
-  
+
+
             widgets.add(_buildSectionHeader('الملاحظات والتحديثات', headerStyle, PdfColors.blueGrey800));
-  
+
             widgets.add(pw.SizedBox(height: 15));
-  
+
             if (dayEntries.isEmpty) {
-  
+
               widgets.add(_buildEmptyState('لا توجد ملاحظات مسجلة في هذه الفترة', regularStyle, PdfColors.grey100));
-  
+
             } else {
-  
-              for (int i = 0; i < dayEntries.length; i++) {
-  
+
+              for (int i = 0; < dayEntries.length; i++) {
+
                 final entry = dayEntries[i];
-  
+
                 widgets.add(_buildEntryCard(
                     entry,
                     i + 1,
@@ -599,30 +606,30 @@ import 'package:flutter/foundation.dart';
                     PdfColors.grey400,
                     PdfColors.grey100,
                     images: fetchedImages));
-  
+
                 widgets.add(pw.SizedBox(height: 15));
-  
+
               }
-  
+
             }
-  
-  
+
+
             widgets.add(pw.SizedBox(height: 20));
-  
+
             widgets.add(_buildSectionHeader('الاختبارات والفحوصات', headerStyle, PdfColors.blueGrey800));
-  
+
             widgets.add(pw.SizedBox(height: 15));
-  
+
             if (dayTests.isEmpty) {
-  
+
               widgets.add(_buildEmptyState('لا توجد اختبارات محدثة في هذه الفترة', regularStyle, PdfColors.grey100));
-  
+
             } else {
-  
-              for (int i = 0; i < dayTests.length; i++) {
-  
+
+              for (int i = 0; < dayTests.length; i++) {
+
                 final test = dayTests[i];
-  
+
                 widgets.add(_buildTestCard(
 
                     test,
@@ -642,55 +649,55 @@ import 'package:flutter/foundation.dart';
                     PdfColors.grey100,
 
                     images: fetchedImages));
-  
+
                 widgets.add(pw.SizedBox(height: 15));
-  
+
               }
-  
+
             }
-  
-  
+
+
             widgets.add(pw.SizedBox(height: 20));
-  
+
             widgets.add(_buildSectionHeader('طلبات المواد والمعدات', headerStyle, PdfColors.blueGrey800));
-  
+
             widgets.add(pw.SizedBox(height: 15));
-  
+
             if (dayRequests.isEmpty) {
-  
+
               widgets.add(_buildEmptyState('لا توجد طلبات مواد في هذه الفترة', regularStyle, PdfColors.grey100));
-  
+
             } else {
-  
+
               widgets.add(_buildRequestsTable(dayRequests, regularStyle, regularStyle,
-  
+
                   PdfColors.grey400, PdfColors.grey100));
-  
+
             }
-  
-  
+
+
             widgets.add(pw.SizedBox(height: 20));
-  
+
             widgets.add(_buildImportantNotice(regularStyle));
-  
+
             return widgets;
-  
+
           },
-  
+
           footer: (context) => PdfStyles.buildFooter(
-  
+
               context,
-  
+
               font: _arabicFont!,
-  
+
               fontFallback: commonFontFallback,
-  
+
               qrData: qrLink,
               generatedByText:
               '${generatedByRole ?? 'المهندس'}: ${generatedBy ?? 'غير محدد'}'),
-  
+
         ),
-  
+
       );
       // Release any cached images once the page is rendered.
       PdfImageCache.clear();
@@ -698,14 +705,14 @@ import 'package:flutter/foundation.dart';
       final pdfBytes = await pdf.save();
       onProgress?.call(1.0);
       final url = await uploadReportPdf(pdfBytes, fileName, token);
-  
+
       return PdfReportResult(bytes: pdfBytes, downloadUrl: url);
       } finally {
         PdfImageCache.clear();
       }
-  
+
     }
-  
+
   static Future<PdfReportResult> generateWithIsolate({
       required String projectId,
       required Map<String, dynamic>? projectData,
@@ -763,7 +770,7 @@ import 'package:flutter/foundation.dart';
         lowMemory: true,
       );
     }
-  
+
     static pw.Widget _buildProjectDetailsTable(
         Map<String, String> details,
         pw.TextStyle headerStyle,
@@ -773,13 +780,13 @@ import 'package:flutter/foundation.dart';
       if (details.isEmpty) {
         return pw.SizedBox.shrink();
       }
-  
+
       final headers = details.keys.toList();
       final values = details.values.toList();
       return pw.Table(
         border: pw.TableBorder.all(color: borderColor),
         columnWidths: {
-          for (int i = 0; i < headers.length; i++) i: const pw.FlexColumnWidth()
+          for (int i = 0; < headers.length; i++) i: const pw.FlexColumnWidth()
         },
         children: [
           pw.TableRow(
@@ -814,133 +821,133 @@ import 'package:flutter/foundation.dart';
         ],
       );
     }
-  
-  
-  
-  
+
+
+
+
     static pw.Widget _buildSummaryItem(
-  
+
         String label, String value, pw.TextStyle regularStyle, PdfColor primaryColor) {
-  
+
       return pw.Column(
-  
+
         children: [
-  
+
           pw.Container(
-  
+
             width: 40,
-  
+
             height: 40,
-  
+
             decoration: pw.BoxDecoration(
-  
+
               color: primaryColor,
-  
+
               borderRadius: pw.BorderRadius.circular(20),
-  
+
             ),
-  
+
             child: pw.Center(
-  
+
               child: pw.Text(
-  
+
                 value,
-  
+
                 style: pw.TextStyle(
-  
+
                   font: _arabicFont,
-  
+
                   color: PdfColors.white,
-  
+
                   fontWeight: pw.FontWeight.bold,
-  
+
                   fontSize: 18,
-  
+
                 ),
-  
+
               ),
-  
+
             ),
-  
+
           ),
-  
+
           pw.SizedBox(height: 8),
-  
+
           pw.Text(label, style: regularStyle),
-  
+
         ],
-  
+
       );
-  
+
     }
-  
-  
+
+
     static pw.Widget _buildSectionHeader(
-  
+
         String title, pw.TextStyle headerStyle, PdfColor primaryColor) {
-  
+
       return pw.Container(
-  
+
         padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-  
+
         decoration: pw.BoxDecoration(
-  
+
           color: primaryColor,
-  
+
           borderRadius: pw.BorderRadius.circular(5),
-  
+
         ),
-  
+
         child: pw.Text(
-  
+
           title,
-  
+
           style: pw.TextStyle(
-  
+
             font: _arabicFont,
-  
+
             color: PdfColors.white,
-  
+
             fontWeight: pw.FontWeight.bold,
-  
+
             fontSize: 18,
-  
+
           ),
-  
+
         ),
-  
+
       );
-  
+
     }
-  
-  
+
+
     static pw.Widget _buildEmptyState(
-  
+
         String message, pw.TextStyle regularStyle, PdfColor lightGrey) {
-  
+
       return pw.Container(
-  
+
         padding: const pw.EdgeInsets.all(20),
-  
+
         decoration: pw.BoxDecoration(
-  
+
           color: lightGrey,
-  
+
           borderRadius: pw.BorderRadius.circular(8),
-  
+
         ),
-  
+
         child: pw.Center(
-  
+
           child: pw.Text(message, style: regularStyle),
-  
+
         ),
-  
+
       );
-  
+
     }
-  
-  
+
+
     static pw.Widget _buildEntryCard(
         Map<String, dynamic> entry,
         int index,
@@ -960,7 +967,7 @@ import 'package:flutter/foundation.dart';
       final imageUrls = (entry['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
       final beforeUrls = (entry['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
       final afterUrls = (entry['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-  
+
       return pw.Container(
         margin: const pw.EdgeInsets.only(bottom: 20),
         padding: const pw.EdgeInsets.all(20),
@@ -1020,9 +1027,9 @@ import 'package:flutter/foundation.dart';
                 ],
               ),
             ),
-  
+
             pw.SizedBox(height: 15),
-  
+
             // Information Section
             pw.Container(
               width: double.infinity,
@@ -1091,8 +1098,7 @@ import 'package:flutter/foundation.dart';
                     pw.TableRow(
                       decoration: pw.BoxDecoration(color: lightGrey),
                       children: [
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(12),
+                        pw.Container(                          padding: const pw.EdgeInsets.all(12),
                           child: pw.Text(
                             note.toString(),
                             style: regularStyle,
@@ -1118,7 +1124,7 @@ import 'package:flutter/foundation.dart';
                 ],
               ),
             ),
-  
+
             // Images Section
             if (imageUrls.isNotEmpty || beforeUrls.isNotEmpty || afterUrls.isNotEmpty) ...[
               pw.SizedBox(height: 20),
@@ -1142,7 +1148,7 @@ import 'package:flutter/foundation.dart';
                 ),
               ),
               pw.SizedBox(height: 10),
-  
+
               if (beforeUrls.isNotEmpty) ...[
                 pw.Container(
                   alignment: pw.Alignment.centerRight,
@@ -1288,7 +1294,7 @@ import 'package:flutter/foundation.dart';
       final section = test['sectionName'] ?? '';
       final name = test['testName'] ?? '';
       final imgUrl = test['imageUrl'];
-  
+
       return pw.Container(
         margin: const pw.EdgeInsets.only(bottom: 20),
         padding: const pw.EdgeInsets.all(20),
@@ -1348,9 +1354,9 @@ import 'package:flutter/foundation.dart';
                 ],
               ),
             ),
-  
+
             pw.SizedBox(height: 15),
-  
+
             // Information Section
             pw.Container(
               width: double.infinity,
@@ -1446,7 +1452,7 @@ import 'package:flutter/foundation.dart';
                 ],
               ),
             ),
-  
+
             // Image Section
             if (imgUrl != null) ...[
               pw.SizedBox(height: 20),
@@ -1477,278 +1483,278 @@ import 'package:flutter/foundation.dart';
         ),
       );
     }
-  
-  
+
+
     static pw.Widget _buildRequestsTable(
-  
+
         List<Map<String, dynamic>> requests,
-  
+
         pw.TextStyle regularStyle,
-  
+
         pw.TextStyle labelStyle,
-  
+
         PdfColor borderColor,
-  
+
         PdfColor lightGrey) {
-  
+
       return pw.Table(
-  
+
         border: pw.TableBorder.all(color: borderColor),
-  
+
         children: [
-  
+
           pw.TableRow(
-  
+
             decoration: pw.BoxDecoration(color: lightGrey),
-  
+
             children: [
-  
+
               pw.Padding(
-  
+
                 padding: const pw.EdgeInsets.all(8),
-  
+
                 child: pw.Text('التاريخ',
-  
+
                     style: labelStyle, textAlign: pw.TextAlign.center),
-  
+
               ),
-  
+
               pw.Padding(
-  
+
                 padding: const pw.EdgeInsets.all(8),
-  
+
                 child: pw.Text('المهندس',
-  
+
                     style: labelStyle, textAlign: pw.TextAlign.center),
-  
+
               ),
-  
+
               pw.Padding(
-  
+
                 padding: const pw.EdgeInsets.all(8),
-  
+
                 child: pw.Text('الحالة',
-  
+
                     style: labelStyle, textAlign: pw.TextAlign.center),
-  
+
               ),
-  
+
               pw.Padding(
-  
+
                 padding: const pw.EdgeInsets.all(8),
-  
+
                 child: pw.Text('الكمية',
-  
+
                     style: labelStyle, textAlign: pw.TextAlign.center),
-  
+
               ),
-  
+
               pw.Padding(
-  
+
                 padding: const pw.EdgeInsets.all(8),
-  
+
                 child: pw.Text('اسم المادة',
-  
+
                     style: labelStyle, textAlign: pw.TextAlign.center),
-  
+
               ),
-  
+
             ],
-  
+
           ),
-  
+
           ...requests.map((pr) {
-  
+
             final List<dynamic>? items = pr['items'];
-  
+
             String name;
-  
+
             String qty;
-  
+
             if (items != null && items.isNotEmpty) {
-  
+
               name = items.map((e) => '${e['name']} (${e['quantity']})').join('، ');
-  
+
               qty = '-';
-  
+
             } else {
-  
+
               name = pr['partName'] ?? '';
-  
+
               qty = pr['quantity']?.toString() ?? '1';
-  
+
             }
-  
+
             final status = pr['status'] ?? '';
-  
+
             final eng = pr['engineerName'] ?? '';
-  
+
             final ts = (pr['requestedAt'] as Timestamp?)?.toDate();
-  
+
             final dateStr = ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts) : '';
-  
-  
+
+
             return pw.TableRow(
-  
+
               children: [
-  
+
                 pw.Padding(
-  
+
                   padding: const pw.EdgeInsets.all(8),
-  
+
                   child: pw.Text(dateStr,
-  
+
                       style: regularStyle, textAlign: pw.TextAlign.center),
-  
+
                 ),
-  
+
                 pw.Padding(
-  
+
                   padding: const pw.EdgeInsets.all(8),
-  
+
                   child: pw.Text(eng,
-  
+
                       style: regularStyle, textAlign: pw.TextAlign.center),
-  
+
                 ),
-  
+
                 pw.Padding(
-  
+
                   padding: const pw.EdgeInsets.all(8),
-  
+
                   child: pw.Text(status,
-  
+
                       style: regularStyle, textAlign: pw.TextAlign.center),
-  
+
                 ),
-  
+
                 pw.Padding(
-  
+
                   padding: const pw.EdgeInsets.all(8),
-  
+
                   child: pw.Text(qty,
-  
+
                       style: regularStyle, textAlign: pw.TextAlign.center),
-  
+
                 ),
-  
+
                 pw.Padding(
-  
+
                   padding: const pw.EdgeInsets.all(8),
-  
+
                   child: pw.Text(name,
-  
+
                       style: regularStyle, textAlign: pw.TextAlign.right),
-  
+
                 ),
-  
+
               ],
-  
+
             );
-  
+
           }).toList(),
-  
+
         ],
-  
+
       );
-  
+
     }
-  
-  
+
+
     static pw.Widget _buildImportantNotice(pw.TextStyle regularStyle) {
-  
+
       return pw.Container(
-  
+
         padding: const pw.EdgeInsets.all(15),
-  
+
         decoration: pw.BoxDecoration(
-  
+
           color: PdfColor.fromHex('#FFF3E0'),
-  
+
           border: pw.Border.all(color: PdfColor.fromHex('#FF9800'), width: 2),
-  
+
           borderRadius: pw.BorderRadius.circular(8),
-  
+
         ),
-  
+
         child: pw.Row(
-  
+
           children: [
-  
+
             pw.Expanded(
-  
+
               child: pw.Text(
-  
+
                 'ملاحظة هامة: في حال مضى 24 ساعة يعتبر هذا التقرير مكتمل وغير قابل للتعديل.',
-  
+
                 style: pw.TextStyle(
-  
+
                   font: _arabicFont,
-  
+
                   color: PdfColor.fromHex('#E65100'),
-  
+
                   fontWeight: pw.FontWeight.bold,
-  
+
                   fontSize: 14,
-  
+
                 ),
-  
+
                 textDirection: pw.TextDirection.rtl,
-  
+
                 textAlign: pw.TextAlign.right,
-  
+
               ),
-  
+
             ),
-  
+
             pw.SizedBox(width: 10),
-  
+
             pw.Container(
-  
+
               width: 30,
-  
+
               height: 30,
-  
+
               decoration: pw.BoxDecoration(
-  
+
                 color: PdfColor.fromHex('#FF9800'),
-  
+
                 borderRadius: pw.BorderRadius.circular(15),
-  
+
               ),
-  
+
               child: pw.Center(
-  
+
                 child: pw.Text(
-  
+
                   '!',
-  
+
                   style: pw.TextStyle(
-  
+
                     font: _arabicFont,
-  
+
                     color: PdfColors.white,
-  
+
                     fontWeight: pw.FontWeight.bold,
-  
+
                     fontSize: 18,
-  
+
                   ),
-  
+
                 ),
-  
+
               ),
-  
+
             ),
-  
+
           ],
-  
+
         ),
-  
+
       );
-  
+
     }
-  
+
     // Generates a simplified PDF report that lists phase entries and tests in
     // simple tables without headers or footers.
     static Future<Uint8List> generateSimpleTables({
@@ -1771,12 +1777,12 @@ import 'package:flutter/foundation.dart';
         start ??= DateTime(now.year, now.month, now.day);
         end ??= start.add(const Duration(days: 1));
       }
-  
+
       final List<Map<String, dynamic>> dayEntries = [];
       final List<Map<String, dynamic>> dayTests = [];
       // Collect all image URLs so we can fetch them in a single batch
       final Set<String> imageUrls = {};
-  
+
       try {
         List<Future<void>> fetchTasks = [];
         for (var phase in phases) {
@@ -1813,7 +1819,7 @@ import 'package:flutter/foundation.dart';
               });
             }
           }());
-  
+
           for (var sub in phase['subPhases']) {
             final subId = sub['id'];
             final subName = sub['name'];
@@ -1850,7 +1856,7 @@ import 'package:flutter/foundation.dart';
             }());
           }
         }
-  
+
         final Map<String, Map<String, String>> testInfo = {};
         for (var section in testsStructure) {
           final sectionName = section['section_name'] as String;
@@ -1861,7 +1867,7 @@ import 'package:flutter/foundation.dart';
             };
           }
         }
-  
+
         fetchTasks.add(() async {
           Query<Map<String, dynamic>> qTests = FirebaseFirestore.instance
               .collection('projects')
@@ -1886,15 +1892,14 @@ import 'package:flutter/foundation.dart';
             });
           }
         }());
-  
+
         await Future.wait(fetchTasks);
       } catch (e) {
         print('Error preparing simple report details: $e');
       }
-  
-      final int imgDim = lowMemory
-          ? _lowMemImageDimension
-          : _adaptiveDimension(imageUrls.length);
+
+      // استخدام أبعاد محسنة دائماً بناءً على عدد الصور
+      final int imgDim = _adaptiveHighQualityDimension(imageUrls.length);
 
       final fetchedImages = await _fetchImagesForUrls(
         imageUrls.toList(),
@@ -1905,12 +1910,12 @@ import 'package:flutter/foundation.dart';
       );
 
       onProgress?.call(0.9);
-  
+
       await _loadArabicFont();
       if (_arabicFont == null) {
         throw Exception('Arabic font not available');
       }
-  
+
       // Use maximum compression for the simplified report as well.
       final pdf = pw.Document(
         compress: true,
@@ -1919,7 +1924,7 @@ import 'package:flutter/foundation.dart';
       final fileName =
           'simple_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
       final token = generateReportToken();
-  
+
       final pw.TextStyle headerStyle = pw.TextStyle(
         font: _arabicFont,
         fontSize: 16,
@@ -1929,7 +1934,7 @@ import 'package:flutter/foundation.dart';
         font: _arabicFont,
         fontSize: 14,
       );
-  
+
       pdf.addPage(
         pw.MultiPage(
           maxPages: 10000,
@@ -1985,7 +1990,7 @@ import 'package:flutter/foundation.dart';
         PdfImageCache.clear();
       }
     }
-  
+
     static pw.Widget _buildSimpleEntriesTable(
       List<Map<String, dynamic>> entries,
       pw.TextStyle headerStyle,
@@ -2001,7 +2006,7 @@ import 'package:flutter/foundation.dart';
         final key = sub != null ? '$phaseName > $sub' : phaseName;
         grouped.putIfAbsent(key, () => []).add(entry);
       }
-  
+
       final List<pw.Widget> widgets = [];
       grouped.forEach((phase, items) {
         widgets.add(
@@ -2016,13 +2021,13 @@ import 'package:flutter/foundation.dart';
             ),
           ),
         );
-  
+
         for (final item in items) {
           final note = item['note']?.toString() ?? '';
           final imgs =
               (item['imageUrls'] as List?)?.map((it) => it.toString()).toList() ?? [];
           final imgWidgets = _buildImageLinkWidgets(imgs, images);
-  
+
           widgets.add(
             pw.Table(
               border: pw.TableBorder.all(color: borderColor),
@@ -2052,9 +2057,9 @@ import 'package:flutter/foundation.dart';
               ],
             ),
           );
-  
+
           widgets.add(pw.SizedBox(height: 5));
-  
+
           widgets.add(
             pw.Table(
               border: pw.TableBorder.all(color: borderColor),
@@ -2088,11 +2093,11 @@ import 'package:flutter/foundation.dart';
               ],
             ),
           );
-  
+
           widgets.add(pw.SizedBox(height: 10));
         }
       });
-  
+
       return pw.Column(children: widgets);
     }
     static pw.Widget _buildSimpleTestsTable(
@@ -2108,7 +2113,7 @@ import 'package:flutter/foundation.dart';
         final name = '${t['sectionName'] ?? ''} - ${t['testName'] ?? ''}';
         grouped.putIfAbsent(name, () => []).add(t);
       }
-  
+
       final List<pw.Widget> widgets = [];
       grouped.forEach((test, items) {
         widgets.add(
@@ -2123,13 +2128,13 @@ import 'package:flutter/foundation.dart';
             ),
           ),
         );
-  
+
         for (final item in items) {
           final note = item['note']?.toString() ?? '';
           final url = item['imageUrl'] as String?;
           final imgWidgets =
               url != null ? _buildImageLinkWidgets([url], images) : <pw.Widget>[];
-  
+
           widgets.add(
             pw.Table(
               border: pw.TableBorder.all(color: borderColor),
@@ -2159,9 +2164,9 @@ import 'package:flutter/foundation.dart';
               ],
             ),
           );
-  
+
           widgets.add(pw.SizedBox(height: 5));
-  
+
           widgets.add(
             pw.Table(
               border: pw.TableBorder.all(color: borderColor),
@@ -2195,14 +2200,14 @@ import 'package:flutter/foundation.dart';
               ],
             ),
           );
-  
+
           widgets.add(pw.SizedBox(height: 10));
         }
       });
-  
+
       return pw.Column(children: widgets);
     }
-  
+
     static pw.Widget _tableCell(
       String text,
       pw.TextStyle style,
@@ -2218,7 +2223,7 @@ import 'package:flutter/foundation.dart';
         ),
       );
     }
-  
+
     static pw.TableRow _headerRow(
       String title,
       pw.TextStyle style,
@@ -2242,8 +2247,7 @@ import 'package:flutter/foundation.dart';
     }
 
   }
-  
+
   // The isolate implementation previously used for offloading PDF generation
   // has been removed. Generating the report directly simplifies asset and
   // Firebase usage, ensuring compatibility across all platforms.
-  
