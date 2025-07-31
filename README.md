@@ -41,7 +41,7 @@ A comprehensive system for managing projects, engineers, clients, and employees,
     * Define weekly and official holidays (including programmed Saudi official holidays).
 * **PDF Support**:
     * Generate and export detailed PDF reports for projects, attendance records, and meeting minutes.
-    * Images in generated reports are fetched and resized up to 1024px to handle large photos without running out of memory.
+    * Images are resized dynamically based on the number of photos. For large reports, pictures may be scaled down to 256–128px to keep memory usage low.
 
 ## Technologies Used
 

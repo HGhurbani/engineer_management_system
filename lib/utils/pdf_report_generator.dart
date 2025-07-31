@@ -47,6 +47,7 @@ import 'package:flutter/foundation.dart';
     static const int _jpgQuality = 85;
     // More aggressive settings for devices with limited memory.
   static const int _lowMemImageDimension = 256;
+  static const int _veryLowMemImageDimension = 128;
   static const int _lowMemJpgQuality = 60;
   // Skip downloading images that exceed this size in bytes to avoid
   // exhausting memory on devices with limited resources.
@@ -61,6 +62,14 @@ import 'package:flutter/foundation.dart';
     if (count >= 100) return 384;
     if (count >= 50) return 512;
     return _maxImageDimension;
+  }
+
+  /// More aggressive scaling when memory is very limited.
+  static int _adaptiveLowMemoryDimension(int count) {
+    if (count >= 200) return _veryLowMemImageDimension;
+    if (count >= 100) return 192;
+    if (count >= 50) return _lowMemImageDimension;
+    return _lowMemImageDimension;
   }
 
     /// استخدام أبعاد عالية الجودة بشكل دائم
@@ -375,8 +384,10 @@ import 'package:flutter/foundation.dart';
 
       }
 
-      // استخدام أبعاد محسنة دائماً بناءً على عدد الصور
-      final int imgDim = _adaptiveHighQualityDimension(imageUrls.length);
+      // Determine image size based on photo count and memory mode
+      final int imgDim = lowMemory
+          ? _adaptiveLowMemoryDimension(imageUrls.length)
+          : _adaptiveHighQualityDimension(imageUrls.length);
 
       final fetchedImages = await _fetchImagesForUrls(
         imageUrls.toList(),
@@ -1898,8 +1909,10 @@ import 'package:flutter/foundation.dart';
         print('Error preparing simple report details: $e');
       }
 
-      // استخدام أبعاد محسنة دائماً بناءً على عدد الصور
-      final int imgDim = _adaptiveHighQualityDimension(imageUrls.length);
+      // Determine image size based on photo count and memory mode
+      final int imgDim = lowMemory
+          ? _adaptiveLowMemoryDimension(imageUrls.length)
+          : _adaptiveHighQualityDimension(imageUrls.length);
 
       final fetchedImages = await _fetchImagesForUrls(
         imageUrls.toList(),
