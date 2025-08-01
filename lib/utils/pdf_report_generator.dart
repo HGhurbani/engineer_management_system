@@ -41,17 +41,27 @@ import 'report_storage.dart';
     // More aggressive settings for devices with limited memory.
   static const int _lowMemImageDimension = 256;
   static const int _veryLowMemImageDimension = 128;
+  // Extremely small dimension used when the report contains hundreds of photos
+  // to guarantee that memory usage stays low even on devices with very limited
+  // resources.
+  static const int _extremeLowMemImageDimension = 64;
   static const int _lowMemJpgQuality = 60;
   // Automatically enable low-memory mode when the report contains
   // a large number of photos. This prevents out-of-memory failures on
   // devices with limited resources by downscaling images and reducing
   // concurrency from the start instead of retrying after a crash.
-  static const int _autoLowMemoryThreshold = 100; // photos
+  // Trigger low-memory mode earlier so images are aggressively downscaled before
+  // memory pressure leads to a crash.
+  static const int _autoLowMemoryThreshold = 80; // photos
   // When the number of images becomes extremely large we show small
   // thumbnails in the PDF to keep memory usage low while still allowing
   // the user to preview the full quality image via a link.
   static const int _thumbnailCountThreshold = 200; // photos
+  // When images become extremely numerous we switch to tiny thumbnails to keep
+  // the PDF generation stable.
+  static const int _extremeThumbnailCountThreshold = 400; // photos
   static const int _thumbnailDimension = 150;
+  static const int _extremeThumbnailDimension = 100;
   // Skip downloading images that exceed this size in bytes to avoid
   // exhausting memory on devices with limited resources.
   // Made public so other libraries can reference this limit.
@@ -69,6 +79,7 @@ import 'report_storage.dart';
 
   /// More aggressive scaling when memory is very limited.
   static int _adaptiveLowMemoryDimension(int count) {
+    if (count >= _extremeThumbnailCountThreshold) return _extremeLowMemImageDimension;
     if (count >= 200) return _veryLowMemImageDimension;
     if (count >= 100) return 192;
     if (count >= 50) return _lowMemImageDimension;
@@ -77,6 +88,7 @@ import 'report_storage.dart';
 
     /// استخدام أبعاد عالية الجودة بشكل دائم
   static int _adaptiveHighQualityDimension(int count) {
+    if (count >= _extremeThumbnailCountThreshold) return _veryLowMemImageDimension;
     if (count >= 200) return 256;
     if (count >= 100) return 384;
     if (count >= 50) return 512;
@@ -397,6 +409,8 @@ import 'report_storage.dart';
 
       final bool thumbnailMode =
           imageUrls.length >= _thumbnailCountThreshold;
+      final bool extremeThumbnailMode =
+          imageUrls.length >= _extremeThumbnailCountThreshold;
 
       await _loadArabicFont(fontBytes: arabicFontBytes);
 
@@ -408,16 +422,23 @@ import 'report_storage.dart';
 
       // Determine image size based on photo count, memory mode and whether
       // thumbnails should be used.
-      final int imgDim = thumbnailMode
-          ? _thumbnailDimension
-          : lowMemory
-              ? _adaptiveLowMemoryDimension(imageUrls.length)
-              : _adaptiveHighQualityDimension(imageUrls.length);
-
-      final double gridSize =
-          thumbnailMode ? _thumbnailDimension.toDouble() : 80.0;
-      final double singleSize =
-          thumbnailMode ? _thumbnailDimension.toDouble() : 120.0;
+      final int imgDim = extremeThumbnailMode
+          ? _extremeLowMemImageDimension
+          : thumbnailMode
+              ? _thumbnailDimension
+              : lowMemory
+                  ? _adaptiveLowMemoryDimension(imageUrls.length)
+                  : _adaptiveHighQualityDimension(imageUrls.length);
+      final double gridSize = extremeThumbnailMode
+          ? _extremeThumbnailDimension.toDouble()
+          : thumbnailMode
+              ? _thumbnailDimension.toDouble()
+              : 80.0;
+      final double singleSize = extremeThumbnailMode
+          ? _extremeThumbnailDimension.toDouble()
+          : thumbnailMode
+              ? _thumbnailDimension.toDouble()
+              : 120.0;
 
       final tempDir = await Directory.systemTemp.createTemp('report_imgs');
       final fetchedImages = await _fetchImagesForUrls(
@@ -1968,16 +1989,23 @@ import 'report_storage.dart';
 
       final bool thumbnailMode =
           imageUrls.length >= _thumbnailCountThreshold;
+      final bool extremeThumbnailMode =
+          imageUrls.length >= _extremeThumbnailCountThreshold;
 
       // Determine image size based on photo count and memory mode
-      final int imgDim = thumbnailMode
-          ? _thumbnailDimension
-          : lowMemory
-              ? _adaptiveLowMemoryDimension(imageUrls.length)
-              : _adaptiveHighQualityDimension(imageUrls.length);
+      final int imgDim = extremeThumbnailMode
+          ? _extremeLowMemImageDimension
+          : thumbnailMode
+              ? _thumbnailDimension
+              : lowMemory
+                  ? _adaptiveLowMemoryDimension(imageUrls.length)
+                  : _adaptiveHighQualityDimension(imageUrls.length);
 
-      final double gridSize =
-          thumbnailMode ? _thumbnailDimension.toDouble() : 80.0;
+      final double gridSize = extremeThumbnailMode
+          ? _extremeThumbnailDimension.toDouble()
+          : thumbnailMode
+              ? _thumbnailDimension.toDouble()
+              : 80.0;
 
       final tempDir = await Directory.systemTemp.createTemp('simple_report_imgs');
       final fetchedImages = await _fetchImagesForUrls(
