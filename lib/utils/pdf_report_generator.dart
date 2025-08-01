@@ -744,37 +744,28 @@ import 'report_storage.dart';
       void Function(double progress)? onProgress,
       bool lowMemory = false,
     }) async {
-      if (!lowMemory) {
-        // For modern devices it's faster to run on the main isolate.
-        return PdfReportGenerator.generate(
-          projectId: projectId,
-          projectData: projectData,
-          phases: phases,
-          testsStructure: testsStructure,
-          generatedBy: generatedBy,
-          generatedByRole: generatedByRole,
-          start: start,
-          end: end,
-          onProgress: onProgress,
-          lowMemory: lowMemory,
-        );
-      }
+      // Previous versions attempted to offload PDF creation to a background
+      // isolate when `lowMemory` was true. However, the PDF generation logic
+      // relies on Flutter plugins such as Firebase which can only be accessed
+      // from the root isolate. Spawning an isolate would therefore trigger
+      // "UI actions are only available on root isolate" errors when the report
+      // contained a large number of images and lowMemory mode activated.
 
-      // Older low-memory devices benefit from offloading the heavy work.
-      final fontBytes =
-          (await rootBundle.load('assets/fonts/Tajawal-Bold.ttf')).buffer.asUint8List();
-
-      return compute(_generateIsolate, {
-        'projectId': projectId,
-        'projectData': projectData,
-        'phases': phases,
-        'testsStructure': testsStructure,
-        'generatedBy': generatedBy,
-        'generatedByRole': generatedByRole,
-        'start': start,
-        'end': end,
-        'fontData': fontBytes,
-      });
+      // Instead we run everything on the main isolate while still enabling the
+      // low-memory image handling paths. This keeps plugin calls on the correct
+      // isolate and avoids crashes when many photos are included.
+      return PdfReportGenerator.generate(
+        projectId: projectId,
+        projectData: projectData,
+        phases: phases,
+        testsStructure: testsStructure,
+        generatedBy: generatedBy,
+        generatedByRole: generatedByRole,
+        start: start,
+        end: end,
+        onProgress: onProgress,
+        lowMemory: true,
+      );
     }
 
   static Future<PdfReportResult> _generateIsolate(
