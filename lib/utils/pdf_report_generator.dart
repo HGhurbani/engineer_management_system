@@ -1,32 +1,24 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
-  import 'dart:typed_data';
-
-
-  import 'package:cloud_firestore/cloud_firestore.dart';
-
-  import 'package:flutter/services.dart' show ByteData, rootBundle;
-
-  import 'package:http/http.dart' as http;
-  import 'package:image/image.dart' as img;
-  import 'package:meta/meta.dart';
-
-  import 'package:pdf/pdf.dart';
-
-  import 'package:pdf/widgets.dart' as pw;
-
-  import 'package:intl/intl.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart' show ByteData, rootBundle;
+import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
+import 'package:meta/meta.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-
-  import 'pdf_styles.dart';
-
-  import 'pdf_image_cache.dart';
-
-  import 'report_storage.dart';
+import '../firebase_options.dart';
+import 'pdf_styles.dart';
+import 'pdf_image_cache.dart';
+import 'report_storage.dart';
 
   class PdfReportResult {
     final Uint8List bytes;
@@ -787,6 +779,9 @@ import 'package:flutter/foundation.dart';
 
   static Future<PdfReportResult> _generateIsolate(
         Map<String, dynamic> args) async {
+      WidgetsFlutterBinding.ensureInitialized();
+      await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform);
       return PdfReportGenerator.generate(
         projectId: args['projectId'] as String,
         projectData:
