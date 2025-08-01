@@ -167,6 +167,15 @@ import 'report_storage.dart';
                 .timeout(const Duration(seconds: 120));
             final contentType = response.headers['content-type'] ?? '';
             if (response.statusCode == 200 && contentType.startsWith('image/')) {
+              // Validate the payload is actually a decodable image before
+              // attempting to process it. When the image data is corrupt the
+              // PDF library throws "Invalid argument(s): 0" which previously
+              // caused the entire report generation to fail.
+              if (img.decodeImage(response.bodyBytes) == null) {
+                print('Skipping invalid image from URL $url');
+                return;
+              }
+
               final resizedBytes = await _resizeImageIfNeeded(response.bodyBytes,
                   maxDimension: maxDimension, quality: quality);
               final memImg = pw.MemoryImage(resizedBytes);
