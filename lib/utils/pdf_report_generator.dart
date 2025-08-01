@@ -1953,11 +1953,12 @@ import 'report_storage.dart';
           fetchConcurrency = 1;
         }
 
-        final bool thumbnailMode =
-            imageUrls.length >= _thumbnailCountThreshold;
       } catch (e) {
         print('Error preparing simple report details: $e');
       }
+
+      final bool thumbnailMode =
+          imageUrls.length >= _thumbnailCountThreshold;
 
       // Determine image size based on photo count and memory mode
       final int imgDim = thumbnailMode
