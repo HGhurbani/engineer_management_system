@@ -86,24 +86,17 @@ import 'package:flutter/foundation.dart';
   }
 
 
-    static Future<void> _loadArabicFont({Uint8List? fontBytes}) async {
-
-      if (_arabicFont != null) return;
-
-      try {
-
-        final bytes = fontBytes ??
-            (await rootBundle.load('assets/fonts/Tajawal-Bold.ttf')).buffer.asUint8List();
-
-        _arabicFont = pw.Font.ttf(bytes);
-
-      } catch (e) {
-
-        print('Error loading Arabic font: $e');
-
-      }
-
+  static Future<void> _loadArabicFont({Uint8List? fontBytes}) async {
+    if (_arabicFont != null) return;
+    try {
+      final ByteData data = fontBytes != null
+          ? ByteData.view(fontBytes.buffer)
+          : await rootBundle.load('assets/fonts/Tajawal-Bold.ttf');
+      _arabicFont = pw.Font.ttf(data);
+    } catch (e) {
+      print('Error loading Arabic font: $e');
     }
+  }
 
   static Future<Uint8List> _resizeImageIfNeeded(Uint8List bytes,
       {int? maxDimension, int? quality}) async {
