@@ -47,6 +47,11 @@ import 'report_storage.dart';
   // devices with limited resources by downscaling images and reducing
   // concurrency from the start instead of retrying after a crash.
   static const int _autoLowMemoryThreshold = 100; // photos
+  // When the number of images becomes extremely large we show small
+  // thumbnails in the PDF to keep memory usage low while still allowing
+  // the user to preview the full quality image via a link.
+  static const int _thumbnailCountThreshold = 200; // photos
+  static const int _thumbnailDimension = 150;
   // Skip downloading images that exceed this size in bytes to avoid
   // exhausting memory on devices with limited resources.
   // Made public so other libraries can reference this limit.
@@ -381,6 +386,9 @@ import 'report_storage.dart';
         fetchConcurrency = 1;
       }
 
+      final bool thumbnailMode =
+          imageUrls.length >= _thumbnailCountThreshold;
+
       await _loadArabicFont(fontBytes: arabicFontBytes);
 
       if (_arabicFont == null) {
@@ -389,10 +397,18 @@ import 'report_storage.dart';
 
       }
 
-      // Determine image size based on photo count and memory mode
-      final int imgDim = lowMemory
-          ? _adaptiveLowMemoryDimension(imageUrls.length)
-          : _adaptiveHighQualityDimension(imageUrls.length);
+      // Determine image size based on photo count, memory mode and whether
+      // thumbnails should be used.
+      final int imgDim = thumbnailMode
+          ? _thumbnailDimension
+          : lowMemory
+              ? _adaptiveLowMemoryDimension(imageUrls.length)
+              : _adaptiveHighQualityDimension(imageUrls.length);
+
+      final double gridSize =
+          thumbnailMode ? _thumbnailDimension.toDouble() : 80.0;
+      final double singleSize =
+          thumbnailMode ? _thumbnailDimension.toDouble() : 120.0;
 
       final tempDir = await Directory.systemTemp.createTemp('report_imgs');
       final fetchedImages = await _fetchImagesForUrls(
@@ -623,7 +639,8 @@ import 'report_storage.dart';
                     smallGrey,
                     PdfColors.grey400,
                     PdfColors.grey100,
-                    images: fetchedImages));
+                    images: fetchedImages,
+                    imageSize: gridSize));
 
                 widgets.add(pw.SizedBox(height: 15));
 
@@ -666,7 +683,8 @@ import 'report_storage.dart';
 
                     PdfColors.grey100,
 
-                    images: fetchedImages));
+                    images: fetchedImages,
+                    imageSize: singleSize));
 
                 widgets.add(pw.SizedBox(height: 15));
 
@@ -975,7 +993,8 @@ import 'report_storage.dart';
         pw.TextStyle metaStyle,
         PdfColor borderColor,
         PdfColor lightGrey,
-        {Map<String, String>? images}) {
+        {Map<String, String>? images,
+        double imageSize = 80}) {
       final note = entry['note'] ?? '';
       final engineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
       final ts = (entry['timestamp'] as Timestamp?)?.toDate();
@@ -1178,7 +1197,8 @@ import 'report_storage.dart';
                   ),
                 ),
                 pw.SizedBox(height: 5),
-                _buildImagesGrid(beforeUrls, borderColor, images: images),
+                _buildImagesGrid(beforeUrls, borderColor,
+                    images: images, size: imageSize),
                 pw.SizedBox(height: 10),
               ],
               if (afterUrls.isNotEmpty) ...[
@@ -1186,7 +1206,8 @@ import 'report_storage.dart';
                   textAlign: pw.TextAlign.right,
                   textDirection: pw.TextDirection.rtl,),
                 pw.SizedBox(height: 5),
-                _buildImagesGrid(afterUrls, borderColor, images: images),
+                _buildImagesGrid(afterUrls, borderColor,
+                    images: images, size: imageSize),
                 pw.SizedBox(height: 10),
               ],
               if (imageUrls.isNotEmpty) ...[
@@ -1194,7 +1215,8 @@ import 'report_storage.dart';
                   textAlign: pw.TextAlign.right,
                   textDirection: pw.TextDirection.rtl,),
                 pw.SizedBox(height: 5),
-                _buildImagesGrid(imageUrls, borderColor, images: images),
+                _buildImagesGrid(imageUrls, borderColor,
+                    images: images, size: imageSize),
               ],
             ],
           ],
@@ -1206,6 +1228,7 @@ import 'report_storage.dart';
         List<String> urls,
         PdfColor borderColor, {
           Map<String, String>? images,
+          double size = 80,
         }) {
       if (urls.isEmpty) return pw.SizedBox();
 
@@ -1221,8 +1244,8 @@ import 'report_storage.dart';
             mainAxisSize: pw.MainAxisSize.min,
             children: [
               pw.Container(
-                width: 80,
-                height: 80,
+                width: size,
+                height: size,
                 decoration: pw.BoxDecoration(
                   border: pw.Border.all(color: borderColor),
                 ),
@@ -1267,8 +1290,9 @@ import 'report_storage.dart';
 
     static List<pw.Widget> _buildImageLinkWidgets(
         List<String> urls,
-        Map<String, String> images,
-        ) {
+        Map<String, String> images, {
+        double size = 80,
+        }) {
       return urls.map((url) {
         final path = images[url];
         if (path == null) return pw.SizedBox();
@@ -1276,7 +1300,7 @@ import 'report_storage.dart';
         return pw.Column(
           mainAxisSize: pw.MainAxisSize.min,
           children: [
-            pw.Image(img, width: 80, height: 80),
+            pw.Image(img, width: size, height: size),
             pw.SizedBox(height: 4),
             pw.UrlLink(
               destination: url,
@@ -1306,7 +1330,8 @@ import 'report_storage.dart';
         pw.TextStyle metaStyle,
         PdfColor borderColor,
         PdfColor lightGrey,
-        {Map<String, String>? images}) {
+        {Map<String, String>? images,
+        double imageSize = 120}) {
       final note = test['note'] ?? '';
       final engineer = test['engineerName'] ?? 'مهندس';
       final ts = (test['lastUpdatedAt'] as Timestamp?)?.toDate();
@@ -1499,8 +1524,8 @@ import 'report_storage.dart';
               if (images?[imgUrl] != null)
                 pw.Image(
                   pw.MemoryImage(File(images![imgUrl]!).readAsBytesSync()),
-                  width: 120,
-                  height: 120,
+                  width: imageSize,
+                  height: imageSize,
                 ),
             ],
           ],
@@ -1927,14 +1952,22 @@ import 'report_storage.dart';
           imgQuality = _lowMemJpgQuality;
           fetchConcurrency = 1;
         }
+
+        final bool thumbnailMode =
+            imageUrls.length >= _thumbnailCountThreshold;
       } catch (e) {
         print('Error preparing simple report details: $e');
       }
 
       // Determine image size based on photo count and memory mode
-      final int imgDim = lowMemory
-          ? _adaptiveLowMemoryDimension(imageUrls.length)
-          : _adaptiveHighQualityDimension(imageUrls.length);
+      final int imgDim = thumbnailMode
+          ? _thumbnailDimension
+          : lowMemory
+              ? _adaptiveLowMemoryDimension(imageUrls.length)
+              : _adaptiveHighQualityDimension(imageUrls.length);
+
+      final double gridSize =
+          thumbnailMode ? _thumbnailDimension.toDouble() : 80.0;
 
       final tempDir = await Directory.systemTemp.createTemp('simple_report_imgs');
       final fetchedImages = await _fetchImagesForUrls(
@@ -1999,6 +2032,7 @@ import 'report_storage.dart';
                     PdfColors.grey300,
                     PdfColors.grey400,
                     fetchedImages,
+                    imageSize: gridSize,
                   ),
             pw.SizedBox(height: 20),
             pw.Text('الاختبارات والفحوصات', style: headerStyle),
@@ -2012,6 +2046,7 @@ import 'report_storage.dart';
                     PdfColors.grey300,
                     PdfColors.grey400,
                     fetchedImages,
+                    imageSize: gridSize,
                   ),
           ],
         ),
@@ -2036,7 +2071,7 @@ import 'report_storage.dart';
       PdfColor headerColor,
       PdfColor borderColor,
       Map<String, String> images,
-    ) {
+      {double imageSize = 80}) {
       final Map<String, List<Map<String, dynamic>>> grouped = {};
       for (final entry in entries) {
         final phaseName = entry['phaseName'] ?? '';
@@ -2064,7 +2099,8 @@ import 'report_storage.dart';
           final note = item['note']?.toString() ?? '';
           final imgs =
               (item['imageUrls'] as List?)?.map((it) => it.toString()).toList() ?? [];
-          final imgWidgets = _buildImageLinkWidgets(imgs, images);
+          final imgWidgets =
+              _buildImageLinkWidgets(imgs, images, size: imageSize);
 
           widgets.add(
             pw.Table(
@@ -2138,14 +2174,14 @@ import 'report_storage.dart';
 
       return pw.Column(children: widgets);
     }
-    static pw.Widget _buildSimpleTestsTable(
+  static pw.Widget _buildSimpleTestsTable(
       List<Map<String, dynamic>> tests,
       pw.TextStyle headerStyle,
       pw.TextStyle cellStyle,
       PdfColor headerColor,
       PdfColor borderColor,
       Map<String, String> images,
-    ) {
+      {double imageSize = 80}) {
       final Map<String, List<Map<String, dynamic>>> grouped = {};
       for (final t in tests) {
         final name = '${t['sectionName'] ?? ''} - ${t['testName'] ?? ''}';
@@ -2170,8 +2206,9 @@ import 'report_storage.dart';
         for (final item in items) {
           final note = item['note']?.toString() ?? '';
           final url = item['imageUrl'] as String?;
-          final imgWidgets =
-              url != null ? _buildImageLinkWidgets([url], images) : <pw.Widget>[];
+          final imgWidgets = url != null
+              ? _buildImageLinkWidgets([url], images, size: imageSize)
+              : <pw.Widget>[];
 
           widgets.add(
             pw.Table(
