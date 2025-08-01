@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
   import 'dart:typed_data';
 
@@ -124,15 +125,17 @@ import 'package:flutter/foundation.dart';
 
 
 
-    static Future<Map<String, pw.MemoryImage>> _fetchImagesForUrls(
+    static Future<Map<String, String>> _fetchImagesForUrls(
         List<String> urls, {
         void Function(double progress)? onProgress,
         // Reduce concurrent downloads to lower simultaneous memory pressure.
         int concurrency = 3,
         int? maxDimension,
         int? quality,
+        Directory? tempDir,
       }) async {
-      final Map<String, pw.MemoryImage> fetched = {};
+      tempDir ??= await Directory.systemTemp.createTemp('pdf_imgs');
+      final Map<String, String> fetched = {};
       final uniqueUrls = urls.toSet().toList();
       int completed = 0;
 
@@ -140,7 +143,9 @@ import 'package:flutter/foundation.dart';
         if (fetched.containsKey(url)) return;
         final cached = PdfImageCache.get(url);
         if (cached != null) {
-          fetched[url] = cached;
+          final file = File('${tempDir!.path}/${fetched.length}.jpg');
+          await file.writeAsBytes(cached.bytes, flush: true);
+          fetched[url] = file.path;
         } else {
           try {
             // Check the file size first to avoid downloading extremely large
@@ -168,8 +173,10 @@ import 'package:flutter/foundation.dart';
               final resizedBytes = await _resizeImageIfNeeded(response.bodyBytes,
                   maxDimension: maxDimension, quality: quality);
               final memImg = pw.MemoryImage(resizedBytes);
-              fetched[url] = memImg;
               PdfImageCache.put(url, memImg);
+              final file = File('${tempDir!.path}/${fetched.length}.jpg');
+              await file.writeAsBytes(resizedBytes, flush: true);
+              fetched[url] = file.path;
             }
           } catch (e) {
             print('Error fetching image from URL $url: $e');
@@ -395,12 +402,14 @@ import 'package:flutter/foundation.dart';
           ? _adaptiveLowMemoryDimension(imageUrls.length)
           : _adaptiveHighQualityDimension(imageUrls.length);
 
+      final tempDir = await Directory.systemTemp.createTemp('report_imgs');
       final fetchedImages = await _fetchImagesForUrls(
         imageUrls.toList(),
         onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
         concurrency: fetchConcurrency,
         maxDimension: imgDim,
         quality: imgQuality,
+        tempDir: tempDir,
       );
 
       onProgress?.call(0.9);
@@ -722,6 +731,7 @@ import 'package:flutter/foundation.dart';
       final pdfBytes = await pdf.save();
       onProgress?.call(1.0);
       final url = await uploadReportPdf(pdfBytes, fileName, token);
+      await tempDir.delete(recursive: true);
 
       return PdfReportResult(bytes: pdfBytes, downloadUrl: url);
       } finally {
@@ -979,7 +989,7 @@ import 'package:flutter/foundation.dart';
         pw.TextStyle metaStyle,
         PdfColor borderColor,
         PdfColor lightGrey,
-        {Map<String, pw.MemoryImage>? images}) {
+        {Map<String, String>? images}) {
       final note = entry['note'] ?? '';
       final engineer = entry['employeeName'] ?? entry['engineerName'] ?? 'مهندس';
       final ts = (entry['timestamp'] as Timestamp?)?.toDate();
@@ -1209,15 +1219,16 @@ import 'package:flutter/foundation.dart';
     static pw.Widget _buildImagesGrid(
         List<String> urls,
         PdfColor borderColor, {
-          Map<String, pw.MemoryImage>? images,
+          Map<String, String>? images,
         }) {
       if (urls.isEmpty) return pw.SizedBox();
 
       final widgets = <pw.Widget>[];
 
       for (final url in urls) {
-        final memImg = images?[url];
-        if (memImg == null) continue;
+        final path = images?[url];
+        if (path == null) continue;
+        final memImg = pw.MemoryImage(File(path).readAsBytesSync());
 
         widgets.add(
           pw.Column(                      // <-- حاوية لكل صورة وزرها
@@ -1270,11 +1281,12 @@ import 'package:flutter/foundation.dart';
 
     static List<pw.Widget> _buildImageLinkWidgets(
         List<String> urls,
-        Map<String, pw.MemoryImage> images,
+        Map<String, String> images,
         ) {
       return urls.map((url) {
-        final img = images[url];
-        if (img == null) return pw.SizedBox();
+        final path = images[url];
+        if (path == null) return pw.SizedBox();
+        final img = pw.MemoryImage(File(path).readAsBytesSync());
         return pw.Column(
           mainAxisSize: pw.MainAxisSize.min,
           children: [
@@ -1308,7 +1320,7 @@ import 'package:flutter/foundation.dart';
         pw.TextStyle metaStyle,
         PdfColor borderColor,
         PdfColor lightGrey,
-        {Map<String, pw.MemoryImage>? images}) {
+        {Map<String, String>? images}) {
       final note = test['note'] ?? '';
       final engineer = test['engineerName'] ?? 'مهندس';
       final ts = (test['lastUpdatedAt'] as Timestamp?)?.toDate();
@@ -1499,7 +1511,11 @@ import 'package:flutter/foundation.dart';
               ),
               pw.SizedBox(height: 10),
               if (images?[imgUrl] != null)
-                pw.Image(images![imgUrl]!, width: 120, height: 120),
+                pw.Image(
+                  pw.MemoryImage(File(images![imgUrl]!).readAsBytesSync()),
+                  width: 120,
+                  height: 120,
+                ),
             ],
           ],
         ),
@@ -1934,12 +1950,14 @@ import 'package:flutter/foundation.dart';
           ? _adaptiveLowMemoryDimension(imageUrls.length)
           : _adaptiveHighQualityDimension(imageUrls.length);
 
+      final tempDir = await Directory.systemTemp.createTemp('simple_report_imgs');
       final fetchedImages = await _fetchImagesForUrls(
         imageUrls.toList(),
         onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
         concurrency: fetchConcurrency,
         maxDimension: imgDim,
         quality: imgQuality,
+        tempDir: tempDir,
       );
 
       onProgress?.call(0.9);
@@ -2018,6 +2036,7 @@ import 'package:flutter/foundation.dart';
       final bytes = await pdf.save();
       onProgress?.call(1.0);
       await uploadReportPdf(bytes, fileName, token);
+      await tempDir.delete(recursive: true);
       return bytes;
       } finally {
         PdfImageCache.clear();
@@ -2030,7 +2049,7 @@ import 'package:flutter/foundation.dart';
       pw.TextStyle cellStyle,
       PdfColor headerColor,
       PdfColor borderColor,
-      Map<String, pw.MemoryImage> images,
+      Map<String, String> images,
     ) {
       final Map<String, List<Map<String, dynamic>>> grouped = {};
       for (final entry in entries) {
@@ -2139,7 +2158,7 @@ import 'package:flutter/foundation.dart';
       pw.TextStyle cellStyle,
       PdfColor headerColor,
       PdfColor borderColor,
-      Map<String, pw.MemoryImage> images,
+      Map<String, String> images,
     ) {
       final Map<String, List<Map<String, dynamic>>> grouped = {};
       for (final t in tests) {

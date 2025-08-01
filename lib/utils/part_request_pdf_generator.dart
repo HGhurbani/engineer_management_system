@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -25,14 +26,16 @@ class PartRequestPdfGenerator {
     }
   }
 
-  static Future<Map<String, pw.MemoryImage>> _fetchImagesForUrls(
-      List<String> urls) async {
-    final Map<String, pw.MemoryImage> fetched = {};
+  static Future<Map<String, String>> _fetchImagesForUrls(
+      List<String> urls, Directory tempDir) async {
+    final Map<String, String> fetched = {};
     await Future.wait(urls.map((url) async {
       if (fetched.containsKey(url)) return;
       final cached = PdfImageCache.get(url);
       if (cached != null) {
-        fetched[url] = cached;
+        final file = File('${tempDir.path}/${fetched.length}.jpg');
+        await file.writeAsBytes(cached.bytes, flush: true);
+        fetched[url] = file.path;
         return;
       }
       try {
@@ -54,8 +57,10 @@ class PartRequestPdfGenerator {
               response.bodyBytes,
               maxDimension: 200);
           final memImg = pw.MemoryImage(resized);
-          fetched[url] = memImg;
           PdfImageCache.put(url, memImg);
+          final file = File('${tempDir.path}/${fetched.length}.jpg');
+          await file.writeAsBytes(resized, flush: true);
+          fetched[url] = file.path;
         }
       } on TimeoutException catch (_) {
         print('Timeout fetching image from URL $url');
@@ -104,7 +109,8 @@ class PartRequestPdfGenerator {
       });
     }
 
-    final images = await _fetchImagesForUrls(imageUrls);
+    final tempDir = await Directory.systemTemp.createTemp('part_req_imgs');
+    final images = await _fetchImagesForUrls(imageUrls, tempDir);
 
     // Enable compression to keep the generated document lightweight
     final pdf = pw.Document(compress: true);
@@ -151,11 +157,13 @@ class PartRequestPdfGenerator {
       ),
     );
 
-    return pdf.save();
+    final bytes = await pdf.save();
+    await tempDir.delete(recursive: true);
+    return bytes;
   }
 
   static pw.Widget _buildImageTable(
-      List<Map<String, String>> rows, Map<String, pw.MemoryImage> images) {
+      List<Map<String, String>> rows, Map<String, String> images) {
     final headerStyle = pw.TextStyle(
       font: _arabicFont,
       fontSize: 12,
@@ -190,9 +198,10 @@ class PartRequestPdfGenerator {
           final alt = index.isOdd;
           final bg = alt ? PdfColors.grey100 : PdfColors.white;
           final imgUrl = row['img'] ?? '';
-          final img = images[imgUrl];
-          final imgWidget = img != null
-              ? pw.Image(img, width: 40, height: 40, fit: pw.BoxFit.cover)
+          final path = images[imgUrl];
+          final imgWidget = path != null
+              ? pw.Image(pw.MemoryImage(File(path).readAsBytesSync()),
+                  width: 40, height: 40, fit: pw.BoxFit.cover)
               : pw.Text('لا يوجد', style: cellStyle, textAlign: pw.TextAlign.center);
           return pw.TableRow(
             decoration: pw.BoxDecoration(color: bg),
