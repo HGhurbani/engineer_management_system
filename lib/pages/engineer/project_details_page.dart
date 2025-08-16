@@ -34,14 +34,15 @@ import '../../utils/report_storage.dart';
 import '../../utils/pdf_report_generator.dart';
 import '../../utils/part_request_pdf_generator.dart';
 import '../../utils/progress_dialog.dart';
+import '../../utils/report_progress_overlay.dart';
 // --- End PDF Imports ---
 
 import '../../main.dart'; // Assuming helper functions are in main.dart
 import '../auth/login_page.dart' show LoginConstants;
 import '../../theme/app_constants.dart';
-
-
-
+import 'add_phase_entry_page.dart';
+import '../common/material_request_details_page.dart';
+import 'images_viewer_page.dart';
 class ProjectDetailsPage extends StatefulWidget {
   final String projectId;
   final String? highlightItemId;
@@ -971,12 +972,21 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final bool isArabic = Localizations.localeOf(context).languageCode == 'ar';
     String getLocalizedText(String ar, String en) => isArabic ? ar : en;
 
-    final progress = ProgressDialog.show(
-        context, getLocalizedText('جاري إنشاء التقرير...', 'Generating Report...'));
+    // عرض بوب أب التقدم على اليمين
+    ReportProgressOverlay.showProgressOverlay(
+      context,
+      reportId: 'report_${DateTime.now().millisecondsSinceEpoch}',
+      initialMessage: getLocalizedText('جاري إنشاء التقرير...', 'Generating report...'),
+    );
 
     final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
+    
     try {
       PdfReportResult result;
+      
+      ReportProgressOverlay.updateProgress(0.1, 
+        message: getLocalizedText('جاري تحميل البيانات...', 'Loading data...'));
+      
       try {
         result = await PdfReportGenerator.generateWithIsolate(
           projectId: widget.projectId,
@@ -987,10 +997,26 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           generatedByRole: 'المهندس',
           start: start,
           end: end,
-          onProgress: (p) => progress.value = p,
+          onProgress: (p) {
+            final progress = 0.1 + (p * 0.8); // من 10% إلى 90%
+            String message;
+            if (p < 0.3) {
+              message = getLocalizedText('جاري تحميل البيانات...', 'Loading data...');
+            } else if (p < 0.6) {
+              message = getLocalizedText('جاري معالجة الصور...', 'Processing images...');
+            } else if (p < 0.9) {
+              message = getLocalizedText('جاري إنشاء التقرير...', 'Generating report...');
+            } else {
+              message = getLocalizedText('جاري حفظ التقرير...', 'Saving report...');
+            }
+            ReportProgressOverlay.updateProgress(progress, message: message);
+          },
         );
       } catch (e) {
         // Retry with low-memory settings if initial attempt fails.
+        ReportProgressOverlay.updateProgress(0.5, 
+          message: getLocalizedText('إعادة المحاولة مع إعدادات الذاكرة المنخفضة...', 'Retrying with low memory settings...'));
+        
         result = await PdfReportGenerator.generateWithIsolate(
           projectId: widget.projectId,
           projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
@@ -1000,13 +1026,49 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           generatedByRole: 'المهندس',
           start: start,
           end: end,
-          onProgress: (p) => progress.value = p,
+          onProgress: (p) {
+            final progress = 0.5 + (p * 0.4); // من 50% إلى 90%
+            String message;
+            if (p < 0.3) {
+              message = getLocalizedText('جاري تحميل البيانات...', 'Loading data...');
+            } else if (p < 0.6) {
+              message = getLocalizedText('جاري معالجة الصور...', 'Processing images...');
+            } else if (p < 0.9) {
+              message = getLocalizedText('جاري إنشاء التقرير...', 'Generating report...');
+            } else {
+              message = getLocalizedText('جاري حفظ التقرير...', 'Saving report...');
+            }
+            ReportProgressOverlay.updateProgress(progress, message: message);
+          },
           lowMemory: true,
         );
       }
 
-      await ProgressDialog.hide(context);
-      _showFeedbackSnackBar(context, getLocalizedText('تم إنشاء التقرير بنجاح.', 'Report generated successfully.'), isError: false);
+      ReportProgressOverlay.updateProgress(1.0, 
+        message: getLocalizedText('تم إنشاء التقرير بنجاح', 'Report generated successfully'));
+      
+      await Future.delayed(const Duration(milliseconds: 500));
+      ReportProgressOverlay.hideProgressOverlay();
+      
+      // عرض إشعار اكتمال التقرير
+      ReportProgressOverlay.showCompletionNotification(
+        context,
+        reportId: 'report_${DateTime.now().millisecondsSinceEpoch}',
+        fileName: fileName,
+        onTap: () {
+          _openPdfPreview(
+            result.bytes,
+            fileName,
+            getLocalizedText('يرجى الإطلاع على التقرير للمشروع.', 'Please review the project report.'),
+            result.downloadUrl,
+          );
+        },
+      );
+      
+      _showFeedbackSnackBar(context, 
+        getLocalizedText('تم إنشاء التقرير بنجاح.', 'Report generated successfully.'), 
+        isError: false);
+      
       _openPdfPreview(
         result.bytes,
         fileName,
@@ -1014,7 +1076,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         result.downloadUrl,
       );
     } catch (e) {
-      await ProgressDialog.hide(context);
+      ReportProgressOverlay.hideProgressOverlay();
       _showFeedbackSnackBar(
         context,
         getLocalizedText('فشل إنشاء التقرير بسبب نقص الذاكرة.', 'Failed to generate report due to low memory.'),
@@ -1597,8 +1659,8 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       ),
       elevation: 3,
       centerTitle: true,
-      actions: [
-        IconButton(
+              actions: [
+          IconButton(
           icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           tooltip: 'تقرير اليوم',
           onPressed: _selectReportDate,
@@ -1791,7 +1853,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 trailingWidget = IconButton(
                   icon: const Icon(Icons.add_comment_outlined, color: AppConstants.primaryLight),
                   tooltip: 'إضافة ملاحظة/صورة للمرحلة الرئيسية',
-                  onPressed: () => _showAddNoteOrImageDialog(phaseId, phaseName),
+                  onPressed: () => _navigateToAddPhaseEntryPage(phaseId, phaseName),
                 );
               } else if (canGeneratePdfForMainPhase) {
                 trailingWidget = Row(
@@ -1877,10 +1939,21 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                       isSubPhaseCompletedByAnyEngineer ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
                                       color: isSubPhaseCompletedByAnyEngineer ? AppConstants.successColor : AppConstants.textSecondary,
                                     ),
-                                    title: Text(subPhaseName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: null)),                                    trailing: subPhaseTrailingWidget,
+                                    title: Text(subPhaseName, style: TextStyle(fontSize: 14, color: AppConstants.textSecondary, decoration: null)),
+                                    trailing: canEngineerEditThisSubPhase ? Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.add_comment_outlined, color: AppConstants.primaryLight, size: 20),
+                                          tooltip: 'إضافة ملاحظة/صورة للمرحلة الفرعية',
+                                          onPressed: () => _navigateToAddPhaseEntryPage(phaseId, subPhaseName, subPhaseId: subPhaseId),
+                                        ),
+                                        subPhaseTrailingWidget ?? const SizedBox.shrink(),
+                                      ],
+                                    ) : subPhaseTrailingWidget,
                                     onTap: () {
                                       if (canEngineerEditThisSubPhase) {
-                                        _showAddNoteOrImageDialog(phaseId, subPhaseName, subPhaseId: subPhaseId);
+                                        _navigateToAddPhaseEntryPage(phaseId, subPhaseName, subPhaseId: subPhaseId);
                                       }
                                     },
                                     subtitle: _buildEntriesList(phaseId, isSubPhaseCompletedByAnyEngineer, subPhaseName, subPhaseId: subPhaseId, isSubEntry: true),
@@ -2100,20 +2173,18 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               final requestDoc = requests[index];
               final data = requestDoc.data() as Map<String, dynamic>;
               final List<dynamic>? itemsData = data['items'];
-              String partName;
-              String quantity;
+              String materialsCount;
               if (itemsData != null && itemsData.isNotEmpty) {
-                partName = itemsData.map((e) => '${e['name']} (${e['quantity']})').join('، ');
-                quantity = '-';
+                materialsCount = '${itemsData.length} مادة';
               } else {
-                partName = data['partName'] ?? 'مادة غير مسماة';
-                quantity = data['quantity']?.toString() ?? 'N/A';
+                materialsCount = 'مادة واحدة';
               }
               final status = data['status'] ?? 'غير معروف';
               final requestedAt = (data['requestedAt'] as Timestamp?)?.toDate();
               final formattedDate = requestedAt != null
                   ? DateFormat('yyyy/MM/dd hh:mm a', 'ar').format(requestedAt)
                   : 'غير معروف';
+              final engineerName = data['engineerName'] ?? 'مهندس غير معروف';
 
               Color statusColor;
               switch (status) {
@@ -2142,13 +2213,13 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
                 child: ListTile(
-                  title: Text('اسم المادة: $partName',
+                  title: Text('عدد المواد: $materialsCount',
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Text('الكمية: $quantity',
-                      //     style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                      Text('مقدم الطلب: $engineerName',
+                          style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
                       Row(
                         children: [
                           Icon(Icons.circle, color: statusColor, size: 10),
@@ -2160,7 +2231,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                           style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
                     ],
                   ),
-                  onTap: () => _showPartRequestDetailsDialog(requestDoc),
+                  onTap: () => _navigateToMaterialRequestDetails(requestDoc),
                 ),
               );
             },
@@ -2576,6 +2647,44 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
         );
       },
     );
+  }
+
+  // دالة جديدة للانتقال إلى صفحة تفاصيل طلب المواد
+  Future<void> _navigateToMaterialRequestDetails(DocumentSnapshot requestDoc) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MaterialRequestDetailsPage(
+          requestDoc: requestDoc,
+          userRole: 'engineer',
+        ),
+      ),
+    );
+  }
+
+  // دالة جديدة للانتقال إلى صفحة إضافة المراحل والاختبارات
+  Future<void> _navigateToAddPhaseEntryPage(String phaseId, String phaseOrSubPhaseName, {String? subPhaseId}) async {
+    if (!mounted || _currentEngineerUid == null) return;
+    
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddPhaseEntryPage(
+          projectId: widget.projectId,
+          phaseId: phaseId,
+          phaseOrSubPhaseName: phaseOrSubPhaseName,
+          subPhaseId: subPhaseId,
+          isAdmin: false,
+        ),
+      ),
+    );
+    
+    // إذا تم الحفظ بنجاح، قم بتحديث الصفحة
+    if (result == true) {
+      setState(() {
+        // تحديث البيانات إذا لزم الأمر
+      });
+    }
   }
 
   // lib/pages/engineer/project_details_page.dart
@@ -3059,7 +3168,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                   textDirection: ui.TextDirection.rtl,
                                   spacing: AppConstants.paddingSmall / 2,
                                   runSpacing: AppConstants.paddingSmall / 2,
-                                  children: beforeUrls.map((url) {
+                                  children: [
+                                  // عرض الصور مع إمكانية النقر على كل صورة على حدة
+                                  ...beforeUrls.map((url) {
                                     return InkWell(
                                       onTap: () => _viewImageDialog(url),
                                       child: ClipRRect(
@@ -3069,6 +3180,46 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                       ),
                                     );
                                   }).toList(),
+                                  // زر عرض جميع الصور
+                                  if (beforeUrls.length > 1)
+                                    InkWell(
+                                      onTap: () => _viewMultipleImagesDialog(
+                                        beforeUrls,
+                                        'صور قبل العمل',
+                                        note: note,
+                                        authorName: employeeName,
+                                        timestamp: timestamp?.toDate(),
+                                      ),
+                                      child: Container(
+                                        height: 100,
+                                        width: 100,
+                                        decoration: BoxDecoration(
+                                          color: AppConstants.primaryColor.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
+                                          border: Border.all(color: AppConstants.primaryColor.withOpacity(0.3)),
+                                        ),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.collections,
+                                              color: AppConstants.primaryColor,
+                                              size: 24,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'عرض الكل',
+                                              style: TextStyle(
+                                                color: AppConstants.primaryColor,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
                                 ),
                               ],
                             ),
@@ -3087,7 +3238,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                   textDirection: ui.TextDirection.rtl,
                                   spacing: AppConstants.paddingSmall / 2,
                                   runSpacing: AppConstants.paddingSmall / 2,
-                                  children: afterUrls.map((url) {
+                                  children: [
+                                  // عرض الصور مع إمكانية النقر على كل صورة على حدة
+                                  ...afterUrls.map((url) {
                                     return InkWell(
                                       onTap: () => _viewImageDialog(url),
                                       child: ClipRRect(
@@ -3097,6 +3250,46 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                       ),
                                     );
                                   }).toList(),
+                                  // زر عرض جميع الصور
+                                  if (afterUrls.length > 1)
+                                    InkWell(
+                                      onTap: () => _viewMultipleImagesDialog(
+                                        afterUrls,
+                                        'صور بعد العمل',
+                                        note: note,
+                                        authorName: employeeName,
+                                        timestamp: timestamp?.toDate(),
+                                      ),
+                                      child: Container(
+                                        height: 100,
+                                        width: 100,
+                                        decoration: BoxDecoration(
+                                          color: AppConstants.primaryColor.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
+                                          border: Border.all(color: AppConstants.primaryColor.withOpacity(0.3)),
+                                        ),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.collections,
+                                              color: AppConstants.primaryColor,
+                                              size: 24,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'عرض الكل',
+                                              style: TextStyle(
+                                                color: AppConstants.primaryColor,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
                                 ),
                               ],
                             ),
@@ -3115,7 +3308,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                   textDirection: ui.TextDirection.rtl,
                                   spacing: AppConstants.paddingSmall / 2,
                                   runSpacing: AppConstants.paddingSmall / 2,
-                                  children: imageUrls.map((url) {
+                                  children: [
+                                  // عرض الصور مع إمكانية النقر على كل صورة على حدة
+                                  ...imageUrls.map((url) {
                                     return InkWell(
                                       onTap: () => _viewImageDialog(url),
                                       child: ClipRRect(
@@ -3125,6 +3320,46 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                                       ),
                                     );
                                   }).toList(),
+                                  // زر عرض جميع الصور
+                                  if (imageUrls.length > 1)
+                                    InkWell(
+                                      onTap: () => _viewMultipleImagesDialog(
+                                        imageUrls,
+                                        'صور إضافية',
+                                        note: note,
+                                        authorName: employeeName,
+                                        timestamp: timestamp?.toDate(),
+                                      ),
+                                      child: Container(
+                                        height: 100,
+                                        width: 100,
+                                        decoration: BoxDecoration(
+                                          color: AppConstants.primaryColor.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(AppConstants.borderRadius / 2.5),
+                                          border: Border.all(color: AppConstants.primaryColor.withOpacity(0.3)),
+                                        ),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.collections,
+                                              color: AppConstants.primaryColor,
+                                              size: 24,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'عرض الكل',
+                                              style: TextStyle(
+                                                color: AppConstants.primaryColor,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
                                 ),
                               ],
                             ),
@@ -3161,7 +3396,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                 icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
                 label: Text(isSubEntry ? 'إضافة للمرحلة الفرعية' : 'إضافة للمرحلة الرئيسية', style: const TextStyle(fontSize: 13)),
                 style: TextButton.styleFrom(foregroundColor: AppConstants.primaryColor),
-                onPressed: () => _showAddNoteOrImageDialog(phaseOrMainPhaseId, parentName, subPhaseId: subPhaseId),
+                onPressed: () => _navigateToAddPhaseEntryPage(phaseOrMainPhaseId, parentName, subPhaseId: subPhaseId),
               ),
             ),
           ),
@@ -3170,35 +3405,27 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
   }
 
   Future<void> _viewImageDialog(String imageUrl) async {
-    // ... (no changes in this function)
-    await showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.transparent,
-        contentPadding: EdgeInsets.zero,
-        insetPadding: const EdgeInsets.all(10),
-        content: InteractiveViewer(
-          panEnabled: true,
-          boundaryMargin: const EdgeInsets.all(20),
-          minScale: 0.5,
-          maxScale: 4,
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.contain,
-            loadingBuilder: (ctx, child, progress) =>
-            progress == null ? child : const Center(child: CircularProgressIndicator(color: AppConstants.primaryColor)),
-            errorBuilder: (ctx, err, st) => const Center(child: Icon(Icons.error_outline, color: AppConstants.errorColor, size: 50)),
-          ),
-        ),
-        actions: [
-          TextButton(
-            style: TextButton.styleFrom(backgroundColor: Colors.black.withOpacity(0.5)),
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text("إغلاق", style: TextStyle(color: Colors.white)),
-          )
-        ],
-        actionsAlignment: MainAxisAlignment.center,
-      ),
+    Navigator.pushNamed(
+      context,
+      '/engineer/images_viewer',
+      arguments: {
+        'imageUrls': [imageUrl],
+        'title': 'صورة الملاحظة',
+      },
+    );
+  }
+
+  Future<void> _viewMultipleImagesDialog(List<String> imageUrls, String title, {String? note, String? authorName, DateTime? timestamp}) async {
+    Navigator.pushNamed(
+      context,
+      '/engineer/images_viewer',
+      arguments: {
+        'imageUrls': imageUrls,
+        'title': title,
+        'note': note,
+        'authorName': authorName,
+        'timestamp': timestamp,
+      },
     );
   }
 

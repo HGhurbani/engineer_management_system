@@ -1,5 +1,6 @@
 import 'dart:collection';
 import "package:pdf/widgets.dart" as pw;
+import 'package:flutter/foundation.dart';
 
 /// Simple LRU cache for [pw.MemoryImage] objects used while generating PDFs.
 ///
@@ -18,6 +19,9 @@ class PdfImageCache {
   // Fewer cached images further limit memory usage when generating
   // very large reports with hundreds of pictures.
   static const int _maxEntries = 20;
+  
+  // Web-specific cache size for better memory management
+  static const int _webMaxEntries = 10;
 
   static pw.MemoryImage? get(String url) {
     final img = _cache.remove(url);
@@ -29,7 +33,8 @@ class PdfImageCache {
   }
 
   static void put(String url, pw.MemoryImage image) {
-    if (_cache.length >= _maxEntries) {
+    final maxEntries = kIsWeb ? _webMaxEntries : _maxEntries;
+    if (_cache.length >= maxEntries) {
       _cache.remove(_cache.keys.first);
     }
     _cache[url] = image;
@@ -42,5 +47,16 @@ class PdfImageCache {
 
   static void clearPrecache() {
     precache.clear();
+  }
+  
+  /// Web-specific memory cleanup
+  static void clearForWeb() {
+    _cache.clear();
+    precache.clear();
+    // Force garbage collection on web
+    if (kIsWeb) {
+      // Add a small delay to allow garbage collection
+      Future.delayed(const Duration(milliseconds: 100));
+    }
   }
 }

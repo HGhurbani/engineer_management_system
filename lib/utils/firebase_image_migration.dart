@@ -1,5 +1,6 @@
 
 import 'dart:typed_data';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:http/http.dart' as http;
@@ -217,12 +218,16 @@ class FirebaseImageMigration {
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_migrated.jpg';
       
       // رفع الصورة إلى الخادم الجديد
-      final newUrl = await ImageUploadService.uploadImage(
-        imageBytes: response.bodyBytes,
-        fileName: fileName,
-        projectId: projectId,
-        category: category,
-      );
+      // إنشاء ملف مؤقت من البيانات
+      final tempFile = File('temp_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      await tempFile.writeAsBytes(response.bodyBytes);
+      
+      final newUrl = await ImageUploadService.uploadSingleImage(tempFile);
+      
+      // حذف الملف المؤقت
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
       
       return newUrl;
       

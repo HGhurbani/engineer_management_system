@@ -20,6 +20,8 @@ import 'pdf_styles.dart';
 import 'pdf_image_cache.dart';
 import 'report_storage.dart';
 
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+
   class PdfReportResult {
     final Uint8List bytes;
     final String? downloadUrl;
@@ -36,9 +38,9 @@ import 'report_storage.dart';
     // Lowering the dimension reduces the memory consumed when many
     // pictures are included in a single report. Using 1024 keeps better
     // clarity for large photos while still bounding memory usage.
-    static const int _maxImageDimension = 1024;
-    static const int _jpgQuality = 85;
-    // More aggressive settings for devices with limited memory.
+      static const int _maxImageDimension = 1024;
+  static const int _jpgQuality = 85;
+  // More aggressive settings for devices with limited memory.
   static const int _lowMemImageDimension = 256;
   static const int _veryLowMemImageDimension = 128;
   // Extremely small dimension used when the report contains hundreds of photos
@@ -46,6 +48,19 @@ import 'report_storage.dart';
   // resources.
   static const int _extremeLowMemImageDimension = 64;
   static const int _lowMemJpgQuality = 60;
+  
+  // Web-specific settings for better memory management
+  static const int _webMaxImageDimension = 800;
+  static const int _webLowMemImageDimension = 200;
+  static const int _webVeryLowMemImageDimension = 100;
+  static const int _webExtremeLowMemImageDimension = 50;
+  static const int _webJpgQuality = 70;
+  static const int _webLowMemJpgQuality = 50;
+  
+  // إضافة إدارة ذكية للذاكرة
+  static const int _memoryThreshold = 100 * 1024 * 1024; // 100MB
+  static const int _lowMemoryThreshold = 50 * 1024 * 1024; // 50MB
+  
   // Automatically enable low-memory mode when the report contains
   // a large number of photos. This prevents out-of-memory failures on
   // devices with limited resources by downscaling images and reducing
@@ -86,6 +101,24 @@ import 'report_storage.dart';
     return _lowMemImageDimension;
   }
 
+  /// Web-specific adaptive dimensions for better memory management
+  static int _adaptiveWebDimension(int count) {
+    if (count >= _extremeThumbnailCountThreshold) return _webExtremeLowMemImageDimension;
+    if (count >= _thumbnailCountThreshold) return _webVeryLowMemImageDimension;
+    if (count >= 100) return _webLowMemImageDimension;
+    if (count >= 50) return _webMaxImageDimension;
+    return _webMaxImageDimension;
+  }
+
+  /// Web-specific low memory dimensions
+  static int _adaptiveWebLowMemoryDimension(int count) {
+    if (count >= _extremeThumbnailCountThreshold) return _webExtremeLowMemImageDimension;
+    if (count >= 200) return _webVeryLowMemImageDimension;
+    if (count >= 100) return _webLowMemImageDimension;
+    if (count >= 50) return _webLowMemImageDimension;
+    return _webLowMemImageDimension;
+  }
+
     /// استخدام أبعاد عالية الجودة بشكل دائم
   static int _adaptiveHighQualityDimension(int count) {
     if (count >= _extremeThumbnailCountThreshold) return _veryLowMemImageDimension;
@@ -108,109 +141,132 @@ import 'report_storage.dart';
     }
   }
 
-  static Future<Uint8List> _resizeImageIfNeeded(Uint8List bytes,
-      {int? maxDimension, int? quality}) async {
-    // Fallback to max dimension when none provided.
-    final dim = maxDimension ?? _maxImageDimension;
-    final q = quality ?? _jpgQuality;
-    final image = img.decodeImage(bytes);
-    if (image == null) return bytes;
-    // Skip resizing when the image is already within the limit.
-    if (image.width <= dim && image.height <= dim) {
-      return Uint8List.fromList(img.encodeJpg(image, quality: q));
+    static Future<Uint8List> _resizeImageEfficiently(Uint8List bytes,
+        {int? maxDimension, int? quality}) async {
+      // استخدام الأبعاد والجودة الافتراضية إذا لم يتم توفيرها
+      final dim = maxDimension ?? (kIsWeb ? _webMaxImageDimension : _maxImageDimension);
+      final q = quality ?? (kIsWeb ? _webJpgQuality : _jpgQuality);
+
+      // التحقق من صلاحية الصورة قبل المعالجة لتجنب الأخطاء
+      final image = img.decodeImage(bytes);
+      if (image == null) return bytes; // إذا كانت البيانات غير صالحة، أعدها كما هي
+
+      // إذا كانت الصورة أصلاً صغيرة، فقط قم بضغطها بالجودة المطلوبة
+      if (image.width <= dim && image.height <= dim) {
+        return FlutterImageCompress.compressWithList(
+          bytes,
+          quality: q,
+        );
+      }
+
+      // تغيير الحجم مع الحفاظ على نسبة الأبعاد
+      // المكتبة تتعامل مع minWidth و minHeight بذكاء لتغيير الحجم
+      return FlutterImageCompress.compressWithList(
+        bytes,
+        minHeight: dim,
+        minWidth: dim,
+        quality: q,
+      );
     }
-    final resized = img.copyResize(image,
-        width: image.width >= image.height ? dim : null,
-        height: image.height > image.width ? dim : null);
-    return Uint8List.fromList(img.encodeJpg(resized, quality: q));
-  }
 
     @visibleForTesting
     static Future<Uint8List> resizeImageForTest(Uint8List bytes,
-            {int? maxDimension, int? quality}) =>
-        _resizeImageIfNeeded(bytes,
+        {int? maxDimension, int? quality}) =>
+        _resizeImageEfficiently(bytes,
             maxDimension: maxDimension, quality: quality);
 
 
 
 
+    // (هذه الدالة المعدلة تستبدل الدالة القديمة _fetchImagesForUrls بالكامل)
+// إنها تستخدم البث المباشر للملفات لتوفير الذاكرة بشكل جذري
+
     static Future<Map<String, String>> _fetchImagesForUrls(
         List<String> urls, {
-        void Function(double progress)? onProgress,
-        // Reduce concurrent downloads to lower simultaneous memory pressure.
-        int concurrency = 3,
-        int? maxDimension,
-        int? quality,
-        Directory? tempDir,
-      }) async {
-      tempDir ??= await Directory.systemTemp.createTemp('pdf_imgs');
+          void Function(double progress)? onProgress,
+          // 💡 خفض التزامن إلى 1 هو الخيار الأكثر أمانًا للأجهزة الضعيفة
+          int concurrency = 1,
+          int? maxDimension,
+          int? quality,
+          Directory? tempDir,
+        }) async {
+      tempDir ??= await Directory.systemTemp.createTemp('pdf_imgs_stream');
       final Map<String, String> fetched = {};
       final uniqueUrls = urls.toSet().toList();
       int completed = 0;
+      final client = http.Client();
+
+      // Web-specific optimizations
+      final isWeb = kIsWeb;
+      final webConcurrency = isWeb ? 1 : concurrency; // Force sequential processing on web
+      final webDelay = isWeb ? 100 : 50; // Longer delays between batches on web
 
       Future<void> handleUrl(String url) async {
-        if (fetched.containsKey(url)) return;
-        final cached = PdfImageCache.get(url);
-        if (cached != null) {
-          final file = File('${tempDir!.path}/${fetched.length}.jpg');
-          await file.writeAsBytes(cached.bytes, flush: true);
-          fetched[url] = file.path;
-        } else {
-          try {
-            // Check the file size first to avoid downloading extremely large
-            // images that could cause memory issues during decoding.
-            try {
-              final head = await http
-                  .head(Uri.parse(url))
-                  .timeout(const Duration(seconds: 30));
-              final lenStr = head.headers['content-length'];
-              final len = lenStr != null ? int.tryParse(lenStr) : null;
-              if (len != null && len > maxImageFileSize) {
-                // Skip oversized images
-                print('Skipping large image from URL $url: $len bytes');
-                return;
-              }
-            } catch (_) {
-              // Ignore HEAD errors and attempt full download.
-            }
+        if (fetched.containsKey(url) || url.isEmpty) return;
 
-            final response = await http
-                .get(Uri.parse(url))
-                .timeout(const Duration(seconds: 120));
-            final contentType = response.headers['content-type'] ?? '';
-            if (response.statusCode == 200 && contentType.startsWith('image/')) {
-              // Validate the payload is actually a decodable image before
-              // attempting to process it. When the image data is corrupt the
-              // PDF library throws "Invalid argument(s): 0" which previously
-              // caused the entire report generation to fail.
-              if (img.decodeImage(response.bodyBytes) == null) {
-                print('Skipping invalid image from URL $url');
-                return;
-              }
+        // اسم ملف فريد لتجنب أي تضارب
+        final filePath = '${tempDir!.path}/${DateTime.now().microsecondsSinceEpoch}.jpg';
+        final file = File(filePath);
 
-              final resizedBytes = await _resizeImageIfNeeded(response.bodyBytes,
-                  maxDimension: maxDimension, quality: quality);
-              final memImg = pw.MemoryImage(resizedBytes);
-              PdfImageCache.put(url, memImg);
-              final file = File('${tempDir!.path}/${fetched.length}.jpg');
+        try {
+          // 1. بث استجابة الشبكة مباشرة إلى ملف دون تحميلها في الذاكرة
+          final request = http.Request('GET', Uri.parse(url));
+          final response = await client.send(request);
+
+          if (response.statusCode == 200) {
+            // فتح "مجرى كتابة" إلى الملف
+            final sink = file.openWrite();
+            // كتابة كل جزء من البيانات يأتي من الشبكة إلى الملف مباشرة
+            await response.stream.pipe(sink);
+            // إغلاق المجرى يضمن حفظ كل البيانات
+            await sink.close();
+
+            // 2. الآن بعد أن أصبحت الصورة على القرص، نقوم بضغطها وتغيير حجمها منه
+            // هذا يستهلك ذاكرة قليلة جدًا مقارنة بالمعالجة من Uint8List
+            final actualMaxDimension = maxDimension ?? (isWeb ? _webMaxImageDimension : _maxImageDimension);
+            final actualQuality = quality ?? (isWeb ? _webJpgQuality : _jpgQuality);
+            
+            final resizedBytes = await FlutterImageCompress.compressWithFile(
+              file.path,
+              minHeight: actualMaxDimension,
+              minWidth: actualMaxDimension,
+              quality: actualQuality,
+            );
+
+            // إذا نجحت عملية الضغط، قم بالكتابة فوق الملف الأصلي بالنسخة المضغوطة
+            if (resizedBytes != null) {
               await file.writeAsBytes(resizedBytes, flush: true);
               fetched[url] = file.path;
+            } else {
+              // إذا فشل الضغط لسبب ما، استخدم الملف الأصلي (نادر الحدوث)
+              fetched[url] = file.path;
             }
-          } catch (e) {
-            print('Error fetching image from URL $url: $e');
+
+          } else {
+            print('Error fetching image (status code ${response.statusCode}) from URL $url');
+          }
+        } catch (e) {
+          print('Error streaming or processing image from URL $url: $e');
+          // تأكد من حذف الملف إذا فشلت العملية
+          if (await file.exists()) {
+            await file.delete();
           }
         }
-        onProgress?.call(++completed / uniqueUrls.length);
+
+        // تحديث شريط التقدم
+        completed++;
+        onProgress?.call(completed / uniqueUrls.length);
       }
 
-      for (int i = 0; i < uniqueUrls.length; i += concurrency) {
-        final batch = uniqueUrls.skip(i).take(concurrency).toList();
+      // معالجة الصور بشكل متسلسل أو بدفعات صغيرة
+      for (int i = 0; i < uniqueUrls.length; i += webConcurrency) {
+        final batch = uniqueUrls.skip(i).take(webConcurrency).toList();
         await Future.wait(batch.map(handleUrl));
-        // Drop references to the batch images once they are cached
-        PdfImageCache.clearPrecache();
-        // Allow GC to run between batches
-        await Future.delayed(const Duration(milliseconds: 10));
+        // إعطاء فرصة لجامع القمامة للعمل بين الدفعات
+        await Future.delayed(Duration(milliseconds: webDelay));
       }
+
+      client.close();
       return fetched;
     }
 
@@ -233,9 +289,15 @@ import 'report_storage.dart';
       void Function(double progress)? onProgress,
       bool lowMemory = false,
       Uint8List? arabicFontBytes,
+
     }) async {
+
       // Ensure the cache does not retain images from previous reports
-      PdfImageCache.clear();
+      if (kIsWeb) {
+        PdfImageCache.clearForWeb();
+      } else {
+        PdfImageCache.clear();
+      }
       onProgress?.call(0.0);
       try {
 
@@ -399,12 +461,23 @@ import 'report_storage.dart';
       }
 
 
-      // Enable low-memory mode automatically when the number of
-      // collected images exceeds the configured threshold.
-      if (!lowMemory && imageUrls.length > _autoLowMemoryThreshold) {
-        lowMemory = true;
-        imgQuality = _lowMemJpgQuality;
-        fetchConcurrency = 1;
+      // Web-specific memory management
+      final isWeb = kIsWeb;
+      if (isWeb) {
+        // More aggressive low-memory mode for web
+        if (imageUrls.length > 30) {
+          lowMemory = true;
+          imgQuality = _webLowMemJpgQuality;
+          fetchConcurrency = 1;
+        }
+      } else {
+        // Enable low-memory mode automatically when the number of
+        // collected images exceeds the configured threshold.
+        if (!lowMemory && imageUrls.length > _autoLowMemoryThreshold) {
+          lowMemory = true;
+          imgQuality = _lowMemJpgQuality;
+          fetchConcurrency = 1;
+        }
       }
 
       final bool thumbnailMode =
@@ -423,12 +496,12 @@ import 'report_storage.dart';
       // Determine image size based on photo count, memory mode and whether
       // thumbnails should be used.
       final int imgDim = extremeThumbnailMode
-          ? _extremeLowMemImageDimension
+          ? (isWeb ? _webExtremeLowMemImageDimension : _extremeLowMemImageDimension)
           : thumbnailMode
               ? _thumbnailDimension
               : lowMemory
-                  ? _adaptiveLowMemoryDimension(imageUrls.length)
-                  : _adaptiveHighQualityDimension(imageUrls.length);
+                  ? (isWeb ? _adaptiveWebLowMemoryDimension(imageUrls.length) : _adaptiveLowMemoryDimension(imageUrls.length))
+                  : (isWeb ? _adaptiveWebDimension(imageUrls.length) : _adaptiveHighQualityDimension(imageUrls.length));
       final double gridSize = extremeThumbnailMode
           ? _extremeThumbnailDimension.toDouble()
           : thumbnailMode
@@ -444,7 +517,7 @@ import 'report_storage.dart';
       final fetchedImages = await _fetchImagesForUrls(
         imageUrls.toList(),
         onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
-        concurrency: fetchConcurrency,
+        concurrency: isWeb ? 1 : fetchConcurrency, // Force sequential processing on web
         maxDimension: imgDim,
         quality: imgQuality,
         tempDir: tempDir,
@@ -623,9 +696,9 @@ import 'report_storage.dart';
           ),
 
           build: (context) {
-
-            final widgets = <pw.Widget>[];
-            widgets.add(
+            // القائمة النهائية التي تحتوي على كل عناصر التقرير
+            return [
+              // --- (الجزء الأول) تفاصيل المشروع ---
               _buildProjectDetailsTable(
                 {
                   'أسماء الموظفين': employeeNames,
@@ -638,116 +711,74 @@ import 'report_storage.dart';
                 PdfColors.blueGrey800,
                 PdfColors.grey400,
               ),
-            );
-            widgets.add(pw.SizedBox(height: 20));
+              pw.SizedBox(height: 30),
 
+              // --- (الجزء الثاني) قسم الملاحظات والتحديثات ---
+              // يتم بناؤه باستخدام ListView.builder للحفاظ على الذاكرة
+              _buildSectionHeader('الملاحظات والتحديثات', headerStyle, PdfColors.blueGrey800),
+              pw.SizedBox(height: 15),
+              dayEntries.isEmpty
+                  ? _buildEmptyState('لا توجد ملاحظات مسجلة في هذه الفترة', regularStyle, PdfColors.grey100)
+                  : pw.ListView.builder(
+                itemCount: dayEntries.length,
+                itemBuilder: (context, index) {
+                  final entry = dayEntries[index];
+                  return pw.Padding(
+                    padding: const pw.EdgeInsets.only(bottom: 15),
+                    child: _buildEntryCard(
+                        entry,
+                        index + 1,
+                        headerStyle,
+                        regularStyle,
+                        regularStyle,
+                        smallGrey,
+                        PdfColors.grey400,
+                        PdfColors.grey100,
+                        images: fetchedImages,
+                        imageSize: gridSize),
+                  );
+                },
+              ),
 
+              // --- (الجزء الثالث) قسم الاختبارات والفحوصات ---
+              // يتم بناؤه أيضًا باستخدام ListView.builder
+              pw.SizedBox(height: 20),
+              _buildSectionHeader('الاختبارات والفحوصات', headerStyle, PdfColors.blueGrey800),
+              pw.SizedBox(height: 15),
+              dayTests.isEmpty
+                  ? _buildEmptyState('لا توجد اختبارات محدثة في هذه الفترة', regularStyle, PdfColors.grey100)
+                  : pw.ListView.builder(
+                itemCount: dayTests.length,
+                itemBuilder: (context, index) {
+                  final test = dayTests[index];
+                  return pw.Padding(
+                    padding: const pw.EdgeInsets.only(bottom: 15),
+                    child: _buildTestCard(
+                        test,
+                        index + 1,
+                        headerStyle,
+                        regularStyle,
+                        regularStyle,
+                        smallGrey,
+                        PdfColors.grey400,
+                        PdfColors.grey100,
+                        images: fetchedImages,
+                        imageSize: singleSize),
+                  );
+                },
+              ),
 
-            widgets.add(pw.SizedBox(height: 30));
-
-
-            widgets.add(_buildSectionHeader('الملاحظات والتحديثات', headerStyle, PdfColors.blueGrey800));
-
-            widgets.add(pw.SizedBox(height: 15));
-
-            if (dayEntries.isEmpty) {
-
-              widgets.add(_buildEmptyState('لا توجد ملاحظات مسجلة في هذه الفترة', regularStyle, PdfColors.grey100));
-
-            } else {
-
-              for (int i = 0; i < dayEntries.length; i++) {
-
-                final entry = dayEntries[i];
-
-                widgets.add(_buildEntryCard(
-                    entry,
-                    i + 1,
-                    headerStyle,
-                    regularStyle,
-                    regularStyle,
-                    smallGrey,
-                    PdfColors.grey400,
-                    PdfColors.grey100,
-                    images: fetchedImages,
-                    imageSize: gridSize));
-
-                widgets.add(pw.SizedBox(height: 15));
-
-              }
-
-            }
-
-
-            widgets.add(pw.SizedBox(height: 20));
-
-            widgets.add(_buildSectionHeader('الاختبارات والفحوصات', headerStyle, PdfColors.blueGrey800));
-
-            widgets.add(pw.SizedBox(height: 15));
-
-            if (dayTests.isEmpty) {
-
-              widgets.add(_buildEmptyState('لا توجد اختبارات محدثة في هذه الفترة', regularStyle, PdfColors.grey100));
-
-            } else {
-
-              for (int i = 0; i < dayTests.length; i++) {
-
-                final test = dayTests[i];
-
-                widgets.add(_buildTestCard(
-
-                    test,
-
-                    i + 1,
-
-                    headerStyle,
-
-                    regularStyle,
-
-                    regularStyle,
-
-                    smallGrey,
-
-                    PdfColors.grey400,
-
-                    PdfColors.grey100,
-
-                    images: fetchedImages,
-                    imageSize: singleSize));
-
-                widgets.add(pw.SizedBox(height: 15));
-
-              }
-
-            }
-
-
-            widgets.add(pw.SizedBox(height: 20));
-
-            widgets.add(_buildSectionHeader('طلبات المواد والمعدات', headerStyle, PdfColors.blueGrey800));
-
-            widgets.add(pw.SizedBox(height: 15));
-
-            if (dayRequests.isEmpty) {
-
-              widgets.add(_buildEmptyState('لا توجد طلبات مواد في هذه الفترة', regularStyle, PdfColors.grey100));
-
-            } else {
-
-              widgets.add(_buildRequestsTable(dayRequests, regularStyle, regularStyle,
-
-                  PdfColors.grey400, PdfColors.grey100));
-
-            }
-
-
-            widgets.add(pw.SizedBox(height: 20));
-
-            widgets.add(_buildImportantNotice(regularStyle));
-
-            return widgets;
-
+              // --- (الجزء الرابع) باقي الأقسام ---
+              pw.SizedBox(height: 20),
+              _buildSectionHeader('طلبات المواد والمعدات', headerStyle, PdfColors.blueGrey800),
+              pw.SizedBox(height: 15),
+              dayRequests.isEmpty
+                  ? _buildEmptyState('لا توجد طلبات مواد في هذه الفترة', regularStyle, PdfColors.grey100)
+                  : _buildRequestsTable(dayRequests, regularStyle, regularStyle,
+                  PdfColors.grey400, PdfColors.grey100),
+              pw.SizedBox(height: 20),
+              _buildImportantNotice(regularStyle),
+            ];
           },
 
           footer: (context) => PdfStyles.buildFooter(
@@ -766,16 +797,29 @@ import 'report_storage.dart';
 
       );
       // Release any cached images once the page is rendered.
-      PdfImageCache.clear();
+      if (kIsWeb) {
+        PdfImageCache.clearForWeb();
+      } else {
+        PdfImageCache.clear();
+      }
 
       final pdfBytes = await pdf.save();
       onProgress?.call(1.0);
       final url = await uploadReportPdf(pdfBytes, fileName, token);
       await tempDir.delete(recursive: true);
 
+
+
+      print('تم إنشاء التقرير بنجاح: ${pdfBytes.length} bytes');
       return PdfReportResult(bytes: pdfBytes, downloadUrl: url);
       } finally {
-        PdfImageCache.clear();
+        if (kIsWeb) {
+          PdfImageCache.clearForWeb();
+          // Force garbage collection on web
+          Future.delayed(const Duration(milliseconds: 200));
+        } else {
+          PdfImageCache.clear();
+        }
       }
 
     }
@@ -791,6 +835,7 @@ import 'report_storage.dart';
       DateTime? end,
       void Function(double progress)? onProgress,
       bool lowMemory = false,
+
     }) async {
       // Previous versions attempted to offload PDF creation to a background
       // isolate when `lowMemory` was true. However, the PDF generation logic
@@ -812,7 +857,8 @@ import 'report_storage.dart';
         start: start,
         end: end,
         onProgress: onProgress,
-        lowMemory: true,
+        lowMemory: lowMemory,
+
       );
     }
 
@@ -834,6 +880,7 @@ import 'report_storage.dart';
         end: args['end'] as DateTime?,
         lowMemory: true,
         arabicFontBytes: args['fontData'] as Uint8List?,
+
       );
     }
 
@@ -1576,6 +1623,39 @@ import 'report_storage.dart';
 
         PdfColor lightGrey) {
 
+      // إنشاء قائمة منفصلة لكل مادة في كل طلب
+      final List<Map<String, dynamic>> expandedRequests = [];
+
+      for (final pr in requests) {
+        final List<dynamic>? items = pr['items'];
+        final status = pr['status'] ?? '';
+        final eng = pr['engineerName'] ?? '';
+        final ts = (pr['requestedAt'] as Timestamp?)?.toDate();
+        final dateStr = ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts) : '';
+
+        if (items != null && items.isNotEmpty) {
+          // إذا كان الطلب يحتوي على مواد متعددة، أنشئ صف منفصل لكل مادة
+          for (final item in items) {
+            expandedRequests.add({
+              'dateStr': dateStr,
+              'engineerName': eng,
+              'status': status,
+              'quantity': item['quantity']?.toString() ?? '1',
+              'materialName': item['name'] ?? '',
+            });
+          }
+        } else {
+          // إذا كان الطلب يحتوي على مادة واحدة فقط
+          expandedRequests.add({
+            'dateStr': dateStr,
+            'engineerName': eng,
+            'status': status,
+            'quantity': pr['quantity']?.toString() ?? '1',
+            'materialName': pr['partName'] ?? '',
+          });
+        }
+      }
+
       return pw.Table(
 
         border: pw.TableBorder.all(color: borderColor),
@@ -1642,36 +1722,7 @@ import 'report_storage.dart';
 
           ),
 
-          ...requests.map((pr) {
-
-            final List<dynamic>? items = pr['items'];
-
-            String name;
-
-            String qty;
-
-            if (items != null && items.isNotEmpty) {
-
-              name = items.map((e) => '${e['name']} (${e['quantity']})').join('، ');
-
-              qty = '-';
-
-            } else {
-
-              name = pr['partName'] ?? '';
-
-              qty = pr['quantity']?.toString() ?? '1';
-
-            }
-
-            final status = pr['status'] ?? '';
-
-            final eng = pr['engineerName'] ?? '';
-
-            final ts = (pr['requestedAt'] as Timestamp?)?.toDate();
-
-            final dateStr = ts != null ? DateFormat('dd/MM/yy', 'ar').format(ts) : '';
-
+          ...expandedRequests.map((pr) {
 
             return pw.TableRow(
 
@@ -1681,7 +1732,7 @@ import 'report_storage.dart';
 
                   padding: const pw.EdgeInsets.all(8),
 
-                  child: pw.Text(dateStr,
+                  child: pw.Text(pr['dateStr'],
 
                       style: regularStyle, textAlign: pw.TextAlign.center),
 
@@ -1691,7 +1742,7 @@ import 'report_storage.dart';
 
                   padding: const pw.EdgeInsets.all(8),
 
-                  child: pw.Text(eng,
+                  child: pw.Text(pr['engineerName'],
 
                       style: regularStyle, textAlign: pw.TextAlign.center),
 
@@ -1701,7 +1752,7 @@ import 'report_storage.dart';
 
                   padding: const pw.EdgeInsets.all(8),
 
-                  child: pw.Text(status,
+                  child: pw.Text(pr['status'],
 
                       style: regularStyle, textAlign: pw.TextAlign.center),
 
@@ -1711,7 +1762,7 @@ import 'report_storage.dart';
 
                   padding: const pw.EdgeInsets.all(8),
 
-                  child: pw.Text(qty,
+                  child: pw.Text(pr['quantity'],
 
                       style: regularStyle, textAlign: pw.TextAlign.center),
 
@@ -1721,7 +1772,7 @@ import 'report_storage.dart';
 
                   padding: const pw.EdgeInsets.all(8),
 
-                  child: pw.Text(name,
+                  child: pw.Text(pr['materialName'],
 
                       style: regularStyle, textAlign: pw.TextAlign.right),
 

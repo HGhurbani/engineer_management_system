@@ -9,6 +9,17 @@ import '../../main.dart';
 import '../../theme/app_constants.dart';
 import '../../models/material_item.dart';
 
+// إضافة كلاس للمواد الجديدة
+class NewMaterialOption {
+  final String name;
+  final bool isNew;
+
+  NewMaterialOption({required this.name, this.isNew = true});
+
+  @override
+  String toString() => name;
+}
+
 class RequestMaterialPage extends StatefulWidget {
   final String engineerId;
   final String engineerName;
@@ -34,6 +45,7 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
   final List<TextEditingController> _materialControllers = [TextEditingController()];
   final List<TextEditingController> _quantityControllers = [TextEditingController()];
   final List<MaterialItem?> _selectedMaterials = [null];
+  final List<NewMaterialOption?> _newMaterialOptions = [null];
 
   List<MaterialItem> _materials = [];
   bool _loadingMaterials = true;
@@ -100,6 +112,50 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
     }
   }
 
+  // دالة لإضافة مادة جديدة إلى قاعدة البيانات
+  Future<MaterialItem?> _addNewMaterial(String materialName) async {
+    try {
+      // التحقق من عدم وجود المادة بالفعل
+      final existingMaterial = _materials.firstWhere(
+        (material) => material.name.toLowerCase() == materialName.toLowerCase(),
+        orElse: () => MaterialItem(id: '', name: '', unit: '', imageUrl: ''),
+      );
+
+      if (existingMaterial.id.isNotEmpty) {
+        return existingMaterial; // المادة موجودة بالفعل
+      }
+
+      // إضافة المادة الجديدة
+      final docRef = await FirebaseFirestore.instance.collection('materials').add({
+        'name': materialName.trim(),
+        'unit': 'قطعة', // وحدة افتراضية
+        'imageUrl': '', // بدون صورة
+        'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': widget.engineerId, // من أنشأ المادة
+        'isAutoCreated': true, // علامة أن المادة تم إنشاؤها تلقائياً
+      });
+
+      // إنشاء كائن MaterialItem جديد
+      final newMaterial = MaterialItem(
+        id: docRef.id,
+        name: materialName.trim(),
+        unit: 'قطعة',
+        imageUrl: '',
+      );
+
+      // إضافة المادة الجديدة إلى القائمة المحلية
+      setState(() {
+        _materials.add(newMaterial);
+        _materials.sort((a, b) => a.name.compareTo(b.name));
+      });
+
+      return newMaterial;
+    } catch (e) {
+      _showFeedbackSnackBar('فشل إضافة المادة الجديدة: $e', isError: true);
+      return null;
+    }
+  }
+
   Future<void> _submitRequest() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -117,12 +173,37 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
       final List<Map<String, dynamic>> items = [];
       for (int i = 0; i < _materialControllers.length; i++) {
         final selected = _selectedMaterials.length > i ? _selectedMaterials[i] : null;
-        final name = selected != null
-            ? selected.name
-            : _materialControllers[i].text.trim();
+        final newMaterialOption = _newMaterialOptions.length > i ? _newMaterialOptions[i] : null;
+        
+        String materialName;
+        String imageUrl = '';
+        
+        if (selected != null) {
+          // مادة موجودة
+          materialName = selected.name;
+          imageUrl = selected.imageUrl;
+        } else if (newMaterialOption != null && newMaterialOption.isNew) {
+          // مادة جديدة
+          final newMaterial = await _addNewMaterial(newMaterialOption.name);
+          if (newMaterial != null) {
+            materialName = newMaterial.name;
+            imageUrl = newMaterial.imageUrl;
+          } else {
+            // فشل في إضافة المادة الجديدة
+            continue;
+          }
+        } else {
+          // استخدام النص المدخل مباشرة
+          materialName = _materialControllers[i].text.trim();
+        }
+        
         final qty = int.tryParse(_quantityControllers[i].text.trim()) ?? 1;
-        final imageUrl = selected?.imageUrl ?? '';
-        items.add({'name': name, 'quantity': qty, 'imageUrl': imageUrl});
+        items.add({'name': materialName, 'quantity': qty, 'imageUrl': imageUrl});
+      }
+
+      if (items.isEmpty) {
+        _showFeedbackSnackBar('لا توجد مواد صالحة لإرسال الطلب.', isError: true);
+        return;
       }
 
       await FirebaseFirestore.instance.collection('partRequests').add({
@@ -137,6 +218,7 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
         'status': 'معلق', // Pending
         'requestedAt': FieldValue.serverTimestamp(),
       });
+      
       final List<String> adminUids = await getAdminUids(); // جلب جميع الـ UIDs للمسؤولين
 
       if (adminUids.isNotEmpty) {
@@ -228,12 +310,35 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
                           Expanded(
                             child: _loadingMaterials
                                 ? const Center(child: CircularProgressIndicator())
-                                : Autocomplete<MaterialItem>(
+                                : Autocomplete<Object>(
                                     optionsBuilder: (text) {
-                                      final q = text.text.toLowerCase();
-                                      return _materials.where((m) => m.name.toLowerCase().contains(q));
+                                      final query = text.text.toLowerCase().trim();
+                                      if (query.isEmpty) return [];
+                                      
+                                      final List<Object> options = [];
+                                      
+                                      // إضافة المواد الموجودة التي تطابق البحث
+                                      final matchingMaterials = _materials.where((m) => 
+                                        m.name.toLowerCase().contains(query)
+                                      ).toList();
+                                      options.addAll(matchingMaterials);
+                                      
+                                      // إضافة خيار "إضافة مادة جديدة" إذا لم تكن موجودة
+                                      if (query.isNotEmpty && 
+                                          !_materials.any((m) => m.name.toLowerCase() == query)) {
+                                        options.add(NewMaterialOption(name: 'إضافة مادة جديدة: $query'));
+                                      }
+                                      
+                                      return options;
                                     },
-                                    displayStringForOption: (opt) => opt.name,
+                                    displayStringForOption: (opt) {
+                                      if (opt is MaterialItem) {
+                                        return opt.name;
+                                      } else if (opt is NewMaterialOption) {
+                                        return opt.name;
+                                      }
+                                      return opt.toString();
+                                    },
                                     fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
                                       if (_materialControllers.length > index) {
                                         _materialControllers[index] = controller;
@@ -245,6 +350,7 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
                                           labelText: 'اسم المادة المطلوبة',
                                           prefixIcon: Icon(Icons.settings_input_component_outlined, color: AppConstants.primaryColor),
                                           border: OutlineInputBorder(),
+                                          hintText: 'اكتب اسم المادة أو اختر من القائمة',
                                         ),
                                         validator: (value) {
                                           if (value == null || value.isEmpty) {
@@ -254,11 +360,26 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
                                         },
                                       );
                                     },
-                                    onSelected: (opt) {
-                                      if (_selectedMaterials.length > index) {
-                                        _selectedMaterials[index] = opt;
-                                      }
-                                    },
+                                                                                                              onSelected: (opt) {
+                                        if (_selectedMaterials.length > index) {
+                                          if (opt is MaterialItem) {
+                                            // مادة موجودة
+                                            _selectedMaterials[index] = opt;
+                                            _newMaterialOptions[index] = null;
+                                            // تحديث النص في الحقل
+                                            _materialControllers[index].text = opt.name;
+                                          } else if (opt is NewMaterialOption) {
+                                            // مادة جديدة
+                                            _selectedMaterials[index] = null;
+                                            final materialName = opt.name.replaceFirst('إضافة مادة جديدة: ', '');
+                                            _newMaterialOptions[index] = NewMaterialOption(name: materialName);
+                                            // تحديث النص في الحقل ليعرض اسم المادة فقط
+                                            _materialControllers[index].text = materialName;
+                                          }
+                                          // إخفاء القائمة المنسدلة بعد الاختيار
+                                          FocusScope.of(context).unfocus();
+                                        }
+                                      },
                                   ),
                           ),
                           const SizedBox(width: 8),
@@ -293,11 +414,52 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
                                   if (_selectedMaterials.length > index) {
                                     _selectedMaterials.removeAt(index);
                                   }
+                                  if (_newMaterialOptions.length > index) {
+                                    _newMaterialOptions.removeAt(index);
+                                  }
                                 });
                               },
                             ),
                         ],
                       ),
+                      // عرض معلومات المادة المختارة
+                      if (_selectedMaterials[index] != null || _newMaterialOptions[index] != null)
+                        Container(
+                          margin: const EdgeInsets.only(top: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _selectedMaterials[index] != null 
+                                  ? Icons.check_circle 
+                                  : Icons.add_circle,
+                                color: _selectedMaterials[index] != null 
+                                  ? Colors.green 
+                                  : Colors.blue,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _selectedMaterials[index] != null
+                                    ? 'مادة موجودة: ${_selectedMaterials[index]!.name}'
+                                    : 'مادة جديدة: ${_newMaterialOptions[index]!.name}',
+                                  style: TextStyle(
+                                    color: _selectedMaterials[index] != null 
+                                      ? Colors.green.shade700 
+                                      : Colors.blue.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       const SizedBox(height: AppConstants.itemSpacing),
                     ],
                   );
@@ -310,10 +472,51 @@ class _RequestMaterialPageState extends State<RequestMaterialPage> {
                         _materialControllers.add(TextEditingController());
                         _quantityControllers.add(TextEditingController());
                         _selectedMaterials.add(null);
+                        _newMaterialOptions.add(null);
                       });
                     },
                     icon: const Icon(Icons.add_circle_outline, color: AppConstants.primaryColor),
                     label: const Text('إضافة مادة'),
+                  ),
+                ),
+                const SizedBox(height: AppConstants.itemSpacing),
+                // معلومات إضافية عن الميزة الجديدة
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'معلومات مهمة',
+                            style: TextStyle(
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '• يمكنك اختيار مادة موجودة من القائمة أو كتابة اسم مادة جديدة\n'
+                        '• عند كتابة مادة جديدة، سيتم إنشاؤها تلقائياً في النظام\n'
+                        '• المواد الجديدة ستظهر في قائمة المواد للمسؤولين',
+                        style: TextStyle(
+                          color: Colors.blue.shade600,
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: AppConstants.itemSpacing),

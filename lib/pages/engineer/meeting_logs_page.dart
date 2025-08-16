@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'images_viewer_page.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:printing/printing.dart';
@@ -1012,40 +1013,13 @@ class _MeetingLogsPageState extends State<MeetingLogsPage> with TickerProviderSt
   }
 
   Future<void> _viewImageDialog(String imageUrl) async {
-    await showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.transparent,
-        contentPadding: EdgeInsets.zero,
-        insetPadding: const EdgeInsets.all(10),
-        content: InteractiveViewer(
-          panEnabled: true,
-          boundaryMargin: const EdgeInsets.all(20),
-          minScale: 0.5,
-          maxScale: 4,
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.contain,
-            loadingBuilder: (ctx, child, progress) => progress == null
-                ? child
-                : const Center(
-                    child: CircularProgressIndicator(
-                        color: AppConstants.primaryColor)),
-            errorBuilder: (ctx, err, st) => const Center(
-                child: Icon(Icons.error_outline,
-                    color: AppConstants.errorColor, size: 50)),
-          ),
-        ),
-        actions: [
-          TextButton(
-            style:
-                TextButton.styleFrom(backgroundColor: Colors.black.withOpacity(0.5)),
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('إغلاق', style: TextStyle(color: Colors.white)),
-          )
-        ],
-        actionsAlignment: MainAxisAlignment.center,
-      ),
+    Navigator.pushNamed(
+      context,
+      '/engineer/images_viewer',
+      arguments: {
+        'imageUrls': [imageUrl],
+        'title': 'صورة سجل الاجتماع',
+      },
     );
   }
 

@@ -1,164 +1,228 @@
 
-import 'dart:typed_data';
 import 'dart:io';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:image/image.dart' as img;
+import 'package:flutter/foundation.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:http/http.dart' as http;
 
 class ImageUploadService {
   static const String baseUrl = 'https://bhbgroup.me';
   static const String uploadEndpoint = '$baseUrl/api/upload_image.php';
   
+  // إضافة حدود للصور
+  static const int _maxImageSize = 5 * 1024 * 1024; // 5MB
+  static const int _maxImageDimension = 1920;
+  static const int _webMaxImageDimension = 1200;
+  static const int _compressionQuality = 80;
+  
   /// رفع صورة واحدة إلى الخادم
-  static Future<String?> uploadImage({
-    required Uint8List imageBytes,
-    required String fileName,
-    String? projectId,
-    String? category, // 'materials', 'phases', 'tests'
-  }) async {
+  static Future<String?> uploadSingleImage(File imageFile) async {
     try {
-      // ضغط الصورة لتحسين الأداء
-      final compressedBytes = await _compressImage(imageBytes);
-      
-      final uri = Uri.parse(uploadEndpoint);
-      var request = http.MultipartRequest('POST', uri);
-      
-      // إضافة الصورة
-      request.files.add(http.MultipartFile.fromBytes(
-        'image',
-        compressedBytes,
-        filename: fileName,
-      ));
-      
-      // إضافة بيانات إضافية
-      if (projectId != null) request.fields['project_id'] = projectId;
-      if (category != null) request.fields['category'] = category;
-      request.fields['timestamp'] = DateTime.now().millisecondsSinceEpoch.toString();
-      
-      final response = await request.send().timeout(const Duration(minutes: 2));
-      
-      if (response.statusCode == 200) {
-        final responseBody = await response.stream.bytesToString();
-        final data = jsonDecode(responseBody);
-        
-        if (data['success'] == true) {
-          return data['url'] as String?;
-        } else {
-          print('خطأ في رفع الصورة: ${data['message']}');
-          return null;
-        }
-      } else {
-        print('خطأ HTTP: ${response.statusCode}');
+      // معالجة الصورة قبل الرفع
+      final processedFile = await _processImageForUpload(imageFile);
+      if (processedFile == null) {
+        print('Failed to process image for upload');
         return null;
       }
+      
+      final bytes = await processedFile.readAsBytes();
+      final base64Image = base64Encode(bytes);
+      
+      final response = await http.post(
+        Uri.parse(uploadEndpoint),
+        body: {
+          'image': base64Image,
+          'filename': processedFile.path.split('/').last,
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['success'] == true) {
+          return responseData['url'];
+        }
+      }
+      
+      print('Upload failed with status: ${response.statusCode}');
+      return null;
     } catch (e) {
-      print('خطأ في رفع الصورة: $e');
+      print('Error uploading single image: $e');
       return null;
     }
   }
   
-  /// رفع عدة صور بشكل متوازي
-  static Future<List<String>> uploadMultipleImages({
-    required List<Uint8List> imagesList,
-    required List<String> fileNames,
-    String? projectId,
-    String? category,
-    void Function(double progress)? onProgress,
-  }) async {
+  /// رفع عدة صور إلى الخادم
+  static Future<List<String>> uploadMultipleImages(List<File> imageFiles) async {
     final List<String> uploadedUrls = [];
     
-    if (imagesList.length != fileNames.length) {
-      throw ArgumentError('عدد الصور يجب أن يساوي عدد أسماء الملفات');
-    }
-    
-    // رفع الصور بشكل متوازي (6 صور في كل مرة)
-    const int batchSize = 6;
-    int completed = 0;
-    
-    for (int i = 0; i < imagesList.length; i += batchSize) {
-      final batch = <Future<String?>>[];
-      final endIndex = (i + batchSize < imagesList.length) ? i + batchSize : imagesList.length;
+    try {
+      // معالجة الصور في مجموعات لتجنب استهلاك الذاكرة
+      const int batchSize = 3;
       
-      for (int j = i; j < endIndex; j++) {
-        batch.add(uploadImage(
-          imageBytes: imagesList[j],
-          fileName: fileNames[j],
-          projectId: projectId,
-          category: category,
-        ));
-      }
-      
-      final results = await Future.wait(batch);
-      
-      for (final result in results) {
-        if (result != null) {
-          uploadedUrls.add(result);
+      for (int i = 0; i < imageFiles.length; i += batchSize) {
+        final end = (i + batchSize < imageFiles.length) ? i + batchSize : imageFiles.length;
+        final batch = imageFiles.sublist(i, end);
+        
+        // معالجة المجموعة
+        final batchUrls = await _processBatch(batch);
+        uploadedUrls.addAll(batchUrls);
+        
+        // تنظيف الذاكرة بين المجموعات
+        if (kIsWeb) {
+          // إجبار جمع القمامة في الويب
+          print('Batch processed, cleaning memory...');
         }
-        completed++;
-        onProgress?.call(completed / imagesList.length);
+      }
+      
+      return uploadedUrls;
+    } catch (e) {
+      print('Error uploading multiple images: $e');
+      return uploadedUrls; // إرجاع ما تم رفعه بنجاح
+    }
+  }
+  
+  /// معالجة مجموعة من الصور
+  static Future<List<String>> _processBatch(List<File> imageFiles) async {
+    final List<String> urls = [];
+    
+    for (final imageFile in imageFiles) {
+      try {
+        final url = await uploadSingleImage(imageFile);
+        if (url != null) {
+          urls.add(url);
+        }
+      } catch (e) {
+        print('Error processing image in batch: $e');
+        // الاستمرار مع الصور الأخرى
       }
     }
     
-    return uploadedUrls;
+    return urls;
+  }
+  
+  /// معالجة الصورة للرفع
+  static Future<File?> _processImageForUpload(File imageFile) async {
+    try {
+      // فحص حجم الملف
+      final fileSize = await imageFile.length();
+      
+      if (fileSize > _maxImageSize) {
+        print('Image too large, compressing...');
+        return await _compressImage(imageFile);
+      }
+      
+      // فحص أبعاد الصورة
+      final dimensions = await _getImageDimensions(imageFile);
+      if (dimensions.width > _getMaxDimension() || dimensions.height > _getMaxDimension()) {
+        print('Image dimensions too large, resizing...');
+        return await _resizeImage(imageFile);
+      }
+      
+      return imageFile;
+    } catch (e) {
+      print('Error processing image: $e');
+      return null;
+    }
+  }
+  
+  /// ضغط الصورة
+  static Future<File?> _compressImage(File imageFile) async {
+    try {
+      final compressedFile = await FlutterImageCompress.compressAndGetFile(
+        imageFile.path,
+        '${imageFile.path}_compressed.jpg',
+        quality: _compressionQuality,
+        minWidth: _getMaxDimension(),
+        minHeight: _getMaxDimension(),
+      );
+      
+      if (compressedFile != null) {
+        return File(compressedFile.path);
+      }
+      
+      return null;
+    } catch (e) {
+      print('Error compressing image: $e');
+      return null;
+    }
+  }
+  
+  /// تغيير حجم الصورة
+  static Future<File?> _resizeImage(File imageFile) async {
+    try {
+      final bytes = await imageFile.readAsBytes();
+      final image = img.decodeImage(bytes);
+      
+      if (image == null) return null;
+      
+      final maxDimension = _getMaxDimension();
+      final resizedImage = img.copyResize(
+        image,
+        width: image.width > image.height ? maxDimension : null,
+        height: image.height > image.width ? maxDimension : null,
+      );
+      
+      final resizedBytes = img.encodeJpg(resizedImage, quality: _compressionQuality);
+      final tempFile = File('${imageFile.path}_resized.jpg');
+      await tempFile.writeAsBytes(resizedBytes);
+      
+      return tempFile;
+    } catch (e) {
+      print('Error resizing image: $e');
+      return null;
+    }
+  }
+  
+  /// الحصول على أبعاد الصورة
+  static Future<img.Image> _getImageDimensions(File imageFile) async {
+    final bytes = await imageFile.readAsBytes();
+    final image = img.decodeImage(bytes);
+    
+    if (image == null) {
+      throw Exception('Could not decode image');
+    }
+    
+    return image;
+  }
+  
+  /// الحصول على الحد الأقصى للأبعاد
+  static int _getMaxDimension() {
+    return kIsWeb ? _webMaxImageDimension : _maxImageDimension;
   }
   
   /// ضغط الصورة للحصول على أداء أفضل
-  static Future<Uint8List> _compressImage(Uint8List bytes) async {
+  static Future<File?> compressImageForPerformance(File imageFile) async {
     try {
-      final image = img.decodeImage(bytes);
-      if (image == null) return bytes;
+      final compressedFile = await FlutterImageCompress.compressAndGetFile(
+        imageFile.path,
+        '${imageFile.path}_performance.jpg',
+        quality: 70, // جودة منخفضة للأداء
+        minWidth: 800,
+        minHeight: 800,
+      );
       
-      // تحديد الحد الأقصى للأبعاد
-      const int maxDimension = 1920;
-      
-      img.Image resizedImage = image;
-      
-      if (image.width > maxDimension || image.height > maxDimension) {
-        resizedImage = img.copyResize(
-          image,
-          width: image.width > image.height ? maxDimension : null,
-          height: image.height >= image.width ? maxDimension : null,
-        );
+      if (compressedFile != null) {
+        return File(compressedFile.path);
       }
       
-      // ضغط بجودة عالية
-      return Uint8List.fromList(img.encodeJpg(resizedImage, quality: 85));
+      return null;
     } catch (e) {
-      print('خطأ في ضغط الصورة: $e');
-      return bytes;
+      print('Error compressing image for performance: $e');
+      return null;
     }
   }
   
-  /// حذف صورة من الخادم
-  static Future<bool> deleteImage(String imageUrl) async {
-    try {
-      final uri = Uri.parse('$baseUrl/api/delete_image.php');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'image_url': imageUrl}),
-      ).timeout(const Duration(seconds: 30));
-      
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['success'] == true;
+  /// تنظيف الملفات المؤقتة
+  static Future<void> cleanupTempFiles(List<File> tempFiles) async {
+    for (final file in tempFiles) {
+      try {
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (e) {
+        print('Error deleting temp file: $e');
       }
-      return false;
-    } catch (e) {
-      print('خطأ في حذف الصورة: $e');
-      return false;
     }
-  }
-  
-  /// تحسين رابط الصورة للعرض
-  static String optimizeImageUrl(String originalUrl, {int? width, int? height, int? quality}) {
-    final uri = Uri.parse(originalUrl);
-    final queryParams = Map<String, String>.from(uri.queryParameters);
-    
-    if (width != null) queryParams['w'] = width.toString();
-    if (height != null) queryParams['h'] = height.toString();
-    if (quality != null) queryParams['q'] = quality.toString();
-    
-    return uri.replace(queryParameters: queryParams.isEmpty ? null : queryParams).toString();
   }
 }

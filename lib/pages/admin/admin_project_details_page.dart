@@ -30,6 +30,7 @@ import '../../utils/report_storage.dart';
 import '../../utils/pdf_report_generator.dart';
 import '../../utils/part_request_pdf_generator.dart';
 import '../../utils/progress_dialog.dart';
+import '../../utils/report_progress_overlay.dart';
 
 import 'package:engineer_management_system/html_stub.dart'
 if (dart.library.html) 'dart:html' as html;
@@ -39,6 +40,8 @@ if (dart.library.html) 'dart:html' as html;
 import 'dart:ui' as ui;
 
 import 'edit_assigned_engineers_page.dart';
+import 'admin_add_phase_entry_page.dart';
+import '../common/material_request_details_page.dart';
 
 // --- MODIFICATION START: Import notification helper functions ---
 // Make sure the path to your main.dart (or a dedicated notification service file) is correct.
@@ -785,8 +788,8 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       flexibleSpace: Container(decoration: const BoxDecoration(gradient: LinearGradient(colors: [AppConstants.primaryColor, AppConstants.primaryLight], begin: Alignment.topLeft, end: Alignment.bottomRight))),
       elevation: 4,
       centerTitle: true,
-      actions: [
-        IconButton(
+              actions: [
+          IconButton(
           icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
           tooltip: 'تقرير اليوم',
           onPressed: _selectReportDate,
@@ -1030,7 +1033,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                         IconButton(
                           icon: const Icon(Icons.add_comment_outlined, color: AppConstants.primaryLight),
                           tooltip: 'إضافة ملاحظة/صورة للمرحلة الرئيسية',
-                          onPressed: () => _showAddNoteOrImageDialog(phaseId, phaseActualName),
+                          onPressed: () => _navigateToAddPhaseEntryPage(phaseId, phaseActualName),
                         ),
                         // IconButton(
                         //   icon: const Icon(Icons.edit_note_outlined, color: AppConstants.primaryLight),
@@ -1135,7 +1138,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                                             IconButton(
                                               icon: const Icon(Icons.add_comment_outlined, color: AppConstants.primaryLight),
                                               tooltip: 'إضافة ملاحظة/صورة للمرحلة الفرعية',
-                                              onPressed: () => _showAddNoteOrImageDialog(phaseId, subPhaseActualName, subPhaseId: subPhaseId),
+                                              onPressed: () => _navigateToAddPhaseEntryPage(phaseId, subPhaseActualName, subPhaseId: subPhaseId),
                                             ),
                                             Checkbox(
                                               value: isSubCompleted,
@@ -1310,16 +1313,11 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
               final requestDoc = requests[index];
               final data = requestDoc.data() as Map<String, dynamic>;
               final List<dynamic>? itemsData = data['items'];
-              String partName;
-              String quantity;
+              String materialsCount;
               if (itemsData != null && itemsData.isNotEmpty) {
-                partName = itemsData
-                    .map((e) => '${e['name']} (${e['quantity']})')
-                    .join('، ');
-                quantity = '-';
+                materialsCount = '${itemsData.length} مادة';
               } else {
-                partName = data['partName'] ?? 'مادة غير مسماة';
-                quantity = data['quantity']?.toString() ?? 'N/A';
+                materialsCount = 'مادة واحدة';
               }
               final engineerName = data['engineerName'] ?? 'مهندس غير معروف';
               final status = data['status'] ?? 'غير معروف';
@@ -1360,39 +1358,54 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
                 margin: const EdgeInsets.only(bottom: AppConstants.itemSpacing),
                 elevation: 1.5,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5)),
-                child: ListTile(
-                  title: Text('اسم المادة: $partName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('الكمية: $quantity', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
-                      Text('مقدم الطلب: $engineerName', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
-                      Row(
-                        children: [
-                          Icon(statusIcon, color: statusColor, size: 16),
-                          const SizedBox(width: 4),
-                          Text(status, style: TextStyle(fontSize: 14, color: statusColor, fontWeight: FontWeight.w500)),
-                        ],
-                      ),
-                      Text('تاريخ الطلب: $formattedDate', style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
-                    ],
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.picture_as_pdf_outlined,
-                        color: AppConstants.primaryColor),
-                    tooltip: 'تقرير PDF',
-                    onPressed: () async {
-                      final bytes = await PartRequestPdfGenerator.generate(
-                          data,
-                          generatedByRole: 'المسؤول');
-                      if (!mounted) return;
-                      Navigator.pushNamed(context, '/pdf_preview', arguments: {
-                        'bytes': bytes,
-                        'fileName': 'part_request_${requestDoc.id}.pdf',
-                        'text':
-                        'تقرير طلب مواد للمشروع ${data['projectName'] ?? ''}'
-                      });
-                    },
+                child: InkWell(
+                  onTap: () => _navigateToMaterialRequestDetails(requestDoc),
+                  borderRadius: BorderRadius.circular(AppConstants.borderRadius / 1.5),
+                  child: ListTile(
+                    title: Text('عدد المواد: $materialsCount', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConstants.textPrimary)),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('مقدم الطلب: $engineerName', style: const TextStyle(fontSize: 14, color: AppConstants.textSecondary)),
+                        Row(
+                          children: [
+                            Icon(statusIcon, color: statusColor, size: 16),
+                            const SizedBox(width: 4),
+                            Text(status, style: TextStyle(fontSize: 14, color: statusColor, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                        Text('تاريخ الطلب: $formattedDate', style: TextStyle(fontSize: 12, color: AppConstants.textSecondary.withOpacity(0.8))),
+                      ],
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // زر الحذف
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: AppConstants.errorColor),
+                          tooltip: 'حذف الطلب',
+                          onPressed: () => _showDeletePartRequestConfirmation(requestDoc.id, materialsCount),
+                        ),
+                        // زر PDF
+                        IconButton(
+                          icon: const Icon(Icons.picture_as_pdf_outlined,
+                              color: AppConstants.primaryColor),
+                          tooltip: 'تقرير PDF',
+                          onPressed: () async {
+                            final bytes = await PartRequestPdfGenerator.generate(
+                                data,
+                                generatedByRole: 'المسؤول');
+                            if (!mounted) return;
+                            Navigator.pushNamed(context, '/pdf_preview', arguments: {
+                              'bytes': bytes,
+                              'fileName': 'part_request_${requestDoc.id}.pdf',
+                              'text':
+                              'تقرير طلب مواد للمشروع ${data['projectName'] ?? ''}'
+                            });
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -1475,6 +1488,51 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         );
       },
     );
+  }
+
+  Future<void> _navigateToMaterialRequestDetails(DocumentSnapshot requestDoc) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MaterialRequestDetailsPage(
+          requestDoc: requestDoc,
+          userRole: 'admin',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showDeletePartRequestConfirmation(String docId, String partName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return Directionality(
+          textDirection: ui.TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('تأكيد الحذف'),
+            content: Text('هل أنت متأكد من حذف طلب المواد: "$partName"؟\n\nلا يمكن التراجع عن هذا الإجراء.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('إلغاء'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppConstants.errorColor,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('حذف'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _deletePartRequest(docId);
+    }
   }
 
   Future<void> _deletePartRequest(String docId) async {
@@ -1914,10 +1972,19 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         ? 'التقرير التراكمي'
         : 'التقرير اليومي';
 
-    final progress = ProgressDialog.show(context, 'جاري تحميل البيانات...');
+    // عرض بوب أب التقدم على اليمين
+    ReportProgressOverlay.showProgressOverlay(
+      context,
+      reportId: 'report_${DateTime.now().millisecondsSinceEpoch}',
+      initialMessage: 'جاري إنشاء التقرير...',
+    );
 
     try {
       PdfReportResult result;
+      
+      ReportProgressOverlay.updateProgress(0.1, 
+        message: 'جاري تحميل البيانات...');
+      
       try {
         result = await PdfReportGenerator.generateWithIsolate(
           projectId: widget.projectId,
@@ -1928,10 +1995,26 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           generatedByRole: 'المسؤول',
           start: start,
           end: end,
-          onProgress: (p) => progress.value = p,
+          onProgress: (p) {
+            final progress = 0.1 + (p * 0.8); // من 10% إلى 90%
+            String message;
+            if (p < 0.3) {
+              message = 'جاري تحميل البيانات...';
+            } else if (p < 0.6) {
+              message = 'جاري معالجة الصور...';
+            } else if (p < 0.9) {
+              message = 'جاري إنشاء التقرير...';
+            } else {
+              message = 'جاري حفظ التقرير...';
+            }
+            ReportProgressOverlay.updateProgress(progress, message: message);
+          },
         );
       } catch (e) {
         // Retry with low-memory settings if initial attempt fails.
+        ReportProgressOverlay.updateProgress(0.5, 
+          message: 'إعادة المحاولة مع إعدادات الذاكرة المنخفضة...');
+        
         result = await PdfReportGenerator.generateWithIsolate(
           projectId: widget.projectId,
           projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
@@ -1941,12 +2024,45 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           generatedByRole: 'المسؤول',
           start: start,
           end: end,
-          onProgress: (p) => progress.value = p,
+          onProgress: (p) {
+            final progress = 0.5 + (p * 0.4); // من 50% إلى 90%
+            String message;
+            if (p < 0.3) {
+              message = 'جاري تحميل البيانات...';
+            } else if (p < 0.6) {
+              message = 'جاري معالجة الصور...';
+            } else if (p < 0.9) {
+              message = 'جاري إنشاء التقرير...';
+            } else {
+              message = 'جاري حفظ التقرير...';
+            }
+            ReportProgressOverlay.updateProgress(progress, message: message);
+          },
           lowMemory: true,
         );
       }
 
-      await ProgressDialog.hide(context);
+      ReportProgressOverlay.updateProgress(1.0, 
+        message: 'تم إنشاء التقرير بنجاح');
+      
+      await Future.delayed(const Duration(milliseconds: 500));
+      ReportProgressOverlay.hideProgressOverlay();
+      
+      // عرض إشعار اكتمال التقرير
+      ReportProgressOverlay.showCompletionNotification(
+        context,
+        reportId: 'report_${DateTime.now().millisecondsSinceEpoch}',
+        fileName: fileName,
+        onTap: () {
+          _openPdfPreview(
+            result.bytes,
+            fileName,
+            'يرجى الإطلاع على $headerText للمشروع.',
+            result.downloadUrl,
+          );
+        },
+      );
+      
       _showFeedbackSnackBar(context, 'تم إنشاء التقرير بنجاح.', isError: false);
 
       _openPdfPreview(
@@ -1956,7 +2072,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         result.downloadUrl,
       );
     } catch (e) {
-      await ProgressDialog.hide(context);
+      ReportProgressOverlay.hideProgressOverlay();
       _showFeedbackSnackBar(context, 'فشل إنشاء التقرير بسبب نقص الذاكرة.', isError: true);
       print('Error generating daily report PDF: $e');
     }
@@ -2427,6 +2543,30 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
         );
       },
     );
+  }
+
+  // دالة جديدة للانتقال إلى صفحة إضافة المراحل والاختبارات
+  Future<void> _navigateToAddPhaseEntryPage(String phaseId, String phaseOrSubPhaseName, {String? subPhaseId}) async {
+    if (!mounted) return;
+    
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AdminAddPhaseEntryPage(
+          projectId: widget.projectId,
+          phaseId: phaseId,
+          phaseOrSubPhaseName: phaseOrSubPhaseName,
+          subPhaseId: subPhaseId,
+        ),
+      ),
+    );
+    
+    // إذا تم الحفظ بنجاح، قم بتحديث الصفحة
+    if (result == true) {
+      setState(() {
+        // تحديث البيانات إذا لزم الأمر
+      });
+    }
   }
 
   // --- MODIFICATION START: _showAddNoteOrImageDialog - Send notifications ---

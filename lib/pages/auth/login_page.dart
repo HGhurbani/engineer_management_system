@@ -85,16 +85,21 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Future<void> _loginUser() async {
+  Future<void> _checkEmailAndHandleLogin() async {
     if (!_loginFormKey.currentState!.validate()) return;
     if (!mounted) return;
     setState(() { _isLoading = true; _error = null; });
 
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
     try {
+      // محاولة تسجيل الدخول
       UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        email: email,
+        password: password,
       );
+      
       final uid = userCredential.user!.uid;
       DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
@@ -107,6 +112,7 @@ class _LoginPageState extends State<LoginPage> {
       final userData = userDoc.data() as Map<String, dynamic>;
       String role = userData['role'];
       String userName = userData['name'] ?? 'المستخدم';
+      
       // Determine clientType for clients, default if not present
       String clientType = "individual"; // Default
       if (role == 'client' && userData.containsKey('clientType')) {
@@ -117,7 +123,6 @@ class _LoginPageState extends State<LoginPage> {
       if (fcmToken != null) {
         await FirebaseFirestore.instance.collection('users').doc(uid).update({'fcmToken': fcmToken});
       }
-
 
       _showSnackBar('مرحباً $userName! تم تسجيل الدخول بنجاح', isSuccess: true);
       await Future.delayed(const Duration(milliseconds: 1200));
@@ -130,11 +135,128 @@ class _LoginPageState extends State<LoginPage> {
         default: if (mounted) setState(() => _error = 'نوع المستخدم غير معروف.');
       }
     } on FirebaseAuthException catch (e) {
-      if (mounted) setState(() => _error = _getFirebaseErrorMessage(e.code));
+      if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        // التحقق من وجود البريد الإلكتروني في النظام
+        try {
+          final querySnapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .where('email', isEqualTo: email)
+              .get();
+
+          if (querySnapshot.docs.isNotEmpty) {
+            // البريد موجود ولكن كلمة المرور خاطئة - عرض خيار نسيت كلمة المرور
+            _showForgotPasswordDialog(email);
+          } else {
+            // البريد غير موجود - عرض خيار إنشاء حساب
+            _showCreateAccountDialog(email);
+          }
+        } catch (firestoreError) {
+          if (mounted) setState(() => _error = _getFirebaseErrorMessage(e.code));
+        }
+      } else {
+        if (mounted) setState(() => _error = _getFirebaseErrorMessage(e.code));
+      }
     } catch (e) {
       if (mounted) setState(() => _error = 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _showForgotPasswordDialog(String email) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Directionality(
+          textDirection: ui.TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+            title: const Row(
+              children: [
+                Icon(Icons.lock_reset, color: AppConstants.primaryColor),
+                SizedBox(width: 8),
+                Text('نسيت كلمة المرور؟', style: TextStyle(color: AppConstants.textPrimary)),
+              ],
+            ),
+            content: Text(
+              'البريد الإلكتروني مسجل في النظام. هل تريد إعادة تعيين كلمة المرور؟',
+              style: const TextStyle(color: AppConstants.textSecondary),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إلغاء', style: TextStyle(color: AppConstants.textSecondary)),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await _resetPassword(email);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppConstants.primaryColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+                ),
+                child: const Text('إعادة تعيين', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showCreateAccountDialog(String email) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Directionality(
+          textDirection: ui.TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+            title: const Row(
+              children: [
+                Icon(Icons.person_add, color: AppConstants.primaryColor),
+                SizedBox(width: 8),
+                Text('إنشاء حساب جديد', style: TextStyle(color: AppConstants.textPrimary)),
+              ],
+            ),
+            content: Text(
+              'البريد الإلكتروني غير مسجل في النظام. هل تريد إنشاء حساب جديد؟',
+              style: const TextStyle(color: AppConstants.textSecondary),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إلغاء', style: TextStyle(color: AppConstants.textSecondary)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showRegisterDialog();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppConstants.primaryColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+                ),
+                child: const Text('إنشاء حساب', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _resetPassword(String email) async {
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      _showSnackBar('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني', isSuccess: true);
+    } on FirebaseAuthException catch (e) {
+      _showSnackBar('فشل إرسال رابط إعادة التعيين: ${_getFirebaseErrorMessage(e.code)}', isError: true);
+    } catch (e) {
+      _showSnackBar('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.', isError: true);
     }
   }
 
@@ -279,6 +401,7 @@ class _LoginPageState extends State<LoginPage> {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
+    final projectNameController = TextEditingController();
     String selectedRole = 'client'; // Default role
     String selectedClientType = 'individual'; // Default client type, only relevant if role is client
 
@@ -329,31 +452,67 @@ class _LoginPageState extends State<LoginPage> {
                                 child: DropdownButtonFormField<String>(
                                   value: selectedRole,
                                   decoration: InputDecoration(labelText: 'نوع المستخدم', prefixIcon: const Icon(Icons.category_outlined, color: AppConstants.primaryColor), border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
-                                  items: const [
-                                    DropdownMenuItem(value: 'client', child: Text('عميل', style: TextStyle(color: AppConstants.textPrimary))),
-                                    DropdownMenuItem(value: 'engineer', child: Text('مهندس', style: TextStyle(color: AppConstants.textPrimary))),
-                                    // Add other roles if needed, e.g., 'employee'
+                                  items: [
+                                    const DropdownMenuItem(value: 'client', child: Text('عميل', style: TextStyle(color: AppConstants.textPrimary))),
+                                    DropdownMenuItem(
+                                      value: 'supplier', 
+                                      child: Row(
+                                        children: [
+                                          const Text('مورد', style: TextStyle(color: AppConstants.textSecondary)),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppConstants.textSecondary.withOpacity(0.2),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: const Text('قريباً', style: TextStyle(color: AppConstants.textSecondary, fontSize: 10)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ],
-                                  onChanged: (val) { if (val != null) setDialogState(() => selectedRole = val); },
+                                  onChanged: (val) { 
+                                    if (val != null && val != 'supplier') {
+                                      setDialogState(() => selectedRole = val); 
+                                    }
+                                  },
                                   validator: (value) => (value == null || value.isEmpty) ? 'الرجاء اختيار نوع المستخدم' : null,
                                 ),
                               ),
-                              if (selectedRole == 'client') ...[ // Show clientType dropdown only if role is client
-                                const SizedBox(height: LoginConstants.spacing),
-                                Container(
-                                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppConstants.borderRadius), border: Border.all(color: LoginConstants.borderColor), color: AppConstants.cardColor),
-                                  child: DropdownButtonFormField<String>(
-                                    value: selectedClientType,
-                                    decoration: InputDecoration(labelText: 'نوع العميل', prefixIcon: const Icon(Icons.business_center_outlined, color: AppConstants.primaryColor), border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
-                                    items: const [
-                                      DropdownMenuItem(value: 'individual', child: Text('فردي', style: TextStyle(color: AppConstants.textPrimary))),
-                                      DropdownMenuItem(value: 'company', child: Text('شركة', style: TextStyle(color: AppConstants.textPrimary))),
-                                    ],
-                                    onChanged: (val) { if (val != null) setDialogState(() => selectedClientType = val); },
-                                    validator: (value) => (value == null || value.isEmpty) ? 'الرجاء اختيار نوع العميل' : null,
-                                  ),
-                                ),
-                              ]
+                                                             if (selectedRole == 'client') ...[ // Show clientType dropdown only if role is client
+                                 const SizedBox(height: LoginConstants.spacing),
+                                 Container(
+                                   decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppConstants.borderRadius), border: Border.all(color: LoginConstants.borderColor), color: AppConstants.cardColor),
+                                   child: DropdownButtonFormField<String>(
+                                     value: selectedClientType,
+                                     decoration: InputDecoration(labelText: 'نوع العميل', prefixIcon: const Icon(Icons.business_center_outlined, color: AppConstants.primaryColor), border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
+                                     items: const [
+                                       DropdownMenuItem(value: 'individual', child: Text('فردي', style: TextStyle(color: AppConstants.textPrimary))),
+                                       DropdownMenuItem(value: 'company', child: Text('شركة', style: TextStyle(color: AppConstants.textPrimary))),
+                                     ],
+                                     onChanged: (val) { if (val != null) setDialogState(() => selectedClientType = val); },
+                                                                        validator: (value) => (value == null || value.isEmpty) ? 'الرجاء اختيار نوع العميل' : null,
+                                 ),
+                               ),
+                               const SizedBox(height: LoginConstants.spacing),
+                               _buildEnhancedTextField(
+                                 controller: projectNameController, 
+                                 label: 'اسم المشروع', 
+                                 icon: Icons.work_outline_rounded,
+                                 validator: (value) {
+                                   if (selectedRole == 'client') {
+                                     if (value == null || value.isEmpty) {
+                                       return 'الرجاء إدخال اسم المشروع';
+                                     }
+                                     if (value.length < 2) {
+                                       return 'اسم المشروع يجب أن يكون حرفين على الأقل';
+                                     }
+                                   }
+                                   return null;
+                                 }
+                               ),
+                               ]
                             ],
                           ),
                         ),
@@ -379,8 +538,32 @@ class _LoginPageState extends State<LoginPage> {
                                         userDataToSet['clientType'] = selectedClientType;
                                       }
                                       await FirebaseFirestore.instance.collection('users').doc(userCred.user!.uid).set(userDataToSet);
+                                      
+                                      // إنشاء مشروع تلقائياً للعملاء
+                                      if (selectedRole == 'client') {
+                                        final projectName = projectNameController.text.trim();
+                                        if (projectName.isNotEmpty) {
+                                          final projectDoc = await FirebaseFirestore.instance.collection('projects').add({
+                                            'name': projectName,
+                                            'clientId': userCred.user!.uid,
+                                            'clientName': nameController.text.trim(),
+                                            'projectType': 'مشروع جديد',
+                                            'status': 'active',
+                                            'createdAt': FieldValue.serverTimestamp(),
+                                            'assignedEngineers': [],
+                                            'phases': [],
+                                            'tests': [],
+                                          });
+                                          
+                                          // تحديث بيانات المستخدم بإضافة معرف المشروع
+                                          await FirebaseFirestore.instance.collection('users').doc(userCred.user!.uid).update({
+                                            'projectId': projectDoc.id,
+                                          });
+                                        }
+                                      }
+                                      
                                       Navigator.pop(context);
-                                      _showSnackBar('تم إنشاء الحساب بنجاح! يمكنك الآن تسجيل الدخول.', isSuccess: true);
+                                      _showSnackBar('تم إنشاء الحساب والمشروع بنجاح! يمكنك الآن تسجيل الدخول.', isSuccess: true);
                                     } on FirebaseAuthException catch (e) {
                                       Navigator.pop(context); _showSnackBar('فشل التسجيل: ${_getFirebaseErrorMessage(e.code)}', isError: true);
                                     } catch (e) {
@@ -534,59 +717,26 @@ class _LoginPageState extends State<LoginPage> {
                       Container(
                         decoration: BoxDecoration(gradient: LoginConstants.primaryGradient, borderRadius: BorderRadius.circular(AppConstants.borderRadius), boxShadow: [BoxShadow(color: AppConstants.primaryColor.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 6))]),
                         child: ElevatedButton.icon(
-                          onPressed: _isLoading ? null : _loginUser,
+                          onPressed: _isLoading ? null : _checkEmailAndHandleLogin,
                           icon: _isLoading ? const SizedBox.shrink() : const Icon(Icons.login_rounded, color: Colors.white, size: 20),
                           label: _isLoading ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation<Color>(Colors.white))) : const Text('تسجيل الدخول', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, shadowColor: Colors.transparent, padding: const EdgeInsets.symmetric(vertical: 17), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)), minimumSize: const Size(double.infinity, 50)),
                         ),
                       ),
-                      // const SizedBox(height: LoginConstants.spacing * 0.75),
-                      // Row(
-                      //   children: [
-                      //     Expanded(
-                      //       child: _buildRoleLoginButton(
-                      //         label: 'دخول كمسؤول',
-                      //         icon: Icons.admin_panel_settings_rounded,
-                      //         onPressed: _loginAsAdmin,
-                      //         color1: LoginConstants.adminButtonColor1,
-                      //         color2: LoginConstants.adminButtonColor2,
-                      //       ),
-                      //     ),
-                      //     const SizedBox(width: LoginConstants.spacing / 2),
-                      //     Expanded(
-                      //       child: _buildRoleLoginButton(
-                      //         label: 'دخول كمهندس',
-                      //         icon: Icons.engineering_rounded,
-                      //         onPressed: _loginAsEngineer,
-                      //         color1: LoginConstants.engineerButtonColor1,
-                      //         color2: LoginConstants.engineerButtonColor2,
-                      //       ),
-                      //     ),
-                      //   ],
-                      // ),
-                      // const SizedBox(height: LoginConstants.spacing / 2), // Added spacing before the new button
-                      // // New Client Login Button
-                      // _buildRoleLoginButton(
-                      //   label: 'دخول كعميل',
-                      //   icon: Icons.person_rounded, // Example icon for client
-                      //   onPressed: _loginAsClient,
-                      //   color1: LoginConstants.clientButtonColor1, // Using new client button colors
-                      //   color2: LoginConstants.clientButtonColor2,
-                      // ),
-                      // const SizedBox(height: LoginConstants.spacing * 0.75), // Adjusted spacing for register button
-                      // // Register Button
-                      // TextButton.icon(
-                      //   onPressed: _isLoading ? null : _showRegisterDialog,
-                      //   icon: const Icon(Icons.person_add_alt_1_outlined, color: AppConstants.primaryColor, size: 20),
-                      //   label: const Text(
-                      //     'ليس لديك حساب؟ إنشاء حساب جديد',
-                      //     style: TextStyle(color: AppConstants.primaryColor, fontSize: 14, fontWeight: FontWeight.w600),
-                      //   ),
-                      //   style: TextButton.styleFrom(
-                      //     padding: const EdgeInsets.symmetric(vertical: 12),
-                      //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
-                      //   ),
-                      // ),
+                      const SizedBox(height: LoginConstants.spacing * 0.75),
+                      // Register Button
+                      TextButton.icon(
+                        onPressed: _isLoading ? null : _showRegisterDialog,
+                        icon: const Icon(Icons.person_add_alt_1_outlined, color: AppConstants.primaryColor, size: 20),
+                        label: const Text(
+                          'ليس لديك حساب؟ إنشاء حساب جديد',
+                          style: TextStyle(color: AppConstants.primaryColor, fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppConstants.borderRadius)),
+                        ),
+                      ),
                       const SizedBox(height: LoginConstants.spacing),
                       Text('© ${DateTime.now().year} ${LoginConstants.appName}', textAlign: TextAlign.center, style: TextStyle(color: AppConstants.textSecondary.withOpacity(0.7), fontSize: 12)),
                     ],
