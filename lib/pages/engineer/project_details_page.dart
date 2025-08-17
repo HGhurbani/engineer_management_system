@@ -43,6 +43,8 @@ import '../../theme/app_constants.dart';
 import 'add_phase_entry_page.dart';
 import '../common/material_request_details_page.dart';
 import 'images_viewer_page.dart';
+import '../../services/report_snapshot_service.dart';
+import '../../utils/pdf_builder.dart';
 class ProjectDetailsPage extends StatefulWidget {
   final String projectId;
   final String? highlightItemId;
@@ -76,6 +78,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
   // --- Font for PDF ---
   pw.Font? _arabicFont; // To store the loaded font for PDF
+  final ReportSnapshotService _snapshotService = ReportSnapshotService();
 
   static const List<Map<String, dynamic>> predefinedPhasesStructure = [
     // ... (Your existing predefinedPhasesStructure - no changes here) ...
@@ -959,6 +962,48 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
   }
 
+  Future<void> _generateSnapshotPdf() async {
+    _showLoadingDialog(context, "جاري إنشاء التقرير...");
+    try {
+      final snapshot = await _snapshotService.fetchSnapshot(widget.projectId);
+      if (snapshot == null) {
+        Navigator.pop(context);
+        _showFeedbackSnackBar(context, "لم يتم العثور على بيانات التقرير.", isError: true);
+        return;
+      }
+      if (_arabicFont == null) {
+        await _loadArabicFont();
+      }
+      final bytes = await PdfBuilder.fromSnapshot(snapshot, arabicFont: _arabicFont);
+      if (!mounted) return;
+      Navigator.pop(context);
+      Navigator.pushNamed(context, '/pdf_preview', arguments: {
+        'bytes': bytes,
+        'fileName': 'project_${widget.projectId}_report.pdf',
+        'text': 'تقرير المشروع'
+      });
+    } catch (e) {
+      Navigator.pop(context);
+      _showFeedbackSnackBar(context, 'فشل إنشاء التقرير: $e', isError: true);
+    }
+  }
+
+  Future<void> _rebuildSnapshot() async {
+    _showLoadingDialog(context, "جاري إعادة بناء التقرير...");
+    try {
+      await _snapshotService.rebuildSnapshot(widget.projectId);
+      if (mounted) {
+        Navigator.pop(context);
+        _showFeedbackSnackBar(context, "تمت إعادة بناء التقرير", isError: false);
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        _showFeedbackSnackBar(context, 'فشل إعادة بناء التقرير: $e', isError: true);
+      }
+    }
+  }
+
 
   Future<void> _generateDailyReportPdf({DateTime? start, DateTime? end}) async {
     DateTime now = DateTime.now();
@@ -1659,11 +1704,21 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       ),
       elevation: 3,
       centerTitle: true,
-              actions: [
-          IconButton(
+      actions: [
+        IconButton(
           icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
-          tooltip: 'تقرير اليوم',
-          onPressed: _selectReportDate,
+          tooltip: 'تقرير المشروع',
+          onPressed: _generateSnapshotPdf,
+        ),
+        PopupMenuButton<String>(
+          onSelected: (value) {
+            if (value == 'rebuild') {
+              _rebuildSnapshot();
+            }
+          },
+          itemBuilder: (context) => const [
+            PopupMenuItem(value: 'rebuild', child: Text('إعادة بناء التقرير')),
+          ],
         ),
       ],
       bottom: TabBar(
