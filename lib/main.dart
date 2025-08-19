@@ -40,7 +40,6 @@ import 'package:engineer_management_system/pages/common/change_password_page.dar
 import 'package:engineer_management_system/pages/common/pdf_preview_screen.dart';
 import 'package:engineer_management_system/pages/common/bookings_page.dart';
 import 'package:engineer_management_system/pages/common/material_request_details_page.dart';
-import 'package:engineer_management_system/pages/admin/report_snapshot_migration_page.dart';
 
 import 'package:engineer_management_system/pages/admin/admin_evaluations_page.dart'; // استيراد صفحة التقييم الجديدة
 import 'package:flutter/foundation.dart';
@@ -50,6 +49,7 @@ import 'package:engineer_management_system/utils/performance_monitor.dart';
 import 'package:engineer_management_system/utils/firebase_manager.dart';
 import 'package:engineer_management_system/utils/advanced_cache_manager.dart';
 import 'package:engineer_management_system/utils/advanced_report_manager.dart';
+import 'utils/instant_image_cache.dart';
 
 late AndroidNotificationChannel channel;
 late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
@@ -407,7 +407,6 @@ class MyApp extends StatelessWidget {
         '/admin/evaluations': (context) => const AdminEvaluationsPage(), // مسار جديد لصفحة التقييم
         '/admin/meeting_logs': (context) => const AdminMeetingLogsPage(),
         '/admin/materials': (context) => const AdminMaterialsPage(),
-        '/admin/report_migration': (context) => const ReportSnapshotMigrationPage(),
 
         // --- ADDITION END ---
       },

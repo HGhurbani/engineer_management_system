@@ -3,11 +3,12 @@ plugins {
     id "kotlin-android"
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services" // Moved here for better organization
 }
 
 android {
     namespace = "com.engineer.system.engineer_management_system"
-    compileSdk = 35
+    compileSdk = 34
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -24,10 +25,11 @@ android {
         applicationId = "com.engineer.system.engineer_management_system"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = 35
+        minSdk = 21 // Set minimum SDK to 21 for Firebase compatibility
+        targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        multiDexEnabled = true // Enable multidex for Firebase
     }
 
     buildTypes {
@@ -35,7 +37,19 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.debug
+            minifyEnabled = false
+            shrinkResources = false
         }
+        debug {
+            minifyEnabled = false
+            shrinkResources = false
+        }
+    }
+
+    // Ensure clean builds
+    lintOptions {
+        disable 'InvalidPackage'
+        checkReleaseBuilds false
     }
 }
 
@@ -43,5 +57,17 @@ flutter {
     source = "../.."
 }
 
-apply plugin: 'com.google.gms.google-services'
+dependencies {
+    // Add Firebase dependencies
+    implementation platform('com.google.firebase:firebase-bom:32.7.0')
+    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-auth'
+    implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.firebase:firebase-storage'
+    implementation 'com.google.firebase:firebase-messaging'
+    implementation 'com.google.firebase:firebase-appcheck'
+    
+    // Multidex support
+    implementation 'androidx.multidex:multidex:2.0.1'
+}
 

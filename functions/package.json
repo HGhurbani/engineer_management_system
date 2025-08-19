@@ -5,9 +5,11 @@
   "engines": {
     "node": "18"
   },
+  "scripts": {
+    "build": "echo 'No build step required'"
+  },
   "dependencies": {
     "firebase-admin": "^11.10.1",
-    "firebase-functions": "^4.3.0",
-    "sharp": "^0.33.2"
+    "firebase-functions": "^4.3.0"
   }
 }

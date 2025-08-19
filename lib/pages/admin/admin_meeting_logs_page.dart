@@ -1148,7 +1148,12 @@ class _AdminMeetingLogsPageState extends State<AdminMeetingLogsPage>
 
     pw.Font? emojiFont;
     try {
-      emojiFont = await PdfGoogleFonts.notoColorEmoji();
+              // Fallback: try to use a system font that supports emojis
+        try {
+          emojiFont = await pw.Font.ttf(await rootBundle.load('assets/fonts/Tajawal-Regular.ttf'));
+        } catch (e) {
+          print('Error loading fallback font: $e');
+        }
     } catch (e) {
       print('Error loading NotoColorEmoji font: $e');
     }

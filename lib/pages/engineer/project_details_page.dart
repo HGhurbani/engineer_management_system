@@ -43,8 +43,10 @@ import '../../theme/app_constants.dart';
 import 'add_phase_entry_page.dart';
 import '../common/material_request_details_page.dart';
 import 'images_viewer_page.dart';
-import '../../services/report_snapshot_service.dart';
-import '../../utils/pdf_builder.dart';
+import '../../utils/report_snapshot_manager.dart';
+import '../../utils/advanced_image_cache_manager.dart';
+import '../../utils/memory_optimizer.dart';
+
 class ProjectDetailsPage extends StatefulWidget {
   final String projectId;
   final String? highlightItemId;
@@ -78,7 +80,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
 
   // --- Font for PDF ---
   pw.Font? _arabicFont; // To store the loaded font for PDF
-  final ReportSnapshotService _snapshotService = ReportSnapshotService();
 
   static const List<Map<String, dynamic>> predefinedPhasesStructure = [
     // ... (Your existing predefinedPhasesStructure - no changes here) ...
@@ -355,6 +356,17 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     _loadArabicFont(); // Load the font
     _fetchInitialData();
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToHighlighted());
+    _initializeCache();
+  }
+
+  /// تهيئة نظام الكاش
+  Future<void> _initializeCache() async {
+    try {
+      await AdvancedImageCacheManager.initialize();
+      print('Image cache initialized successfully');
+    } catch (e) {
+      print('Error initializing image cache: $e');
+    }
   }
 
   Widget _buildEmployeesTab() {
@@ -962,48 +974,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     }
   }
 
-  Future<void> _generateSnapshotPdf() async {
-    _showLoadingDialog(context, "جاري إنشاء التقرير...");
-    try {
-      final snapshot = await _snapshotService.fetchSnapshot(widget.projectId);
-      if (snapshot == null) {
-        Navigator.pop(context);
-        _showFeedbackSnackBar(context, "لم يتم العثور على بيانات التقرير.", isError: true);
-        return;
-      }
-      if (_arabicFont == null) {
-        await _loadArabicFont();
-      }
-      final bytes = await PdfBuilder.fromSnapshot(snapshot, arabicFont: _arabicFont);
-      if (!mounted) return;
-      Navigator.pop(context);
-      Navigator.pushNamed(context, '/pdf_preview', arguments: {
-        'bytes': bytes,
-        'fileName': 'project_${widget.projectId}_report.pdf',
-        'text': 'تقرير المشروع'
-      });
-    } catch (e) {
-      Navigator.pop(context);
-      _showFeedbackSnackBar(context, 'فشل إنشاء التقرير: $e', isError: true);
-    }
-  }
-
-  Future<void> _rebuildSnapshot() async {
-    _showLoadingDialog(context, "جاري إعادة بناء التقرير...");
-    try {
-      await _snapshotService.rebuildSnapshot(widget.projectId);
-      if (mounted) {
-        Navigator.pop(context);
-        _showFeedbackSnackBar(context, "تمت إعادة بناء التقرير", isError: false);
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        _showFeedbackSnackBar(context, 'فشل إعادة بناء التقرير: $e', isError: true);
-      }
-    }
-  }
-
 
   Future<void> _generateDailyReportPdf({DateTime? start, DateTime? end}) async {
     DateTime now = DateTime.now();
@@ -1017,11 +987,10 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final bool isArabic = Localizations.localeOf(context).languageCode == 'ar';
     String getLocalizedText(String ar, String en) => isArabic ? ar : en;
 
-    // عرض بوب أب التقدم على اليمين
     ReportProgressOverlay.showProgressOverlay(
       context,
       reportId: 'report_${DateTime.now().millisecondsSinceEpoch}',
-      initialMessage: getLocalizedText('جاري إنشاء التقرير...', 'Generating report...'),
+      initialMessage: getLocalizedText('جاري البحث عن البيانات...', 'Searching for data...'),
     );
 
     final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
@@ -1030,10 +999,28 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       PdfReportResult result;
       
       ReportProgressOverlay.updateProgress(0.1, 
-        message: getLocalizedText('جاري تحميل البيانات...', 'Loading data...'));
+        message: getLocalizedText('جاري البحث عن Snapshot...', 'Searching for snapshot...'));
       
-      try {
-        result = await PdfReportGenerator.generateWithIsolate(
+      // محاولة الحصول من Snapshot أولاً
+      final snapshot = await ReportSnapshotManager.getReportSnapshot(
+        projectId: widget.projectId,
+        startDate: start,
+        endDate: end,
+        onStatusUpdate: (status) {
+          ReportProgressOverlay.updateProgress(0.3, message: status);
+        },
+        onProgress: (progress) {
+          ReportProgressOverlay.updateProgress(0.1 + (progress * 0.2), 
+            message: getLocalizedText('جاري تجميع البيانات...', 'Gathering data...'));
+        },
+      );
+      
+      if (snapshot != null) {
+        // إنشاء التقرير من Snapshot (أسرع بكثير)
+        ReportProgressOverlay.updateProgress(0.4, 
+          message: getLocalizedText('جاري إنشاء التقرير من البيانات المجمعة...', 'Generating report from aggregated data...'));
+        
+        result = await PdfReportGenerator.generate(
           projectId: widget.projectId,
           projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
           phases: predefinedPhasesStructure,
@@ -1043,13 +1030,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           start: start,
           end: end,
           onProgress: (p) {
-            final progress = 0.1 + (p * 0.8); // من 10% إلى 90%
+            final progress = 0.4 + (p * 0.5); // من 40% إلى 90%
             String message;
             if (p < 0.3) {
-              message = getLocalizedText('جاري تحميل البيانات...', 'Loading data...');
-            } else if (p < 0.6) {
               message = getLocalizedText('جاري معالجة الصور...', 'Processing images...');
-            } else if (p < 0.9) {
+            } else if (p < 0.6) {
               message = getLocalizedText('جاري إنشاء التقرير...', 'Generating report...');
             } else {
               message = getLocalizedText('جاري حفظ التقرير...', 'Saving report...');
@@ -1057,10 +1042,10 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             ReportProgressOverlay.updateProgress(progress, message: message);
           },
         );
-      } catch (e) {
-        // Retry with low-memory settings if initial attempt fails.
-        ReportProgressOverlay.updateProgress(0.5, 
-          message: getLocalizedText('إعادة المحاولة مع إعدادات الذاكرة المنخفضة...', 'Retrying with low memory settings...'));
+      } else {
+        // Fallback للطريقة القديمة
+        ReportProgressOverlay.updateProgress(0.3, 
+          message: getLocalizedText('جاري إنشاء التقرير بالطريقة التقليدية...', 'Generating report using traditional method...'));
         
         result = await PdfReportGenerator.generateWithIsolate(
           projectId: widget.projectId,
@@ -1072,7 +1057,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
           start: start,
           end: end,
           onProgress: (p) {
-            final progress = 0.5 + (p * 0.4); // من 50% إلى 90%
+            final progress = 0.3 + (p * 0.6); // من 30% إلى 90%
             String message;
             if (p < 0.3) {
               message = getLocalizedText('جاري تحميل البيانات...', 'Loading data...');
@@ -1085,7 +1070,6 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
             }
             ReportProgressOverlay.updateProgress(progress, message: message);
           },
-          lowMemory: true,
         );
       }
 
@@ -1704,21 +1688,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
       ),
       elevation: 3,
       centerTitle: true,
-      actions: [
-        IconButton(
+              actions: [
+          IconButton(
           icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white),
-          tooltip: 'تقرير المشروع',
-          onPressed: _generateSnapshotPdf,
-        ),
-        PopupMenuButton<String>(
-          onSelected: (value) {
-            if (value == 'rebuild') {
-              _rebuildSnapshot();
-            }
-          },
-          itemBuilder: (context) => const [
-            PopupMenuItem(value: 'rebuild', child: Text('إعادة بناء التقرير')),
-          ],
+          tooltip: 'تقرير اليوم',
+          onPressed: _selectReportDate,
         ),
       ],
       bottom: TabBar(
@@ -3735,9 +3709,9 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     // Load emoji fallback font
     pw.Font? emojiFont;
     try {
-      emojiFont = await PdfGoogleFonts.notoColorEmoji();
+      emojiFont = await pw.Font.ttf(await rootBundle.load('assets/fonts/Tajawal-Regular.ttf'));
     } catch (e) {
-      print('Error loading NotoColorEmoji font: $e');
+      print('Error loading fallback font: $e');
     }
 
     final List<pw.Font> commonFontFallback = emojiFont != null ? [emojiFont!] : [];

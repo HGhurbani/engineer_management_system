@@ -670,30 +670,6 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                 const SizedBox(height: AppConstants.paddingLarge),
                 Center(
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/admin/report_migration');
-                    },
-                    icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
-                    label: const Text('Build Snapshots',
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppConstants.successColor,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppConstants.paddingLarge,
-                          vertical: AppConstants.paddingMedium),
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppConstants.borderRadius / 1.5),
-                      ),
-                      elevation: AppConstants.cardShadow.isNotEmpty
-                          ? AppConstants.cardShadow.first.blurRadius
-                          : 0,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppConstants.paddingLarge),
-                Center(
-                  child: ElevatedButton.icon(
                     onPressed: _showAddAdminDialog,
                     icon: const Icon(Icons.admin_panel_settings_rounded,
                         color: Colors.white),

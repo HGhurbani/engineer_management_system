@@ -21,6 +21,9 @@ import 'pdf_image_cache.dart';
 import 'report_storage.dart';
 
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'report_snapshot_manager.dart';
+import 'memory_optimizer.dart';
+import 'advanced_image_cache_manager.dart';
 
   class PdfReportResult {
     final Uint8List bytes;
@@ -287,18 +290,15 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 
       DateTime? end,
       void Function(double progress)? onProgress,
+      void Function(String status)? onStatusUpdate,
       bool lowMemory = false,
       Uint8List? arabicFontBytes,
 
     }) async {
 
-      // Ensure the cache does not retain images from previous reports
-      if (kIsWeb) {
-        PdfImageCache.clearForWeb();
-      } else {
-        PdfImageCache.clear();
-      }
-      onProgress?.call(0.0);
+      // بدء مراقبة الذاكرة
+      MemoryOptimizer.startMemoryMonitoring();
+      
       try {
 
       int imgQuality = lowMemory ? _lowMemJpgQuality : _jpgQuality;
@@ -513,16 +513,21 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
               ? _thumbnailDimension.toDouble()
               : 120.0;
 
+      // استخدام المعالج المحسن للصور مع الكاش
+      onStatusUpdate?.call('جاري معالجة الصور...');
       final tempDir = await Directory.systemTemp.createTemp('report_imgs');
-      final fetchedImages = await _fetchImagesForUrls(
-        imageUrls.toList(),
-        onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
-        concurrency: isWeb ? 1 : fetchConcurrency, // Force sequential processing on web
-        maxDimension: imgDim,
-        quality: imgQuality,
+      
+      // تحديد إعدادات الذاكرة
+      final memoryRecommendations = MemoryOptimizer.getMemoryRecommendations(imageUrls.length);
+      
+      // استخدام الكاش المتقدم للصور
+      final fetchedImages = await EnhancedImageProcessor.processImagesBatch(
+        imageUrls: imageUrls.toList(),
         tempDir: tempDir,
+        onProgress: (p) => onProgress?.call(0.6 + p * 0.3),
+        onStatusUpdate: onStatusUpdate,
       );
-
+      
       onProgress?.call(0.9);
 
       pw.Font? emojiFont;
@@ -796,30 +801,22 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
         ),
 
       );
-      // Release any cached images once the page is rendered.
-      if (kIsWeb) {
-        PdfImageCache.clearForWeb();
-      } else {
-        PdfImageCache.clear();
-      }
+      // تنظيف الملفات المؤقتة
+      await EnhancedImageProcessor.cleanupTempFiles(tempDir);
 
       final pdfBytes = await pdf.save();
       onProgress?.call(1.0);
       final url = await uploadReportPdf(pdfBytes, fileName, token);
-      await tempDir.delete(recursive: true);
 
 
 
       print('تم إنشاء التقرير بنجاح: ${pdfBytes.length} bytes');
       return PdfReportResult(bytes: pdfBytes, downloadUrl: url);
       } finally {
-        if (kIsWeb) {
-          PdfImageCache.clearForWeb();
-          // Force garbage collection on web
-          Future.delayed(const Duration(milliseconds: 200));
-        } else {
-          PdfImageCache.clear();
-        }
+        // إيقاف مراقبة الذاكرة
+        MemoryOptimizer.stopMemoryMonitoring();
+        // تنظيف الذاكرة
+        MemoryOptimizer.cleanupMemory();
       }
 
     }
@@ -2408,6 +2405,142 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
           pw.Container(),
         ],
       );
+    }
+
+    /// إنشاء تقرير من Snapshot جاهز
+    static Future<PdfReportResult> generateFromSnapshot({
+      required String projectId,
+      required Map<String, dynamic> snapshot,
+      String? generatedBy,
+      String? generatedByRole,
+      void Function(double progress)? onProgress,
+      bool lowMemory = false,
+      Uint8List? arabicFontBytes,
+    }) async {
+      try {
+        onProgress?.call(0.0);
+        
+        // استخراج البيانات من Snapshot
+        final phasesData = List<Map<String, dynamic>>.from(snapshot['phasesData'] ?? []);
+        final testsData = List<Map<String, dynamic>>.from(snapshot['testsData'] ?? []);
+        final materialsData = List<Map<String, dynamic>>.from(snapshot['materialsData'] ?? []);
+        final imagesData = List<Map<String, dynamic>>.from(snapshot['imagesData'] ?? []);
+        
+        onProgress?.call(0.2);
+        
+        // تجميع URLs الصور
+        final Set<String> imageUrls = {};
+        for (final image in imagesData) {
+          if (image['url'] != null) {
+            imageUrls.add(image['url'].toString());
+          }
+        }
+        
+        onProgress?.call(0.4);
+        
+        // معالجة الصور (مع الكاش المحسن)
+        final tempDir = await Directory.systemTemp.createTemp('report_imgs');
+        final fetchedImages = await _fetchImagesForUrls(
+          imageUrls.toList(),
+          onProgress: (p) => onProgress?.call(0.4 + p * 0.3),
+          concurrency: lowMemory ? 1 : 3,
+          maxDimension: lowMemory ? _lowMemImageDimension : _maxImageDimension,
+          quality: lowMemory ? _lowMemJpgQuality : _jpgQuality,
+          tempDir: tempDir,
+        );
+        
+        onProgress?.call(0.7);
+        
+        // إنشاء PDF (نفس المنطق الموجود)
+        await _loadArabicFont(fontBytes: arabicFontBytes);
+        if (_arabicFont == null) {
+          throw Exception('Arabic font not available');
+        }
+        
+        final pdf = pw.Document(compress: true, version: PdfVersion.pdf_1_5);
+        final fileName = 'report_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
+        final token = generateReportToken();
+        final qrLink = buildReportDownloadUrl(fileName, token);
+        
+        // استخدام البيانات من Snapshot لبناء PDF
+        final projectData = snapshot['projectData'] as Map<String, dynamic>? ?? {};
+        final projectName = projectData['name'] ?? 'مشروع غير مسمى';
+        final clientName = projectData['clientName'] ?? 'غير معروف';
+        
+        // بناء صفحات PDF باستخدام البيانات المجمعة
+        pdf.addPage(
+          pw.MultiPage(
+            maxPages: 10000,
+            pageTheme: pw.PageTheme(
+              pageFormat: PdfPageFormat.a4,
+              textDirection: pw.TextDirection.rtl,
+              theme: pw.ThemeData.withFont(
+                base: _arabicFont,
+                bold: _arabicFont,
+                italic: _arabicFont,
+                boldItalic: _arabicFont,
+              ),
+              margin: const pw.EdgeInsets.all(20),
+            ),
+            header: (context) => pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              child: pw.Text('تقرير المشروع: $projectName', 
+                style: pw.TextStyle(font: _arabicFont, fontSize: 18, fontWeight: pw.FontWeight.bold)),
+            ),
+            build: (context) => [
+              // تفاصيل المشروع
+              pw.Text('اسم المشروع: $projectName', style: pw.TextStyle(font: _arabicFont, fontSize: 16)),
+              pw.Text('اسم العميل: $clientName', style: pw.TextStyle(font: _arabicFont, fontSize: 16)),
+              pw.SizedBox(height: 20),
+              
+              // إحصائيات سريعة
+              pw.Text('إحصائيات التقرير:', style: pw.TextStyle(font: _arabicFont, fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.Text('عدد الإدخالات: ${phasesData.length}', style: pw.TextStyle(font: _arabicFont, fontSize: 14)),
+              pw.Text('عدد الاختبارات: ${testsData.length}', style: pw.TextStyle(font: _arabicFont, fontSize: 14)),
+              pw.Text('عدد طلبات المواد: ${materialsData.length}', style: pw.TextStyle(font: _arabicFont, fontSize: 14)),
+              pw.Text('عدد الصور: ${imagesData.length}', style: pw.TextStyle(font: _arabicFont, fontSize: 14)),
+              pw.SizedBox(height: 20),
+              
+              // ملخص المراحل
+              if (phasesData.isNotEmpty) ...[
+                pw.Text('المراحل:', style: pw.TextStyle(font: _arabicFont, fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                ...phasesData.map((phase) => pw.Text('• ${phase['name'] ?? phase['id']} (${phase['entryCount'] ?? 0} إدخال)', 
+                  style: pw.TextStyle(font: _arabicFont, fontSize: 14))),
+                pw.SizedBox(height: 20),
+              ],
+              
+              // ملخص الاختبارات
+              if (testsData.isNotEmpty) ...[
+                pw.Text('الاختبارات:', style: pw.TextStyle(font: _arabicFont, fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                ...testsData.map((test) => pw.Text('• ${test['name'] ?? test['id']}', 
+                  style: pw.TextStyle(font: _arabicFont, fontSize: 14))),
+                pw.SizedBox(height: 20),
+              ],
+              
+              // ملخص طلبات المواد
+              if (materialsData.isNotEmpty) ...[
+                pw.Text('طلبات المواد:', style: pw.TextStyle(font: _arabicFont, fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                ...materialsData.map((material) => pw.Text('• ${material['itemName'] ?? material['id']}', 
+                  style: pw.TextStyle(font: _arabicFont, fontSize: 14))),
+              ],
+            ],
+          ),
+        );
+        
+        onProgress?.call(0.9);
+        
+        final pdfBytes = await pdf.save();
+        final url = await uploadReportPdf(pdfBytes, fileName, token);
+        await tempDir.delete(recursive: true);
+        
+        onProgress?.call(1.0);
+        
+        return PdfReportResult(bytes: pdfBytes, downloadUrl: url);
+        
+      } catch (e) {
+        print('Error generating PDF from snapshot: $e');
+        rethrow;
+      }
     }
 
   }

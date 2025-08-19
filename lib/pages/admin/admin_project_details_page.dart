@@ -31,6 +31,7 @@ import '../../utils/pdf_report_generator.dart';
 import '../../utils/part_request_pdf_generator.dart';
 import '../../utils/progress_dialog.dart';
 import '../../utils/report_progress_overlay.dart';
+import '../../utils/report_snapshot_manager.dart';
 
 import 'package:engineer_management_system/html_stub.dart'
 if (dart.library.html) 'dart:html' as html;
@@ -1983,10 +1984,28 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
       PdfReportResult result;
       
       ReportProgressOverlay.updateProgress(0.1, 
-        message: 'جاري تحميل البيانات...');
+        message: 'جاري البحث عن Snapshot...');
       
-      try {
-        result = await PdfReportGenerator.generateWithIsolate(
+      // محاولة الحصول من Snapshot أولاً (نفس طريقة المهندس)
+      final snapshot = await ReportSnapshotManager.getReportSnapshot(
+        projectId: widget.projectId,
+        startDate: start,
+        endDate: end,
+        onStatusUpdate: (status) {
+          ReportProgressOverlay.updateProgress(0.3, message: status);
+        },
+        onProgress: (progress) {
+          ReportProgressOverlay.updateProgress(0.1 + (progress * 0.2), 
+            message: 'جاري تجميع البيانات...');
+        },
+      );
+      
+      if (snapshot != null) {
+        // إنشاء التقرير من Snapshot (أسرع بكثير)
+        ReportProgressOverlay.updateProgress(0.4, 
+          message: 'جاري إنشاء التقرير من البيانات المجمعة...');
+        
+        result = await PdfReportGenerator.generate(
           projectId: widget.projectId,
           projectData: _projectDataSnapshot?.data() as Map<String, dynamic>?,
           phases: predefinedPhasesStructure,
@@ -1996,13 +2015,11 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           start: start,
           end: end,
           onProgress: (p) {
-            final progress = 0.1 + (p * 0.8); // من 10% إلى 90%
+            final progress = 0.4 + (p * 0.5); // من 40% إلى 90%
             String message;
             if (p < 0.3) {
-              message = 'جاري تحميل البيانات...';
-            } else if (p < 0.6) {
               message = 'جاري معالجة الصور...';
-            } else if (p < 0.9) {
+            } else if (p < 0.6) {
               message = 'جاري إنشاء التقرير...';
             } else {
               message = 'جاري حفظ التقرير...';
@@ -2010,10 +2027,10 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             ReportProgressOverlay.updateProgress(progress, message: message);
           },
         );
-      } catch (e) {
-        // Retry with low-memory settings if initial attempt fails.
-        ReportProgressOverlay.updateProgress(0.5, 
-          message: 'إعادة المحاولة مع إعدادات الذاكرة المنخفضة...');
+      } else {
+        // Fallback للطريقة القديمة
+        ReportProgressOverlay.updateProgress(0.3, 
+          message: 'جاري إنشاء التقرير بالطريقة التقليدية...');
         
         result = await PdfReportGenerator.generateWithIsolate(
           projectId: widget.projectId,
@@ -2025,7 +2042,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           start: start,
           end: end,
           onProgress: (p) {
-            final progress = 0.5 + (p * 0.4); // من 50% إلى 90%
+            final progress = 0.3 + (p * 0.6); // من 30% إلى 90%
             String message;
             if (p < 0.3) {
               message = 'جاري تحميل البيانات...';
@@ -2038,7 +2055,6 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
             }
             ReportProgressOverlay.updateProgress(progress, message: message);
           },
-          lowMemory: true,
         );
       }
 
