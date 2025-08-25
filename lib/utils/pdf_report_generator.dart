@@ -14,6 +14,7 @@ import 'package:printing/printing.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../firebase_options.dart';
 import 'pdf_styles.dart';
@@ -490,6 +491,23 @@ import 'advanced_image_cache_manager.dart';
         }
       }
 
+      // في حال كان عدد الصور كبيراً جداً، يتم توليد التقرير على الخادم
+      if (imageUrls.length > 100) {
+        try {
+          onStatusUpdate?.call('جاري إنشاء التقرير على الخادم...');
+          final callable = FirebaseFunctions.instance.httpsCallable('generatePdfReport');
+          final result = await callable.call({
+            'images': imageUrls.toList(),
+          });
+          final url = (result.data is Map && result.data['url'] != null)
+              ? result.data['url']
+              : result.data.toString();
+          return PdfReportResult(bytes: Uint8List(0), downloadUrl: url);
+        } catch (e) {
+          print('Remote PDF generation failed: $e');
+        }
+      }
+
       final bool thumbnailMode =
           imageUrls.length >= _thumbnailCountThreshold;
       final bool extremeThumbnailMode =
@@ -811,6 +829,7 @@ import 'advanced_image_cache_manager.dart';
         ),
 
       );
+      PdfImageCache.clearPrecache();
       // تنظيف الملفات المؤقتة
       await EnhancedImageProcessor.cleanupTempFiles(tempDir);
 
@@ -827,6 +846,8 @@ import 'advanced_image_cache_manager.dart';
         MemoryOptimizer.stopMemoryMonitoring();
         // تنظيف الذاكرة
         MemoryOptimizer.cleanupMemory();
+        PdfImageCache.clear();
+        PdfImageCache.clearPrecache();
       }
 
     }
@@ -1316,55 +1337,51 @@ import 'advanced_image_cache_manager.dart';
         }) {
       if (urls.isEmpty) return pw.SizedBox();
 
-      final widgets = <pw.Widget>[];
-
-      for (final url in urls) {
-        final path = images?[url];
-        if (path == null) continue;
-        final memImg = pw.MemoryImage(File(path).readAsBytesSync());
-
-        widgets.add(
-          pw.Column(                      // <-- حاوية لكل صورة وزرها
-            mainAxisSize: pw.MainAxisSize.min,
-            children: [
-              pw.Container(
-                width: size,
-                height: size,
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: borderColor),
-                ),
-                child: pw.Image(memImg, fit: pw.BoxFit.cover),
-              ),
-              pw.SizedBox(height: 4),
-              pw.UrlLink(                 // <-- زر/رابط «معاينة»
-                destination: url,
-                child: pw.Text(
-                  'معاينة',
-                  style: pw.TextStyle(
-                    font: _arabicFont,
-                    fontSize: 10,
-                    color: PdfColors.blue,
-                    decoration: pw.TextDecoration.underline,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      }
-
-      // التفاف العناصر من اليمين (RTL ⇒ start)
       return pw.Container(
         width: double.infinity,
         alignment: pw.Alignment.topRight,
         child: pw.Directionality(
           textDirection: pw.TextDirection.rtl,
-          child: pw.Wrap(
-            alignment: pw.WrapAlignment.start,     // <-- البداية = يمين
-            runAlignment: pw.WrapAlignment.start,  // <-- كل الأسطر تبدأ يمين
-            spacing: 6,
-            runSpacing: 6,
-            children: widgets,
+          child: pw.GridView(
+            crossAxisCount: 3,
+            crossAxisSpacing: 6,
+            mainAxisSpacing: 6,
+            children: List.generate(urls.length, (index) {
+              final url = urls[index];
+              return pw.Builder(builder: (context) {
+                final path = images?[url];
+                if (path == null) return pw.SizedBox();
+                final bytes = File(path).readAsBytesSync();
+                final memImg = pw.MemoryImage(bytes);
+                PdfImageCache.precache.remove(url);
+                return pw.Column(
+                  mainAxisSize: pw.MainAxisSize.min,
+                  children: [
+                    pw.Container(
+                      width: size,
+                      height: size,
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: borderColor),
+                      ),
+                      child: pw.Image(memImg, fit: pw.BoxFit.cover),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.UrlLink(
+                      destination: url,
+                      child: pw.Text(
+                        'معاينة',
+                        style: pw.TextStyle(
+                          font: _arabicFont,
+                          fontSize: 10,
+                          color: PdfColors.blue,
+                          decoration: pw.TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              });
+            }),
           ),
         ),
       );
@@ -1905,6 +1922,7 @@ import 'advanced_image_cache_manager.dart';
       Uint8List? arabicFontBytes,
     }) async {
       PdfImageCache.clear();
+      PdfImageCache.clearPrecache();
       onProgress?.call(0.0);
       try {
       int imgQuality = lowMemory ? _lowMemJpgQuality : _jpgQuality;
@@ -2152,6 +2170,7 @@ import 'advanced_image_cache_manager.dart';
         ),
       );
       // Clear the cache after rendering the page.
+      PdfImageCache.clearPrecache();
       PdfImageCache.clear();
 
       final bytes = await pdf.save();
@@ -2161,6 +2180,7 @@ import 'advanced_image_cache_manager.dart';
       return bytes;
       } finally {
         PdfImageCache.clear();
+        PdfImageCache.clearPrecache();
       }
     }
 
@@ -2624,12 +2644,14 @@ import 'advanced_image_cache_manager.dart';
             ],
           ),
         );
-        
+        PdfImageCache.clearPrecache();
+
         onProgress?.call(0.9);
         
         final pdfBytes = await pdf.save();
         final url = await uploadReportPdf(pdfBytes, fileName, token);
         await tempDir.delete(recursive: true);
+        PdfImageCache.clearPrecache();
         
         onProgress?.call(1.0);
         
