@@ -46,6 +46,8 @@ import 'images_viewer_page.dart';
 import '../../utils/report_snapshot_manager.dart';
 import '../../utils/advanced_image_cache_manager.dart';
 import '../../utils/memory_optimizer.dart';
+import '../../utils/smart_report_cache_manager.dart';
+import '../../utils/enhanced_pdf_generator.dart';
 
 class ProjectDetailsPage extends StatefulWidget {
   final String projectId;
@@ -918,13 +920,13 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
               },
               child: const Text('تقرير اليوم'),
             ),
-            SimpleDialogOption(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _generateDailyReportPdf();
-              },
-              child: const Text('تقرير شامل'),
-            ),
+            // SimpleDialogOption(
+            //   onPressed: () {
+            //     Navigator.pop(ctx);
+            //     _generateDailyReportPdf();
+            //   },
+            //   child: const Text('تقرير شامل'),
+            // ),
             SimpleDialogOption(
               onPressed: () async {
                 Navigator.pop(ctx);
@@ -996,6 +998,70 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
     final fileName = 'daily_report_${DateFormat('yyyyMMdd_HHmmss').format(now)}.pdf';
     
     try {
+      // للتقرير الشامل، استخدم النظام المحسن الجديد
+      if (isFullReport) {
+        ReportProgressOverlay.updateProgress(0.1, 
+          message: getLocalizedText('بدء النظام المحسن للتقرير الشامل...', 'Starting enhanced comprehensive report system...'));
+        
+        final enhancedResult = await EnhancedPdfGenerator.generateComprehensiveReport(
+          projectId: widget.projectId,
+          startDate: DateTime.now().subtract(const Duration(days: 365)), // سنة كاملة للتقرير الشامل
+          endDate: DateTime.now(),
+          generatedBy: _currentEngineerName ?? 'المهندس',
+          generatedByRole: 'المهندس',
+          onStatusUpdate: (status) {
+            ReportProgressOverlay.updateProgress(0.5, 
+              message: status
+            );
+          },
+          onProgress: (progress) {
+            ReportProgressOverlay.updateProgress(progress, 
+              message: getLocalizedText('جاري إنشاء التقرير المحسن...', 'Generating enhanced report...'));
+          },
+          forceRefresh: false, // استخدام البيانات المحفوظة
+        );
+        
+        final result = PdfReportResult(
+          bytes: enhancedResult.bytes,
+          downloadUrl: null,
+        );
+        
+        ReportProgressOverlay.updateProgress(1.0, 
+          message: getLocalizedText('تم إنشاء التقرير الشامل المحسن بنجاح', 'Enhanced comprehensive report generated successfully'));
+        
+        await Future.delayed(const Duration(milliseconds: 500));
+        ReportProgressOverlay.hideProgressOverlay();
+        
+        // عرض إشعار اكتمال التقرير
+        ReportProgressOverlay.showCompletionNotification(
+          context,
+          reportId: 'enhanced_report_${DateTime.now().millisecondsSinceEpoch}',
+          fileName: fileName,
+          onTap: () {
+            _openPdfPreview(
+              result.bytes,
+              fileName,
+              getLocalizedText('يرجى الإطلاع على التقرير الشامل المحسن للمشروع.', 'Please review the enhanced comprehensive project report.'),
+              result.downloadUrl,
+            );
+          },
+        );
+        
+        _showFeedbackSnackBar(context, 
+          getLocalizedText('تم إنشاء التقرير الشامل المحسن بنجاح.', 'Enhanced comprehensive report generated successfully.'), 
+          isError: false);
+
+        _openPdfPreview(
+          result.bytes,
+          fileName,
+          getLocalizedText('يرجى الإطلاع على التقرير الشامل المحسن للمشروع.', 'Please review the enhanced comprehensive project report.'),
+          result.downloadUrl,
+        );
+        
+        return; // الخروج من الدالة بعد إنشاء التقرير المحسن
+      }
+      
+      // للتقارير الأخرى (اليومية والفترة)، استخدم النظام القديم
       PdfReportResult result;
       
       ReportProgressOverlay.updateProgress(0.1, 
@@ -2851,26 +2917,48 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                             }).toList(),
                           ),
                         ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
-                        label: Text(
-                            (_selectedBeforeImages == null || _selectedBeforeImages!.isEmpty)
-                                ? 'إضافة صور قبل (اختياري)'
-                                : 'تغيير/إضافة المزيد من صور قبل',
-                            style: const TextStyle(color: AppConstants.primaryColor)
-                        ),
-                        onPressed: () {
-                          _showImageSourceActionSheet(context, (List<XFile>? images) {
-                            if (images != null && images.isNotEmpty) {
-                              setDialogContentState(() {
-                                if (_selectedBeforeImages == null) {
-                                  _selectedBeforeImages = [];
-                                }
-                                _selectedBeforeImages!.addAll(images);
-                              });
-                            }
-                          });
-                        },
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton.icon(
+                              icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
+                              label: Text(
+                                  (_selectedBeforeImages == null || _selectedBeforeImages!.isEmpty)
+                                      ? 'إضافة صور قبل (اختياري)'
+                                      : 'تغيير/إضافة المزيد من صور قبل',
+                                  style: const TextStyle(color: AppConstants.primaryColor)
+                              ),
+                              onPressed: () {
+                                _showImageSourceActionSheet(context, (List<XFile>? images) {
+                                  if (images != null && images.isNotEmpty) {
+                                    setDialogContentState(() {
+                                      if (_selectedBeforeImages == null) {
+                                        _selectedBeforeImages = [];
+                                      }
+                                      _selectedBeforeImages!.addAll(images);
+                                    });
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.camera_alt, color: AppConstants.primaryColor),
+                            tooltip: 'التقاط صورة بالكاميرا مباشرة',
+                            onPressed: () async {
+                              final ImagePicker picker = ImagePicker();
+                              final XFile? image = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                              if (image != null) {
+                                setDialogContentState(() {
+                                  if (_selectedBeforeImages == null) {
+                                    _selectedBeforeImages = [];
+                                  }
+                                  _selectedBeforeImages!.add(image);
+                                });
+                              }
+                            },
+                          ),
+                        ],
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
                       if (_selectedAfterImages != null && _selectedAfterImages!.isNotEmpty)
@@ -2912,26 +3000,48 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                             }).toList(),
                           ),
                         ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
-                        label: Text(
-                            (_selectedAfterImages == null || _selectedAfterImages!.isEmpty)
-                                ? 'إضافة صور بعد (اختياري)'
-                                : 'تغيير/إضافة المزيد من صور بعد',
-                            style: const TextStyle(color: AppConstants.primaryColor)
-                        ),
-                        onPressed: () {
-                          _showImageSourceActionSheet(context, (List<XFile>? images) {
-                            if (images != null && images.isNotEmpty) {
-                              setDialogContentState(() {
-                                if (_selectedAfterImages == null) {
-                                  _selectedAfterImages = [];
-                                }
-                                _selectedAfterImages!.addAll(images);
-                              });
-                            }
-                          });
-                        },
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton.icon(
+                              icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
+                              label: Text(
+                                  (_selectedAfterImages == null || _selectedAfterImages!.isEmpty)
+                                      ? 'إضافة صور بعد (اختياري)'
+                                      : 'تغيير/إضافة المزيد من صور بعد',
+                                  style: const TextStyle(color: AppConstants.primaryColor)
+                              ),
+                              onPressed: () {
+                                _showImageSourceActionSheet(context, (List<XFile>? images) {
+                                  if (images != null && images.isNotEmpty) {
+                                    setDialogContentState(() {
+                                      if (_selectedAfterImages == null) {
+                                        _selectedAfterImages = [];
+                                      }
+                                      _selectedAfterImages!.addAll(images);
+                                    });
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.camera_alt, color: AppConstants.primaryColor),
+                            tooltip: 'التقاط صورة بالكاميرا مباشرة',
+                            onPressed: () async {
+                              final ImagePicker picker = ImagePicker();
+                              final XFile? image = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                              if (image != null) {
+                                setDialogContentState(() {
+                                  if (_selectedAfterImages == null) {
+                                    _selectedAfterImages = [];
+                                  }
+                                  _selectedAfterImages!.add(image);
+                                });
+                              }
+                            },
+                          ),
+                        ],
                       ),
                       const SizedBox(height: AppConstants.itemSpacing),
                       if (_selectedOtherImages != null && _selectedOtherImages!.isNotEmpty)
@@ -2973,26 +3083,48 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                             }).toList(),
                           ),
                         ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
-                        label: Text(
-                            (_selectedOtherImages == null || _selectedOtherImages!.isEmpty)
-                                ? 'إضافة صور أخرى (اختياري)'
-                                : 'تغيير/إضافة المزيد من الصور',
-                            style: const TextStyle(color: AppConstants.primaryColor)
-                        ),
-                        onPressed: () {
-                          _showImageSourceActionSheet(context, (List<XFile>? images) {
-                            if (images != null && images.isNotEmpty) {
-                              setDialogContentState(() {
-                                if (_selectedOtherImages == null) {
-                                  _selectedOtherImages = [];
-                                }
-                                _selectedOtherImages!.addAll(images);
-                              });
-                            }
-                          });
-                        },
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton.icon(
+                              icon: const Icon(Icons.add_photo_alternate_outlined, color: AppConstants.primaryColor),
+                              label: Text(
+                                  (_selectedOtherImages == null || _selectedOtherImages!.isEmpty)
+                                      ? 'إضافة صور أخرى (اختياري)'
+                                      : 'تغيير/إضافة المزيد من الصور',
+                                  style: const TextStyle(color: AppConstants.primaryColor)
+                              ),
+                              onPressed: () {
+                                _showImageSourceActionSheet(context, (List<XFile>? images) {
+                                  if (images != null && images.isNotEmpty) {
+                                    setDialogContentState(() {
+                                      if (_selectedOtherImages == null) {
+                                        _selectedOtherImages = [];
+                                      }
+                                      _selectedOtherImages!.addAll(images);
+                                    });
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.camera_alt, color: AppConstants.primaryColor),
+                            tooltip: 'التقاط صورة بالكاميرا مباشرة',
+                            onPressed: () async {
+                              final ImagePicker picker = ImagePicker();
+                              final XFile? image = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                              if (image != null) {
+                                setDialogContentState(() {
+                                  if (_selectedOtherImages == null) {
+                                    _selectedOtherImages = [];
+                                  }
+                                  _selectedOtherImages!.add(image);
+                                });
+                              }
+                            },
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -3117,6 +3249,12 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> with TickerProv
                         }
                       }
                       Navigator.pop(dialogContext);
+                      // تحديث الصفحة لعرض الصور والملاحظات الجديدة
+                      if (mounted) {
+                        setState(() {
+                          // تحديث البيانات
+                        });
+                      }
                       _showFeedbackSnackBar(context, 'تمت إضافة الإدخال بنجاح.', isError: false);
                     } catch (e) {
                       if (mounted) _showFeedbackSnackBar(stfContext, 'فشل إضافة الإدخال: $e', isError: true,);

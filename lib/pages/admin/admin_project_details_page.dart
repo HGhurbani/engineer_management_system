@@ -32,6 +32,8 @@ import '../../utils/part_request_pdf_generator.dart';
 import '../../utils/progress_dialog.dart';
 import '../../utils/report_progress_overlay.dart';
 import '../../utils/report_snapshot_manager.dart';
+import '../../utils/smart_report_cache_manager.dart';
+import '../../utils/enhanced_pdf_generator.dart';
 
 import 'package:engineer_management_system/html_stub.dart'
 if (dart.library.html) 'dart:html' as html;
@@ -1912,13 +1914,13 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
               },
               child: const Text('تقرير اليوم'),
             ),
-            SimpleDialogOption(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _generateDailyReportPdf();
-              },
-              child: const Text('تقرير شامل'),
-            ),
+            // SimpleDialogOption(
+            //   onPressed: () {
+            //     Navigator.pop(ctx);
+            //     _generateDailyReportPdf();
+            //   },
+            //   child: const Text('تقرير شامل'),
+            // ),
             SimpleDialogOption(
               onPressed: () async {
                 Navigator.pop(ctx);
@@ -1981,6 +1983,68 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
     );
 
     try {
+      // للتقرير الشامل، استخدم النظام المحسن الجديد
+      if (isFullReport) {
+        ReportProgressOverlay.updateProgress(0.1, 
+          message: 'بدء النظام المحسن للتقرير الشامل...');
+        
+        final enhancedResult = await EnhancedPdfGenerator.generateComprehensiveReport(
+          projectId: widget.projectId,
+          startDate: DateTime.now().subtract(const Duration(days: 365)), // سنة كاملة للتقرير الشامل
+          endDate: DateTime.now(),
+          generatedBy: _currentAdminName ?? 'المسؤول',
+          generatedByRole: 'المسؤول',
+          onStatusUpdate: (status) {
+            ReportProgressOverlay.updateProgress(0.5, 
+              message: status
+            );
+          },
+          onProgress: (progress) {
+            ReportProgressOverlay.updateProgress(progress, 
+              message: 'جاري إنشاء التقرير المحسن...');
+          },
+          forceRefresh: false, // استخدام البيانات المحفوظة
+        );
+        
+        final result = PdfReportResult(
+          bytes: enhancedResult.bytes,
+          downloadUrl: null,
+        );
+        
+        ReportProgressOverlay.updateProgress(1.0, 
+          message: 'تم إنشاء التقرير الشامل المحسن بنجاح');
+        
+        await Future.delayed(const Duration(milliseconds: 500));
+        ReportProgressOverlay.hideProgressOverlay();
+        
+        // عرض إشعار اكتمال التقرير
+        ReportProgressOverlay.showCompletionNotification(
+          context,
+          reportId: 'enhanced_report_${DateTime.now().millisecondsSinceEpoch}',
+          fileName: fileName,
+          onTap: () {
+            _openPdfPreview(
+              result.bytes,
+              fileName,
+              'يرجى الإطلاع على $headerText المحسن للمشروع.',
+              result.downloadUrl,
+            );
+          },
+        );
+        
+        _showFeedbackSnackBar(context, 'تم إنشاء التقرير الشامل المحسن بنجاح.', isError: false);
+
+        _openPdfPreview(
+          result.bytes,
+          fileName,
+          'يرجى الإطلاع على $headerText المحسن للمشروع.',
+          result.downloadUrl,
+        );
+        
+        return; // الخروج من الدالة بعد إنشاء التقرير المحسن
+      }
+      
+      // للتقارير الأخرى (اليومية والفترة)، استخدم النظام القديم
       PdfReportResult result;
       
       ReportProgressOverlay.updateProgress(0.1, 
@@ -2057,7 +2121,7 @@ class _AdminProjectDetailsPageState extends State<AdminProjectDetailsPage> with 
           },
         );
       }
-
+      
       ReportProgressOverlay.updateProgress(1.0, 
         message: 'تم إنشاء التقرير بنجاح');
       

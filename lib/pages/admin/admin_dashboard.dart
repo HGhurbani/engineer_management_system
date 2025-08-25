@@ -785,6 +785,13 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
         color: const Color(0xFF2DD4BF),
         route: '/admin/holiday_settings',
       ),
+      // _ManagementItem(
+      //   title: 'إدارة Snapshots التقارير',
+      //   subtitle: 'إعادة بناء وإصلاح snapshots التقارير',
+      //   icon: Icons.storage_rounded,
+      //   color: Colors.deepPurple,
+      //   route: '/admin/snapshot-rebuild',
+      // ),
     ];
 
     int crossAxisCount;

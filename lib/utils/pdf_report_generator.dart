@@ -358,9 +358,14 @@ import 'advanced_image_cache_manager.dart';
           final snap = await q.orderBy('timestamp').get();
           for (var doc in snap.docs) {
             final data = doc.data();
-            final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-            final beforeImgs = (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-            final afterImgs = (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            // دعم الهياكل القديمة والجديدة للصور
+            final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
+                        (data['otherImages'] as List?)?.map((e) => e.toString()).toList() ?? 
+                        (data['otherImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            final beforeImgs = (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
+                              (data['beforeImages'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            final afterImgs = (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
+                             (data['afterImages'] as List?)?.map((e) => e.toString()).toList() ?? [];
             imageUrls.addAll(imgs);
             imageUrls.addAll(beforeImgs);
             imageUrls.addAll(afterImgs);
@@ -389,9 +394,14 @@ import 'advanced_image_cache_manager.dart';
             final subSnap = await qSub.orderBy('timestamp').get();
             for (var doc in subSnap.docs) {
               final data = doc.data();
-              final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-              final beforeImgs = (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-              final afterImgs = (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              // دعم الهياكل القديمة والجديدة للصور
+              final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
+                          (data['otherImages'] as List?)?.map((e) => e.toString()).toList() ?? 
+                          (data['otherImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              final beforeImgs = (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
+                                (data['beforeImages'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              final afterImgs = (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
+                               (data['afterImages'] as List?)?.map((e) => e.toString()).toList() ?? [];
               imageUrls.addAll(imgs);
               imageUrls.addAll(beforeImgs);
               imageUrls.addAll(afterImgs);
@@ -1931,12 +1941,14 @@ import 'advanced_image_cache_manager.dart';
             final snap = await q.orderBy('timestamp').get();
             for (var doc in snap.docs) {
               final data = doc.data();
-              final imgs =
-                  (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-              final beforeImgs =
-                  (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-              final afterImgs =
-                  (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              // دعم الهياكل القديمة والجديدة للصور
+              final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
+                          (data['otherImages'] as List?)?.map((e) => e.toString()).toList() ?? 
+                          (data['otherImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              final beforeImgs = (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
+                                (data['beforeImages'] as List?)?.map((e) => e.toString()).toList() ?? [];
+              final afterImgs = (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
+                               (data['afterImages'] as List?)?.map((e) => e.toString()).toList() ?? [];
               imageUrls.addAll(imgs);
               imageUrls.addAll(beforeImgs);
               imageUrls.addAll(afterImgs);
@@ -1966,12 +1978,14 @@ import 'advanced_image_cache_manager.dart';
               final subSnap = await qSub.orderBy('timestamp').get();
               for (var doc in subSnap.docs) {
                 final data = doc.data();
-                final imgs =
-                    (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-                final beforeImgs =
-                    (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-                final afterImgs =
-                    (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                // دعم الهياكل القديمة والجديدة للصور
+                final imgs = (data['imageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
+                            (data['otherImages'] as List?)?.map((e) => e.toString()).toList() ?? 
+                            (data['otherImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                final beforeImgs = (data['beforeImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
+                                  (data['beforeImages'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                final afterImgs = (data['afterImageUrls'] as List?)?.map((e) => e.toString()).toList() ?? 
+                                 (data['afterImages'] as List?)?.map((e) => e.toString()).toList() ?? [];
                 imageUrls.addAll(imgs);
                 imageUrls.addAll(beforeImgs);
                 imageUrls.addAll(afterImgs);
@@ -2420,11 +2434,23 @@ import 'advanced_image_cache_manager.dart';
       try {
         onProgress?.call(0.0);
         
-        // استخراج البيانات من Snapshot
+        // استخراج البيانات من Snapshot مع التحقق من صحة البيانات
         final phasesData = List<Map<String, dynamic>>.from(snapshot['phasesData'] ?? []);
         final testsData = List<Map<String, dynamic>>.from(snapshot['testsData'] ?? []);
         final materialsData = List<Map<String, dynamic>>.from(snapshot['materialsData'] ?? []);
         final imagesData = List<Map<String, dynamic>>.from(snapshot['imagesData'] ?? []);
+        
+        // فحص إذا كان الـ Snapshot فارغاً أو يحتوي على بيانات غير صالحة
+        final totalEntries = phasesData.fold<int>(0, (sum, phase) {
+          final entries = phase['entries'] as List? ?? [];
+          return sum + entries.length;
+        });
+        
+        if (totalEntries == 0 && testsData.isEmpty && materialsData.isEmpty) {
+          throw Exception('لا توجد بيانات في Snapshot - قد تحتاج إلى إعادة بناء Snapshot');
+        }
+        
+        print('Generating report from snapshot - Phases: ${phasesData.length}, Total entries: $totalEntries, Tests: ${testsData.length}, Materials: ${materialsData.length}');
         
         onProgress?.call(0.2);
         
@@ -2461,7 +2487,7 @@ import 'advanced_image_cache_manager.dart';
         final fileName = 'report_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
         final token = generateReportToken();
         final qrLink = buildReportDownloadUrl(fileName, token);
-        
+
         // استخدام البيانات من Snapshot لبناء PDF
         final projectData = snapshot['projectData'] as Map<String, dynamic>? ?? {};
         final projectName = projectData['name'] ?? 'مشروع غير مسمى';
@@ -2501,27 +2527,99 @@ import 'advanced_image_cache_manager.dart';
               pw.Text('عدد الصور: ${imagesData.length}', style: pw.TextStyle(font: _arabicFont, fontSize: 14)),
               pw.SizedBox(height: 20),
               
-              // ملخص المراحل
+              // ملخص المراحل مع التفاصيل
               if (phasesData.isNotEmpty) ...[
                 pw.Text('المراحل:', style: pw.TextStyle(font: _arabicFont, fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                ...phasesData.map((phase) => pw.Text('• ${phase['name'] ?? phase['id']} (${phase['entryCount'] ?? 0} إدخال)', 
-                  style: pw.TextStyle(font: _arabicFont, fontSize: 14))),
+                ...phasesData.map((phase) {
+                  final entries = phase['entries'] as List? ?? [];
+                  final entryCount = entries.length;
+                  final phaseName = phase['name'] ?? phase['id'];
+                  return pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('• $phaseName ($entryCount إدخال)', 
+                        style: pw.TextStyle(font: _arabicFont, fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                      if (entryCount > 0) ...[
+                        pw.SizedBox(height: 5),
+                        ...entries.take(3).map((entry) => pw.Padding(
+                          padding: const pw.EdgeInsets.only(right: 20),
+                          child: pw.Text('- ${entry['notes'] ?? 'لا توجد ملاحظات'}', 
+                            style: pw.TextStyle(font: _arabicFont, fontSize: 12)),
+                        )),
+                        if (entryCount > 3)
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.only(right: 20),
+                            child: pw.Text('... و ${entryCount - 3} إدخالات أخرى', 
+                              style: pw.TextStyle(font: _arabicFont, fontSize: 12, fontStyle: pw.FontStyle.italic)),
+                          ),
+                      ],
+                      pw.SizedBox(height: 10),
+                    ],
+                  );
+                }),
                 pw.SizedBox(height: 20),
               ],
               
-              // ملخص الاختبارات
+              // ملخص الاختبارات مع التفاصيل
               if (testsData.isNotEmpty) ...[
                 pw.Text('الاختبارات:', style: pw.TextStyle(font: _arabicFont, fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                ...testsData.map((test) => pw.Text('• ${test['name'] ?? test['id']}', 
-                  style: pw.TextStyle(font: _arabicFont, fontSize: 14))),
+                ...testsData.map((test) {
+                  final testName = test['name'] ?? test['id'];
+                  final status = test['status'] ?? 'غير محدد';
+                  final notes = test['notes'] ?? '';
+                  return pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('• $testName (الحالة: $status)', 
+                        style: pw.TextStyle(font: _arabicFont, fontSize: 14)),
+                      if (notes.isNotEmpty)
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.only(right: 20),
+                          child: pw.Text('ملاحظات: $notes', 
+                            style: pw.TextStyle(font: _arabicFont, fontSize: 12)),
+                        ),
+                      pw.SizedBox(height: 5),
+                    ],
+                  );
+                }),
                 pw.SizedBox(height: 20),
               ],
               
               // ملخص طلبات المواد
               if (materialsData.isNotEmpty) ...[
                 pw.Text('طلبات المواد:', style: pw.TextStyle(font: _arabicFont, fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                ...materialsData.map((material) => pw.Text('• ${material['itemName'] ?? material['id']}', 
-                  style: pw.TextStyle(font: _arabicFont, fontSize: 14))),
+                ...materialsData.map((material) {
+                  final materialName = material['materialName'] ?? 'مادة غير مسماة';
+                  final quantity = material['quantity'] ?? 0;
+                  final status = material['status'] ?? 'معلق';
+                  return pw.Text('• $materialName (الكمية: $quantity، الحالة: $status)', 
+                    style: pw.TextStyle(font: _arabicFont, fontSize: 14));
+                }),
+                pw.SizedBox(height: 20),
+              ],
+              
+              // رسالة إذا لم تكن هناك بيانات
+              if (phasesData.isEmpty && testsData.isEmpty && materialsData.isEmpty) ...[
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(20),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.orange),
+                    borderRadius: pw.BorderRadius.circular(5),
+                  ),
+                  child: pw.Column(
+                    children: [
+                      pw.Text('⚠️ تنبيه', 
+                        style: pw.TextStyle(font: _arabicFont, fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                      pw.SizedBox(height: 10),
+                      pw.Text('لا توجد بيانات متاحة في هذا التقرير. قد تحتاج إلى:', 
+                        style: pw.TextStyle(font: _arabicFont, fontSize: 14)),
+                      pw.Text('• إضافة بيانات للمشروع', 
+                        style: pw.TextStyle(font: _arabicFont, fontSize: 12)),
+                      pw.Text('• إعادة بناء Snapshot التقرير', 
+                        style: pw.TextStyle(font: _arabicFont, fontSize: 12)),
+                    ],
+                  ),
+                ),
               ],
             ],
           ),

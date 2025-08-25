@@ -160,4 +160,62 @@ class ConcurrentOperationsManager {
   
   /// الحصول على عدد العمليات المعلقة
   static int get pendingOperationsCount => _pendingQueue.length;
+
+  /// تنفيذ عمليات متوازية مع إدارة الذاكرة
+  static Future<List<T>> executeParallelOperations<T>({
+    required List<Future<T> Function()> operations,
+    int maxConcurrency = 3,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final results = <T>[];
+    final semaphore = Semaphore(maxConcurrency);
+    
+    try {
+      final futures = operations.map((operation) async {
+        await semaphore.acquire();
+        try {
+          return await operation().timeout(timeout);
+        } finally {
+          semaphore.release();
+        }
+      });
+      
+      final completedResults = await Future.wait(futures);
+      results.addAll(completedResults);
+      
+    } catch (e) {
+      print('Error in parallel operations: $e');
+    }
+    
+    return results;
+  }
+}
+
+/// مدير الإشارات للتحكم في العمليات المتوازية
+class Semaphore {
+  final int _maxCount;
+  int _currentCount;
+  final Queue<Completer<void>> _waiters = Queue();
+  
+  Semaphore(this._maxCount) : _currentCount = _maxCount;
+  
+  Future<void> acquire() async {
+    if (_currentCount > 0) {
+      _currentCount--;
+      return;
+    }
+    
+    final completer = Completer<void>();
+    _waiters.add(completer);
+    await completer.future;
+  }
+  
+  void release() {
+    if (_waiters.isNotEmpty) {
+      final waiter = _waiters.removeFirst();
+      waiter.complete();
+    } else {
+      _currentCount++;
+    }
+  }
 }

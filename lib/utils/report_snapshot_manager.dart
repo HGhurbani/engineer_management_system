@@ -1,18 +1,12 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+
 import 'advanced_cache_manager.dart';
 import 'concurrent_operations_manager.dart';
-import 'dart:io';
-import 'package:http/http.dart' as http;
-import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:image/image.dart' as img;
 
 /// مدير Snapshot التقارير للوصول السريع للبيانات
 class ReportSnapshotManager {
   static const Duration _snapshotCacheExpiry = Duration(hours: 2);
-  static const Duration _snapshotGenerationTimeout = Duration(minutes: 5);
   
   /// الحصول على Snapshot من الكاش أو Firestore
   static Future<Map<String, dynamic>?> getReportSnapshot({
@@ -183,26 +177,167 @@ class ReportSnapshotManager {
     DateTime? endDate,
   ) async {
     try {
+      print('Building snapshot locally for project: $projectId');
       final phasesData = <Map<String, dynamic>>[];
       final testsData = <Map<String, dynamic>>[];
       final materialsData = <Map<String, dynamic>>[];
       final imagesData = <Map<String, dynamic>>[];
       
-      // تجميع بيانات المراحل
+      // تجميع بيانات المراحل - تحسين الهيكل ليتوافق مع Cloud Function
       final phasesSnapshot = await FirebaseFirestore.instance
           .collection('projects')
           .doc(projectId)
           .collection('phases_status')
           .get();
       
+      print('Found ${phasesSnapshot.docs.length} phases');
+      
       for (final phaseDoc in phasesSnapshot.docs) {
-        final entriesSnapshot = await phaseDoc.reference.collection('entries').get();
-        for (final entry in entriesSnapshot.docs) {
-          final data = entry.data();
-          if (_isInDateRange(data['timestamp'], startDate, endDate)) {
-            phasesData.add(data);
-          }
+        final phaseData = phaseDoc.data();
+        final phaseId = phaseDoc.id;
+        final phaseName = phaseData['name'] ?? phaseId;
+        
+        // تجميع الإدخالات لكل مرحلة - مع fallback للمجموعات البديلة
+        var entriesSnapshot = await phaseDoc.reference.collection('entries').get();
+        print('Found ${entriesSnapshot.docs.length} entries for phase $phaseId in phases_status');
+        
+        // إذا لم توجد إدخالات في phases_status، جرب phases
+        if (entriesSnapshot.docs.isEmpty) {
+          entriesSnapshot = await FirebaseFirestore.instance
+              .collection('projects')
+              .doc(projectId)
+              .collection('phases')
+              .doc(phaseId)
+              .collection('entries')
+              .get();
+          print('Found ${entriesSnapshot.docs.length} entries for phase $phaseId in phases (alternative)');
         }
+        
+        final phaseEntries = <Map<String, dynamic>>[];
+        for (final entry in entriesSnapshot.docs) {
+          final entryData = entry.data();
+          if (entryData.isEmpty) {
+            print('Skipping entry ${entry.id} - no data');
+            continue;
+          }
+
+          // فحص وجود محتوى فعلي
+          final hasNotes = entryData['notes'] != null && entryData['notes'].toString().trim().isNotEmpty;
+          final hasImages = (entryData['imageUrls'] != null && (entryData['imageUrls'] as List).isNotEmpty) ||
+                           (entryData['otherImages'] != null && (entryData['otherImages'] as List).isNotEmpty) ||
+                           (entryData['otherImageUrls'] != null && (entryData['otherImageUrls'] as List).isNotEmpty) ||
+                           (entryData['beforeImages'] != null && (entryData['beforeImages'] as List).isNotEmpty) ||
+                           (entryData['beforeImageUrls'] != null && (entryData['beforeImageUrls'] as List).isNotEmpty) ||
+                           (entryData['afterImages'] != null && (entryData['afterImages'] as List).isNotEmpty) ||
+                           (entryData['afterImageUrls'] != null && (entryData['afterImageUrls'] as List).isNotEmpty);
+          final hasStatus = entryData['status'] != null;
+
+          final hasContent = hasNotes || hasImages || hasStatus;
+
+          if (!hasContent) {
+            print('Skipping empty entry ${entry.id}');
+            continue;
+          }
+
+          print('Including entry ${entry.id} with content: notes=$hasNotes, images=$hasImages, status=$hasStatus');
+          
+          // إضافة معلومات المرحلة لكل إدخال
+          final entryWithMeta = {
+            'id': entry.id,
+            ...entryData,
+            'phaseId': phaseId,
+            'phaseName': phaseName,
+            'collectionType': 'main_phase',
+          };
+          phaseEntries.add(entryWithMeta);
+          
+          // تجميع الصور من الإدخال
+          _extractImagesFromEntry(entryData, imagesData);
+        }
+        
+        // إضافة المرحلة مع إدخالاتها
+        phasesData.add({
+          'id': phaseId,
+          'name': phaseName,
+          'entries': phaseEntries,
+          'entryCount': phaseEntries.length,
+        });
+      }
+      
+      // تجميع بيانات المراحل الفرعية أيضاً
+      final subphasesSnapshot = await FirebaseFirestore.instance
+          .collection('projects')
+          .doc(projectId)
+          .collection('subphases_status')
+          .get();
+      
+      print('Found ${subphasesSnapshot.docs.length} subphases');
+      
+      for (final subphaseDoc in subphasesSnapshot.docs) {
+        final subphaseData = subphaseDoc.data();
+        final subphaseId = subphaseDoc.id;
+        final subphaseName = subphaseData['name'] ?? subphaseId;
+        
+        var entriesSnapshot = await subphaseDoc.reference.collection('entries').get();
+        print('Found ${entriesSnapshot.docs.length} entries for subphase $subphaseId in subphases_status');
+        
+        // إذا لم توجد إدخالات في subphases_status، جرب subphases
+        if (entriesSnapshot.docs.isEmpty) {
+          entriesSnapshot = await FirebaseFirestore.instance
+              .collection('projects')
+              .doc(projectId)
+              .collection('subphases')
+              .doc(subphaseId)
+              .collection('entries')
+              .get();
+          print('Found ${entriesSnapshot.docs.length} entries for subphase $subphaseId in subphases (alternative)');
+        }
+        
+        final subphaseEntries = <Map<String, dynamic>>[];
+        for (final entry in entriesSnapshot.docs) {
+          final entryData = entry.data();
+          if (entryData.isEmpty) {
+            print('Skipping subphase entry ${entry.id} - no data');
+            continue;
+          }
+
+          // فحص وجود محتوى فعلي
+          final hasNotes = entryData['notes'] != null && entryData['notes'].toString().trim().isNotEmpty;
+          final hasImages = (entryData['imageUrls'] != null && (entryData['imageUrls'] as List).isNotEmpty) ||
+                           (entryData['otherImages'] != null && (entryData['otherImages'] as List).isNotEmpty) ||
+                           (entryData['beforeImages'] != null && (entryData['beforeImages'] as List).isNotEmpty) ||
+                           (entryData['afterImages'] != null && (entryData['afterImages'] as List).isNotEmpty);
+          final hasStatus = entryData['status'] != null;
+
+          final hasContent = hasNotes || hasImages || hasStatus;
+
+          if (!hasContent) {
+            print('Skipping empty subphase entry ${entry.id}');
+            continue;
+          }
+
+          print('Including subphase entry ${entry.id} with content: notes=$hasNotes, images=$hasImages, status=$hasStatus');
+          final entryWithMeta = {
+            'id': entry.id,
+            ...entryData,
+            'subphaseId': subphaseId,
+            'subphaseName': subphaseName,
+            'collectionType': 'sub_phase',
+          };
+          subphaseEntries.add(entryWithMeta);
+          
+          // تجميع الصور من الإدخال
+          _extractImagesFromEntry(entryData, imagesData);
+        }
+        
+        // إضافة المرحلة الفرعية مع إدخالاتها
+        phasesData.add({
+          'id': subphaseId,
+          'name': subphaseName,
+          'entries': subphaseEntries,
+          'entryCount': subphaseEntries.length,
+          'isSubphase': true,
+        });
       }
       
       // تجميع بيانات الاختبارات
@@ -212,10 +347,16 @@ class ReportSnapshotManager {
           .collection('tests_status')
           .get();
       
+      print('Found ${testsSnapshot.docs.length} tests');
+      
       for (final testDoc in testsSnapshot.docs) {
         final data = testDoc.data();
         if (_isInDateRange(data['lastUpdatedAt'], startDate, endDate)) {
-          testsData.add(data);
+          testsData.add({
+            'id': testDoc.id,
+            ...data,
+            'collectionType': 'test',
+          });
         }
       }
       
@@ -225,28 +366,79 @@ class ReportSnapshotManager {
           .where('projectId', isEqualTo: projectId)
           .get();
       
+      print('Found ${materialsSnapshot.docs.length} material requests');
+      
       for (final materialDoc in materialsSnapshot.docs) {
         final data = materialDoc.data();
         if (_isInDateRange(data['requestedAt'], startDate, endDate)) {
-          materialsData.add(data);
+          materialsData.add({
+            'id': materialDoc.id,
+            ...data,
+            'collectionType': 'material_request',
+          });
         }
       }
       
+      final totalEntries = phasesData.fold<int>(0, (sum, phase) => sum + (phase['entryCount'] as int? ?? 0));
+      
+      print('Snapshot built - Phases: ${phasesData.length}, Entries: $totalEntries, Tests: ${testsData.length}, Materials: ${materialsData.length}, Images: ${imagesData.length}');
+      
       return {
+        'version': 2,
+        'projectId': projectId,
         'phasesData': phasesData,
         'testsData': testsData,
         'materialsData': materialsData,
         'imagesData': imagesData,
+        'summaryStats': {
+          'totalEntries': totalEntries,
+          'totalImages': imagesData.length,
+          'totalTests': testsData.length,
+          'totalRequests': materialsData.length,
+          'lastUpdated': Timestamp.now(),
+        },
         'reportMetadata': {
           'generatedAt': Timestamp.now(),
+          'startDate': startDate,
+          'endDate': endDate,
           'isFullReport': startDate == null && endDate == null,
-          'totalDataSize': phasesData.length + testsData.length + materialsData.length,
+          'totalDataSize': totalEntries + testsData.length + materialsData.length,
+          'imageCount': imagesData.length,
+          'entryCount': totalEntries,
+          'testCount': testsData.length,
+          'requestCount': materialsData.length,
         },
       };
       
     } catch (e) {
       print('Error building snapshot locally: $e');
       return null;
+    }
+  }
+
+  /// استخراج الصور من إدخال معين
+  static void _extractImagesFromEntry(Map<String, dynamic> entryData, List<Map<String, dynamic>> imagesData) {
+    try {
+      // دعم أشكال مختلفة من حقول الصور
+      final imageFields = ['imageUrls', 'otherImages', 'otherImageUrls', 'beforeImageUrls', 'beforeImages', 'afterImageUrls', 'afterImages'];
+      
+      for (final field in imageFields) {
+        final urls = entryData[field] as List?;
+        if (urls != null) {
+          for (final url in urls) {
+            if (url != null && url.toString().isNotEmpty) {
+              imagesData.add({
+                'url': url.toString(),
+                'field': field,
+                'entryId': entryData['id'],
+                'timestamp': entryData['timestamp'],
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error extracting images from entry: $e');
     }
   }
   
@@ -410,9 +602,10 @@ static Map<String, dynamic> _createEmptySnapshot(DateTime? startDate, DateTime? 
       'isFullReport': startDate == null && endDate == null,
       'totalDataSize': 0,
       'isEmpty': true,
-      'generatedAt': DateTime.now().toIso8601String(), // تحويل إلى string لتجنب مشكلة Timestamp
     },
   };
 }
+
+
 
 }

@@ -110,13 +110,39 @@ class InstantPdfGenerator {
             }
           }
           
-          // تجميع URLs الصور
+          // تجميع URLs الصور - دعم الهياكل القديمة والجديدة
           final images = entry['images'] as List? ?? [];
+          final imageUrlsList = entry['imageUrls'] as List? ?? 
+                               entry['otherImages'] as List? ?? 
+                               entry['otherImageUrls'] as List? ?? [];
+          final beforeUrls = entry['beforeImageUrls'] as List? ?? 
+                            entry['beforeImages'] as List? ?? [];
+          final afterUrls = entry['afterImageUrls'] as List? ?? 
+                           entry['afterImages'] as List? ?? [];
+          
+          // معالجة الصور من الحقل images القديم
           for (final image in images) {
             if (image is String && image.isNotEmpty) {
               imageUrls.add(image);
             } else if (image is Map && image['url'] != null) {
               imageUrls.add(image['url'].toString());
+            }
+          }
+          
+          // معالجة الصور من الحقول الجديدة
+          for (final url in imageUrlsList) {
+            if (url is String && url.isNotEmpty) {
+              imageUrls.add(url);
+            }
+          }
+          for (final url in beforeUrls) {
+            if (url is String && url.isNotEmpty) {
+              imageUrls.add(url);
+            }
+          }
+          for (final url in afterUrls) {
+            if (url is String && url.isNotEmpty) {
+              imageUrls.add(url);
             }
           }
         }

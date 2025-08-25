@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import '../../utils/hybrid_image_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../theme/app_constants.dart';
@@ -139,44 +140,17 @@ class _AddPhaseEntryPageState extends State<AddPhaseEntryPage> {
   Future<List<String>> _uploadImages(List<XFile> images, String folder) async {
     if (images.isEmpty) return [];
     
-    List<String> uploadedUrls = [];
-    int totalImages = images.length;
-    int uploadedCount = 0;
-    
-    for (int i = 0; i < images.length; i++) {
-      try {
-        final file = File(images[i].path);
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
-        final ref = FirebaseStorage.instance
-            .ref()
-            .child('projects/${widget.projectId}/$folder/$fileName');
-        
-        final uploadTask = ref.putFile(file);
-        
-        // مراقبة تقدم الرفع
-        uploadTask.snapshotEvents.listen((snapshot) {
-          final progress = (snapshot.bytesTransferred / snapshot.totalBytes) * (1 / totalImages);
-          setState(() {
-            _uploadProgress = (uploadedCount / totalImages) + progress;
-          });
-        });
-        
-        final snapshot = await uploadTask;
-        final downloadUrl = await snapshot.ref.getDownloadURL();
-        uploadedUrls.add(downloadUrl);
-        uploadedCount++;
-        
+    // استخدام الخدمة الهجينة الجديدة للرفع إلى الاستضافة الخاصة
+    return await HybridImageService.uploadImagesWithProgress(
+      images,
+      widget.projectId,
+      folder,
+      (progress) {
         setState(() {
-          _uploadProgress = uploadedCount / totalImages;
+          _uploadProgress = progress;
         });
-        
-      } catch (e) {
-        print('Error uploading image $i: $e');
-        // الاستمرار مع الصور الأخرى
-      }
-    }
-    
-    return uploadedUrls;
+      },
+    );
   }
 
   Future<void> _saveEntry() async {
@@ -196,10 +170,31 @@ class _AddPhaseEntryPageState extends State<AddPhaseEntryPage> {
     });
     
     try {
-      // رفع الصور
+      // رفع الصور مع تحديث الحالة
+      setState(() {
+        _uploadProgress = 0.1;
+      });
+      
       final beforeUrls = await _uploadImages(_selectedBeforeImages, 'before_images');
+      print('Before images uploaded: ${beforeUrls.length}');
+      
+      setState(() {
+        _uploadProgress = 0.4;
+      });
+      
       final afterUrls = await _uploadImages(_selectedAfterImages, 'after_images');
+      print('After images uploaded: ${afterUrls.length}');
+      
+      setState(() {
+        _uploadProgress = 0.7;
+      });
+      
       final otherUrls = await _uploadImages(_selectedOtherImages, 'other_images');
+      print('Other images uploaded: ${otherUrls.length}');
+      
+      setState(() {
+        _uploadProgress = 0.9;
+      });
       
       // حفظ البيانات في Firestore
       final entriesCollectionPath = widget.subPhaseId == null
@@ -208,9 +203,9 @@ class _AddPhaseEntryPageState extends State<AddPhaseEntryPage> {
       
       final entryData = {
         'note': _noteController.text.trim(),
-        'beforeImageUrls': beforeUrls,  // تغيير من 'beforeImages'
-        'afterImageUrls': afterUrls,    // تغيير من 'afterImages'
-        'otherImageUrls': otherUrls,    // تغيير من 'otherImages'
+        'beforeImageUrls': beforeUrls,  // توحيد الأسماء
+        'afterImageUrls': afterUrls,    // توحيد الأسماء
+        'imageUrls': otherUrls,         // استخدام imageUrls للصور الإضافية
         'employeeId': _selectedEmployeeId,
         'employeeName': _selectedEmployeeName,
         'timestamp': FieldValue.serverTimestamp(),
@@ -222,21 +217,44 @@ class _AddPhaseEntryPageState extends State<AddPhaseEntryPage> {
           .collection(entriesCollectionPath)
           .add(entryData);
       
+      print('Entry saved to Firestore with data: $entryData');
+      
+      setState(() {
+        _uploadProgress = 1.0;
+      });
+      
       // إرسال إشعار للعميل
       await _sendClientNotification(beforeUrls, afterUrls, otherUrls);
       
       if (mounted) {
         Navigator.pop(context, true);
-        _showSuccessSnackBar('تمت إضافة الإدخال بنجاح');
+        _showSuccessSnackBar('تمت إضافة الإدخال بنجاح - تم رفع ${beforeUrls.length + afterUrls.length + otherUrls.length} صورة');
       }
       
     } catch (e) {
-      _showErrorSnackBar('فشل في حفظ الإدخال: $e');
+      print('Error saving entry: $e');
+      _showErrorSnackBar('فشل في حفظ الإدخال: ${e.toString().contains('network') ? 'تحقق من الاتصال بالإنترنت' : 'خطأ في الخادم'}');
     } finally {
       setState(() {
         _isUploading = false;
         _uploadProgress = 0.0;
       });
+    }
+  }
+
+  String _getUploadStatusText() {
+    if (_uploadProgress < 0.1) {
+      return 'جاري التحضير...';
+    } else if (_uploadProgress < 0.4) {
+      return 'جاري رفع الصور قبل... ${(_uploadProgress * 100).toInt()}%';
+    } else if (_uploadProgress < 0.7) {
+      return 'جاري رفع الصور بعد... ${(_uploadProgress * 100).toInt()}%';
+    } else if (_uploadProgress < 0.9) {
+      return 'جاري رفع الصور الإضافية... ${(_uploadProgress * 100).toInt()}%';
+    } else if (_uploadProgress < 1.0) {
+      return 'جاري حفظ البيانات... ${(_uploadProgress * 100).toInt()}%';
+    } else {
+      return 'تم الانتهاء! 100%';
     }
   }
 
@@ -622,7 +640,7 @@ class _AddPhaseEntryPageState extends State<AddPhaseEntryPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'جاري رفع الصور... ${(_uploadProgress * 100).toInt()}%',
+                    _getUploadStatusText(),
                     style: TextStyle(
                       color: AppConstants.textSecondary,
                       fontSize: 12,

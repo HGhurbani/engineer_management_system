@@ -31,6 +31,7 @@ import 'package:engineer_management_system/pages/engineer/project_details_page.d
     show ProjectDetailsPage;
 import 'package:engineer_management_system/pages/admin/admin_settings_page.dart';
 import 'package:engineer_management_system/pages/admin/admin_holiday_settings_page.dart';
+import 'package:engineer_management_system/pages/admin/admin_snapshot_rebuild_page.dart';
 import 'package:engineer_management_system/pages/engineer/request_material_page.dart';
 import 'package:engineer_management_system/pages/engineer/meeting_logs_page.dart';
 import 'package:engineer_management_system/pages/engineer/images_viewer_page.dart';
@@ -48,6 +49,7 @@ import 'package:engineer_management_system/utils/concurrent_operations_manager.d
 import 'package:engineer_management_system/utils/performance_monitor.dart';
 import 'package:engineer_management_system/utils/firebase_manager.dart';
 import 'package:engineer_management_system/utils/advanced_cache_manager.dart';
+import 'package:engineer_management_system/utils/smart_report_cache_manager.dart';
 import 'package:engineer_management_system/utils/advanced_report_manager.dart';
 import 'utils/instant_image_cache.dart';
 
@@ -139,6 +141,9 @@ void main() async {
   
   // تهيئة نظام الكاش المتقدم
   await AdvancedCacheManager.initialize();
+  
+  // تهيئة نظام التخزين المؤقت الذكي للتقارير
+  await SmartReportCacheManager.initialize();
   
   // إضافة إدارة الذاكرة
   if (kIsWeb) {
@@ -337,6 +342,7 @@ class MyApp extends StatelessWidget {
         '/admin/daily_schedule': (context) => const AdminDailySchedulePage(),
         '/admin/settings': (context) => const AdminSettingsPage(),
         '/admin/holiday_settings': (context) => const AdminHolidaySettingsPage(),
+        '/admin/snapshot-rebuild': (context) => const AdminSnapshotRebuildPage(),
         '/admin/attendance': (context) => const AdminAttendancePage(),
         '/admin/attendance_report': (context) => const AdminAttendanceReportPage(),
         '/notifications': (context) => const NotificationsPage(),
