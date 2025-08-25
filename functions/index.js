@@ -1,5 +1,7 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const PdfKit = require('pdfkit');
+const axios = require('axios');
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -8,6 +10,57 @@ const db = admin.firestore();
 const bucket = admin.storage().bucket();
 
 const SNAPSHOT_VERSION = 2; // تحديث الإصدار
+
+// توليد ملف PDF على الخادم من مجموعة من روابط الصور
+exports.generatePdfReport = functions.https.onCall(async (data, context) => {
+  const images = data.images || [];
+  if (!Array.isArray(images) || images.length === 0) {
+    return { error: 'No images provided' };
+  }
+
+  const doc = new PdfKit({ autoFirstPage: false });
+  const buffers = [];
+  doc.on('data', buffers.push.bind(buffers));
+
+  return new Promise(async (resolve, reject) => {
+    doc.on('end', async () => {
+      try {
+        const pdfBuffer = Buffer.concat(buffers);
+        const fileName = `reports/server_report_${Date.now()}.pdf`;
+        const file = bucket.file(fileName);
+        await file.save(pdfBuffer, { contentType: 'application/pdf' });
+        const [url] = await file.getSignedUrl({
+          action: 'read',
+          expires: Date.now() + 3600 * 1000,
+        });
+        resolve({ url });
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    for (const url of images) {
+      try {
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const img = doc.openImage(response.data);
+        doc.addPage({ size: 'A4' });
+        const pageWidth = doc.page.width;
+        const pageHeight = doc.page.height;
+        const scale = Math.min(pageWidth / img.width, pageHeight / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        doc.image(img, (pageWidth - w) / 2, (pageHeight - h) / 2, {
+          width: w,
+          height: h,
+        });
+      } catch (e) {
+        console.error('Error processing image', e);
+      }
+    }
+
+    doc.end();
+  });
+});
 
 async function buildReportSnapshot(projectId, startDate = null, endDate = null) {
   try {
