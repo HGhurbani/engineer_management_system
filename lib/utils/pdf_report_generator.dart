@@ -1340,12 +1340,21 @@ import 'advanced_image_cache_manager.dart';
       return pw.Container(
         width: double.infinity,
         alignment: pw.Alignment.topRight,
-        child: pw.Directionality(
+          child: pw.Directionality(
           textDirection: pw.TextDirection.rtl,
           child: pw.GridView(
             crossAxisCount: 3,
             crossAxisSpacing: 6,
             mainAxisSpacing: 6,
+            // GridView in the pdf package requires either a bounded height
+            // or a fixed childAspectRatio. Without this, generating a report
+            // fails with an assertion because the grid's dimensions can't be
+            // calculated when both the height constraints and aspect ratio are
+            // infinite. We approximate each grid tile as a square image with a
+            // small caption underneath, so we set an aspect ratio slightly
+            // smaller than 1 to leave room for the caption. This keeps the
+            // layout stable and prevents the runtime error.
+            childAspectRatio: size / (size + 20),
             children: List.generate(urls.length, (index) {
               final url = urls[index];
               return pw.Builder(builder: (context) {
